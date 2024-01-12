@@ -10,3 +10,4 @@ metadata:
   name: metric-sample
 spec:
   # TODO(user): Add fields here
+  label: cloud-orchestration

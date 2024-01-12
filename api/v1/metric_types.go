@@ -29,7 +29,15 @@ type MetricSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Metric. Edit metric_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Foo  string `json:"foo,omitempty"`
+	Name string `json:"name,omitempty"`
+
+	// +optional
+	Kind string `json:"kind,omitempty"`
+	// +optional
+	LabelSelector string `json:"labelSelector,omitempty"`
+	// +optional
+	FieldSelector string `json:"fieldSelector,omitempty"`
 }
 
 // MetricStatus defines the observed state of Metric
