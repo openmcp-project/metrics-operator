@@ -18,8 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	dynclient "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -27,10 +33,17 @@ import (
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 )
 
+const (
+	cDynatraceUrl string = "https://apm.cf.eu10.hana.ondemand.com/e/089d8509-cd61-4dbf-a85b-0bdd12ee1f16/api/v2"
+	// needs to be set
+	cDynatraceApiToken string = "..."
+)
+
 // MetricReconciler reconciles a Metric object
 type MetricReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	DynamicClient dynamic.Interface
 }
 
 //+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=metrics,verbs=get;list;watch;create;update;patch;delete
@@ -48,10 +61,40 @@ type MetricReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	metric := businessv1.Metric{}
+	err := r.Client.Get(ctx, req.NamespacedName, &metric)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	// TODO(user): your logic here
+	//TODO: create based on referenced configuration CRD and its secret
+	dynPocClient := dynclient.NewDynatraceClientPoc(cDynatraceUrl, cDynatraceApiToken)
 
-	return ctrl.Result{}, nil
+	metricValue, err := r.collectResourcesByGroupVersionKind(ctx, metric.Spec.Group, metric.Spec.Version, metric.Spec.Kind)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	dynPocClient.PostMetric(ctx, metric.Spec.Kind, metric.Spec.Group, metric.Spec.Version, metricValue)
+
+	//TODO: needs to requeue
+	return ctrl.Result{
+		RequeueAfter: time.Duration(1) * time.Minute,
+	}, nil
+}
+
+func (r *MetricReconciler) collectResourcesByGroupVersionKind(ctx context.Context, group string, version string, kind string) (int, error) {
+	list, err := r.DynamicClient.Resource(
+		schema.GroupVersionResource{
+			Group:    group,
+			Version:  version,
+			Resource: kind,
+		},
+	).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("Could not find resources from metric")
+	}
+	return len(list.Items), nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -40,11 +40,15 @@ spec:
                 description: Foo is an example field of Metric. Edit metric_types.go
                   to remove/update
                 type: string
+              group:
+                type: string
               kind:
                 type: string
               labelSelector:
                 type: string
               name:
+                type: string
+              version:
                 type: string
             type: object
           status:

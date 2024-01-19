@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	"k8s.io/client-go/dynamic"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -89,13 +90,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.MetricReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Metric")
-		os.Exit(1)
-	}
+	setupMetricController(mgr)
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -112,4 +108,26 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func setupMetricController(mgr ctrl.Manager) {
+	dynamicClient, err := createDynamicClient(mgr)
+	if err != nil {
+		setupLog.Error(err, "unable to generate dynamic client")
+		os.Exit(1)
+	}
+
+	if err := (&controller.MetricReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		DynamicClient: dynamicClient,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Metric")
+		os.Exit(1)
+	}
+}
+
+func createDynamicClient(mgr ctrl.Manager) (*dynamic.DynamicClient, error) {
+	config := mgr.GetConfig()
+	return dynamic.NewForConfig(config)
 }

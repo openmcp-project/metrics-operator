@@ -35,6 +35,10 @@ type MetricSpec struct {
 	// +optional
 	Kind string `json:"kind,omitempty"`
 	// +optional
+	Group string `json:"group,omitempty"`
+	// +optional
+	Version string `json:"version,omitempty"`
+	// +optional
 	LabelSelector string `json:"labelSelector,omitempty"`
 	// +optional
 	FieldSelector string `json:"fieldSelector,omitempty"`

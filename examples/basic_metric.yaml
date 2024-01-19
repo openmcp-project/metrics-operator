@@ -1,0 +1,8 @@
+apiVersion: business.orchestrate.cloud.sap/v1
+kind: Metric
+metadata:
+  name: basic-metric
+spec:
+  kind: subaccounts
+  group: account.btp.orchestrate.cloud.sap
+  version: v1alpha1
