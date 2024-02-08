@@ -7,6 +7,32 @@ rules:
 - apiGroups:
   - business.orchestrate.cloud.sap
   resources:
+  - managedmetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - business.orchestrate.cloud.sap
+  resources:
+  - managedmetrics/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - business.orchestrate.cloud.sap
+  resources:
+  - managedmetrics/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - business.orchestrate.cloud.sap
+  resources:
   - metrics
   verbs:
   - create

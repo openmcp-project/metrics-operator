@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.12.0
-  name: metrics.business.orchestrate.cloud.sap
+  name: managedmetrics.business.orchestrate.cloud.sap
 spec:
   group: business.orchestrate.cloud.sap
   names:
-    kind: Metric
-    listKind: MetricList
-    plural: metrics
-    singular: metric
+    kind: ManagedMetric
+    listKind: ManagedMetricList
+    plural: managedmetrics
+    singular: managedmetric
   scope: Namespaced
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: Metric is the Schema for the metrics API
+        description: ManagedMetric is the Schema for the managedmetrics API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -32,7 +32,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: MetricSpec defines the desired state of Metric
+            description: ManagedMetricSpec defines the desired state of ManagedMetric
             properties:
               description:
                 description: Sets the description that will be used to identify the
@@ -68,7 +68,7 @@ spec:
                 type: string
             type: object
           status:
-            description: MetricStatus defines the observed state of ManagedMetric
+            description: ManagedMetricStatus defines the observed state of ManagedMetric
             properties:
               active:
                 description: Is set when Metric is Successfully executed and keeps

@@ -1,4 +1,6 @@
 ## Append samples of your project ##
 resources:
 - business_v1_metric.yaml
+- business_v1_managedmetric.yaml
+- business_v1_clientconfig.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

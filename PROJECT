@@ -17,4 +17,12 @@ resources:
   kind: Metric
   path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1
   version: v1
-version: "3"
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: orchestrate.cloud.sap
+  group: business
+  kind: ManagedMetric
+  path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1
+  version: v1

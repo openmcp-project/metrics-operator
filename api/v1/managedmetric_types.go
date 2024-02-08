@@ -20,19 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +kubebuilder:validation:Enum=Enabled;Disabled
-type ActivationType string
-
-const (
-	ActivationEnabled  ActivationType = "Enabled"
-	ActivationDisabled ActivationType = "Disabled"
-)
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// MetricSpec defines the desired state of Metric
-type MetricSpec struct {
+// ManagedMetricSpec defines the desired state of ManagedMetric
+type ManagedMetricSpec struct {
 	// Sets the name that will be used to identify the metric in Dynatrace(or other providers)
 	Name string `json:"name,omitempty"`
 	// Sets the description that will be used to identify the metric in Dynatrace(or other providers)
@@ -56,8 +45,8 @@ type MetricSpec struct {
 	Frequency int `json:"frequency,omitempty"`
 }
 
-// MetricStatus defines the observed state of ManagedMetric
-type MetricStatus struct {
+// ManagedMetricStatus defines the observed state of ManagedMetric
+type ManagedMetricStatus struct {
 	// Is set when Metric is Successfully executed and keeps track of the current cycle.
 	// The cycle starts anew and the status will be set to active if execution was successfull
 	// +optional
@@ -67,24 +56,24 @@ type MetricStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Metric is the Schema for the metrics API
-type Metric struct {
+// ManagedMetric is the Schema for the managedmetrics API
+type ManagedMetric struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MetricSpec   `json:"spec,omitempty"`
-	Status MetricStatus `json:"status,omitempty"`
+	Spec   ManagedMetricSpec   `json:"spec,omitempty"`
+	Status ManagedMetricStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// MetricList contains a list of Metric
-type MetricList struct {
+// ManagedMetricList contains a list of ManagedMetric
+type ManagedMetricList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Metric `json:"items"`
+	Items           []ManagedMetric `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Metric{}, &MetricList{})
+	SchemeBuilder.Register(&ManagedMetric{}, &ManagedMetricList{})
 }

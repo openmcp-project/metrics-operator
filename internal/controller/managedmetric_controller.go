@@ -22,37 +22,43 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 	orchestrator "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric-orchestrator"
 )
 
-// MetricReconciler reconciles a Metric object
-type MetricReconciler struct {
+// ManagedMetricReconciler reconciles a ManagedMetric object
+type ManagedMetricReconciler struct {
 	client.Client
 	RestConfig         *rest.Config
 	Scheme             *runtime.Scheme
+	DynamicClient      dynamic.Interface
 	MetricOrchestrator orchestrator.MetricOrchestrator
 }
 
-//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=metrics,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=metrics/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=metrics/finalizers,verbs=update
+//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=managedmetrics/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=managedmetrics/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
-func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
+func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	freq, err := r.handleCountMetric(ctx, req)
+	freq, err := r.handleManagedMetric(ctx, req)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(freq*2) * time.Minute}, err
+		return ctrl.Result{
+			Requeue:      true,
+			RequeueAfter: time.Duration(1) * time.Minute,
+		}, err
 	}
 
 	fmt.Printf("%s	INFO	Requeued for Execution in %v Minutes\n", time.Now().UTC().Format("2006-01-02T15:04:05+01:00"), freq)
@@ -62,14 +68,17 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}, nil
 }
 
-func (r *MetricReconciler) handleCountMetric(ctx context.Context, req ctrl.Request) (int, error) {
+func (r *ManagedMetricReconciler) handleManagedMetric(ctx context.Context, req ctrl.Request) (int, error) {
+	var status businessv1.ActivationType
 	var err error
+
 	r.MetricOrchestrator, err = orchestrator.NewMetricOrchestrator(ctx, req, r.Client, r.RestConfig)
 	if err != nil {
 		return -1, err
 	}
 
-	frequency, status, err := r.MetricOrchestrator.OrchestrateGenericMetric()
+	frequency, status, err := r.MetricOrchestrator.OrchestrateManagedMetric()
+
 	// check and return Metric
 	if err != nil || status == businessv1.ActivationDisabled {
 		return -1, err
@@ -79,8 +88,8 @@ func (r *MetricReconciler) handleCountMetric(ctx context.Context, req ctrl.Reque
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ManagedMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&businessv1.Metric{}).
+		For(&businessv1.ManagedMetric{}).
 		Complete(r)
 }

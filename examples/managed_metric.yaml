@@ -1,10 +1,10 @@
 apiVersion: business.orchestrate.cloud.sap/v1
-kind: Metric
+kind: ManagedMetric
 metadata:
-  name: basic-metric
+  name: managed-metric
 spec:
-  name: Pods Metric
-  description: Pods metric created by an Operator
+  name: Status Metric
+  description: Status metric created by an Operator
   kind: objects
   group: kubernetes.crossplane.io
   version: v1alpha2

@@ -20,7 +20,6 @@ import (
 	"flag"
 	"os"
 
-	"k8s.io/client-go/dynamic"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -31,9 +30,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/controller"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -46,6 +47,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(businessv1.AddToScheme(scheme))
+
+	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -68,8 +71,7 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Metrics:                server.Options{BindAddress: metricsAddr},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "82620e19.orchestrate.cloud.sap",
@@ -92,6 +94,7 @@ func main() {
 
 	setupMetricController(mgr)
 
+	setupManagedMetricController(mgr)
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -111,23 +114,25 @@ func main() {
 }
 
 func setupMetricController(mgr ctrl.Manager) {
-	dynamicClient, err := createDynamicClient(mgr)
-	if err != nil {
-		setupLog.Error(err, "unable to generate dynamic client")
-		os.Exit(1)
-	}
 
 	if err := (&controller.MetricReconciler{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		DynamicClient: dynamicClient,
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		RestConfig: mgr.GetConfig(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Metric")
 		os.Exit(1)
 	}
 }
 
-func createDynamicClient(mgr ctrl.Manager) (*dynamic.DynamicClient, error) {
-	config := mgr.GetConfig()
-	return dynamic.NewForConfig(config)
+func setupManagedMetricController(mgr ctrl.Manager) {
+
+	if err := (&controller.ManagedMetricReconciler{
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		RestConfig: mgr.GetConfig(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ManagedMetric")
+		os.Exit(1)
+	}
 }

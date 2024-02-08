@@ -24,3 +24,7 @@ Dockerfile.cross
 *.swp
 *.swo
 *~
+
+# exclude secret
+examples/sample_secret.yaml
+examples/dynatrace_secret.yaml
