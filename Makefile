@@ -53,6 +53,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=cmd/embedded/crds
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -145,6 +146,7 @@ $(LOCALBIN):
 
 ## Tool Binaries
 KUBECTL ?= kubectl
+KIND ?= kind # fix this to use tools
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
@@ -181,6 +183,14 @@ $(GOTESTSUM): $(LOCALBIN)
 
 
 ### ------------------------------------ DEVELOPMENT - LOCAL ------------------------------------ ###
+
+.PHONY: dev-deploy
+dev-deploy: manifests kustomize dev-clean
+	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
+
 .PHONY: dev-build
 dev-build: docker-build
 	@echo "Finished building docker image" ${IMG}
@@ -192,10 +202,6 @@ dev-base: manifests kustomize dev-build dev-clean dev-cluster helm-install-local
 dev-cluster:
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
-
-.PHONY: helm-install-local
-helm-install-local:
-	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
 
 .PHONY: dev-local
 dev-local:
@@ -229,8 +235,9 @@ helm-chart: helm-templates
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/values.yaml.tpl > charts/$(PROJECT_FULL_NAME)/values.yaml
 
 .PHONY: helm-install-local
-helm-install-local:
+helm-install-local: docker-build
 	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
+	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
 
 .PHONY: helm-templates
 helm-templates:

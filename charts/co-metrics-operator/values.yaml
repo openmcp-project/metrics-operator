@@ -1,4 +1,4 @@
-# Default values for co-metrics-workspace-operator.
+# Default values for co-metrics-operator.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -63,7 +63,7 @@ podAnnotations: {}
 podLabels: {}
 
 podSecurityContext: {}
-# fsGroup: 2000
+  # fsGroup: 2000
 
 securityContext:
   runAsNonRoot: true
@@ -79,7 +79,7 @@ resources: {}
   #   memory: 128Mi
   # requests:
   #   cpu: 100m
-#   memory: 128Mi
+  #   memory: 128Mi
 
 crds:
   manage: true
@@ -106,7 +106,10 @@ webhooks:
 
 rbac:
   clusterRole:
-    rules: []
+    rules:
+      - apiGroups: ["business.orchestrate.cloud.sap"]
+        resources: ["*"]
+        verbs: ["*"]
   role:
     rules: []
 

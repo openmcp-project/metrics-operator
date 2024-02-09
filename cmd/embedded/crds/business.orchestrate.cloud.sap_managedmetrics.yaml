@@ -1,0 +1,86 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.0
+  name: managedmetrics.business.orchestrate.cloud.sap
+spec:
+  group: business.orchestrate.cloud.sap
+  names:
+    kind: ManagedMetric
+    listKind: ManagedMetricList
+    plural: managedmetrics
+    singular: managedmetric
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ManagedMetric is the Schema for the managedmetrics API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ManagedMetricSpec defines the desired state of ManagedMetric
+            properties:
+              description:
+                description: Sets the description that will be used to identify the
+                  metric in Dynatrace(or other providers)
+                type: string
+              fieldSelector:
+                description: Define fields of your object to adapt filters of the
+                  query
+                type: string
+              frequency:
+                default: 720
+                description: 'Define in what interval the query should be recorded
+                  (in minutes) # min: 1'
+                type: integer
+              group:
+                description: Define the group of your object that should be instrumented
+                  (without version at the end)
+                type: string
+              kind:
+                description: Decide which kind the metric should keep track of (needs
+                  to be plural version)
+                type: string
+              labelSelector:
+                description: Define labels of your object to adapt filters of the
+                  query
+                type: string
+              name:
+                description: Sets the name that will be used to identify the metric
+                  in Dynatrace(or other providers)
+                type: string
+              version:
+                description: Define version of the object you want to intrsument
+                type: string
+            type: object
+          status:
+            description: ManagedMetricStatus defines the observed state of ManagedMetric
+            properties:
+              active:
+                description: Is set when Metric is Successfully executed and keeps
+                  track of the current cycle. The cycle starts anew and the status
+                  will be set to active if execution was successfull
+                enum:
+                - Enabled
+                - Disabled
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -17,12 +17,15 @@ limitations under the License.
 package main
 
 import (
+	"context"
+	"embed"
 	"flag"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,12 +38,24 @@ import (
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/controller"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"github.tools.sap/cloud-orchestration/controller-utils/api"
+	"github.tools.sap/cloud-orchestration/controller-utils/init/crds"
+	"github.tools.sap/cloud-orchestration/controller-utils/init/webhooks"
 	//+kubebuilder:scaffold:imports
 )
+
+var _ = api.Target{}
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+
+	//go:embed embedded/crds
+	crdFiles embed.FS
+
+	crdFlags      = crds.BindFlags(flag.CommandLine)
+	webhooksFlags = webhooks.BindFlags(flag.CommandLine)
 )
 
 func init() {
@@ -52,23 +67,78 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+func runInit(setupClient client.Client) {
+	initContext := context.Background()
+
+	if webhooksFlags.Install {
+		// Generate webhook certificate
+		if err := webhooks.GenerateCertificate(initContext, setupClient, webhooksFlags.CertOptions...); err != nil {
+			setupLog.Error(err, "unable to generate webhook certificates")
+			os.Exit(1)
+		}
+
+		// Install webhooks
+		err := webhooks.Install(
+			initContext,
+			setupClient,
+			scheme,
+			[]client.Object{
+				&businessv1.Metric{},
+				&businessv1.ManagedMetric{},
+			},
+			webhooksFlags.InstallOptions...,
+		)
+		if err != nil {
+			setupLog.Error(err, "unable to configure webhooks")
+			os.Exit(1)
+		}
+	}
+
+	if crdFlags.Install {
+		// Install CRDs
+		if err := crds.Install(initContext, setupClient, crdFiles, crdFlags.InstallOptions...); err != nil {
+			setupLog.Error(err, "unable to install Custom Resource Definitions")
+			os.Exit(1)
+		}
+	}
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
+
+	// skip os.Args[1] which is the command (start or init)
+	err := flag.CommandLine.Parse(os.Args[2:])
+	if err != nil {
+		setupLog.Error(err, "unable to parse arguments for main method")
+		return
+	}
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	config := ctrl.GetConfigOrDie()
+	setupClient, err := client.New(config, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Error(err, "unable to create setup client")
+		os.Exit(1)
+	}
+
+	if os.Args[1] == "init" {
+		runInit(setupClient)
+		return
+	}
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                server.Options{BindAddress: metricsAddr},
