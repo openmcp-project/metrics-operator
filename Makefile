@@ -1,6 +1,12 @@
 
+
+PROJECT_NAME := co-metrics
+PROJECT_FULL_NAME := co-metrics-operator
+
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG_VERSION ?= dev
+IMG_BASE ?= $(PROJECT_FULL_NAME)
+IMG ?= $(IMG_BASE):$(IMG_VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.27.1
 
@@ -74,11 +80,16 @@ build: manifests generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go
 
+.PHONY: build-docker-binary
+build-docker-binary: manifests generate fmt vet ## Build manager binary.
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o bin/manager-linux.amd64 cmd/main.go
+
+
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
+docker-build: build-docker-binary test ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
@@ -137,6 +148,7 @@ KUBECTL ?= kubectl
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
+GOTESTSUM ?= $(LOCALBIN)/gotestsum
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.0.1
@@ -161,3 +173,67 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+.PHONY: gotestsum
+gotestsum: $(GOTESTSUM) ## Download gotestsum locally if necessary.
+$(GOTESTSUM): $(LOCALBIN)
+	test -s $(LOCALBIN)/gotestsum || GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@latest
+
+
+### ------------------------------------ DEVELOPMENT - LOCAL ------------------------------------ ###
+.PHONY: dev-build
+dev-build: docker-build
+	@echo "Finished building docker image" ${IMG}
+
+.PHONY: dev-base
+dev-base: manifests kustomize dev-build dev-clean dev-cluster helm-install-local
+
+.PHONY: dev-cluster
+dev-cluster:
+	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
+	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
+
+.PHONY: helm-install-local
+helm-install-local:
+	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
+
+.PHONY: dev-local
+dev-local:
+	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
+	$(MAKE) install
+	$(MAKE) create-crate-secret
+
+.PHONY: dev-clean
+dev-clean:
+	$(KIND) delete cluster --name=$(PROJECT_FULL_NAME)-dev
+
+.PHONY: dev-run
+dev-run:
+	## todo: add flag --debug
+	go run ./cmd/main.go
+
+.PHONY: lint
+lint:
+	golangci-lint run ./...
+
+.PHONY: lint-fix
+lint-fix:
+	golangci-lint run --fix
+
+### ------------------------------------ HELM ------------------------------------ ###
+
+
+.PHONY: helm-chart
+helm-chart: helm-templates
+	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/Chart.yaml.tpl > charts/$(PROJECT_FULL_NAME)/Chart.yaml
+	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/values.yaml.tpl > charts/$(PROJECT_FULL_NAME)/values.yaml
+
+.PHONY: helm-install-local
+helm-install-local:
+	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
+
+.PHONY: helm-templates
+helm-templates:
+	rm -rf charts/$(PROJECT_FULL_NAME)/templates
+	git clone --depth=1 https://github.tools.sap/cloud-orchestration/operator-helm-templates.git charts/$(PROJECT_FULL_NAME)/templates
+	rm -rf charts/$(PROJECT_FULL_NAME)/templates/.git

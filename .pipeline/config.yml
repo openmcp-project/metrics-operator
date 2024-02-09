@@ -1,0 +1,36 @@
+general:
+  buildTool: 'golang'
+
+  repository: &REPOSITORY_NAME 'co-metrics-operator'
+
+  vaultPath: 'piper/PIPELINE-GROUP-2442'
+  vaultBasePath: 'piper/PIPELINE-GROUP-2442'
+  vaultPipelineName: 'PIPELINE-32588'
+  vaultServerUrl: 'https://vault.tools.sap'
+  vaultNamespace: 'ies/hyperspace/pipelines'
+
+stages:
+  Build:
+    hadolintExecute: false
+    kanikoExecute: true
+    helmExecute: true
+steps:
+  artifactPrepareVersion:
+    versioningType: library
+  kanikoExecute:
+    containerImageName: 'cloud-orchestration/co-metrics-operator'
+  dockerExecute:
+    dockerImage: 'debian:stable'
+  golangBuild:
+    privateModules: 'github.tools.sap/*'
+    dockerImage: &GOLANG_BUILDER 'golang:1.21'
+    output: bin/manager
+    packages:
+      - './cmd/main.go'
+    runTests: true
+    runIntegrationTests: false
+  helmExecute:
+    chartPath: charts/co-metrics-operator
+    publish: true
+  sapCumulusUpload:
+    pipelineId: '4adfb789-72ab-4741-a27a-39ae5d0c9b88'

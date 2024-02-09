@@ -1,0 +1,114 @@
+# Using Piper general purpose pipeline for Azure
+
+trigger:
+  - main
+
+pr:
+  - main
+
+resources:
+  repositories:
+    - repository: piper-pipeline-azure
+      endpoint: github.tools.sap
+      type: githubenterprise
+      name: project-piper/piper-pipeline-azure
+
+extends:
+  template: sap-piper-pipeline.yml@piper-pipeline-azure
+  parameters:
+    customDefaults: "https://github.tools.sap/api/v3/repos/cloud-orchestration/pipeline-library/contents/resources/co-defaults.yml"
+#    buildPostSteps:
+#      #following task is necessary for vault api calls
+#      - task: piper@1
+#        name: getConfig1
+#        inputs:
+#          stepName: getConfig
+#          flags: "--stageConfig --outputFile config-pipeline.json"
+#      - bash: |
+#          set -e
+#          roleId="$(hyperspace.vault.roleId)"
+#          secretId="$(hyperspace.vault.secretId)"
+#          read -r vNS vUrl vGroup < <(jq -r '[.vaultNamespace, .vaultServerUrl, (.vaultBasePath | sub("^.*/";""))] | join(" ")' config-pipeline.json)
+#          tokenReqData=$(printf '{"role_id":"%s", "secret_id":"%s"}' "$roleId" "$secretId")
+#          vaultToken=$(curl -sS -H "X-Vault-Namespace: ${vNS}" -H 'Content-Type: application/json' \
+#            --data-raw "$tokenReqData" "${vUrl}/v1/auth/approle/login" | jq -r '.auth.client_token')
+#          vaultData=$(curl -sS -H "X-Vault-Namespace: ${vNS}" -H "X-Vault-Token: $vaultToken" \
+#            "${vUrl}/v1/piper/data/${vGroup}/GROUP-SECRETS/github" | jq -c '.data.data.access_token')
+#          echo "##vso[task.setvariable variable=access_token;isOutput=true;issecret=true]$vaultData"
+#        displayName: Retrieving github token from vault
+#        name: githubconfig
+#      - bash: |
+#          set -e
+#          roleId="$(hyperspace.vault.roleId)"
+#          secretId="$(hyperspace.vault.secretId)"
+#          read -r vNS vUrl vGroup < <(jq -r '[.vaultNamespace, .vaultServerUrl, (.vaultBasePath | sub("^.*/";""))] | join(" ")' config-pipeline.json)
+#          tokenReqData=$(printf '{"role_id":"%s", "secret_id":"%s"}' "$roleId" "$secretId")
+#          vaultToken=$(curl -sS -H "X-Vault-Namespace: ${vNS}" -H 'Content-Type: application/json' \
+#            --data-raw "$tokenReqData" "${vUrl}/v1/auth/approle/login" | jq -r '.auth.client_token')
+#          vaultData=$(curl -sS -H "X-Vault-Namespace: ${vNS}" -H "X-Vault-Token: $vaultToken" \
+#            "${vUrl}/v1/piper/data/${vGroup}/GROUP-SECRETS/artifactory")
+#          artifactoryToken=$(echo $vaultData | jq -c '.data.data.token')
+#          artifactoryUser=$(echo $vaultData | jq -c '.data.data.user')
+#          echo "##vso[task.setvariable variable=token;isOutput=true;issecret=true]$artifactoryToken"
+#          echo "##vso[task.setvariable variable=user;isOutput=true]$artifactoryUser"
+#          rm config-pipeline.json
+#        displayName: Retrieving artifactory credentials from vault
+#        name: artifactoryconfig
+#      - bash: |
+#          rawImage=$(cat ./.pipeline/commonPipelineEnvironment/container/imageNameTags.json)
+#          image=${rawImage:2}
+#          rawTag=${image#*:}
+#          lengthOfTag=${#rawTag}
+#          tag=${rawTag%]*}
+#          tag=${tag:0:lengthOfTag-2}
+#          imageName=${image%:*}
+#          registry=$(cat ./.pipeline/commonPipelineEnvironment/container/registryUrl | sed 's|https://||')
+#          registryUsername=$(cat ./.pipeline/commonPipelineEnvironment/container/repositoryUsername)
+#          registryPassword=$(cat ./.pipeline/commonPipelineEnvironment/container/repositoryPassword)
+#          echo "##vso[task.setvariable variable=container_image_tag;isOutput=true]$tag"
+#          echo "##vso[task.setvariable variable=container_image_name;isOutput=true]$imageName"
+#          echo "##vso[task.setvariable variable=staging_registry;isOutput=true]$registry"
+#          echo "##vso[task.setvariable variable=staging_registry_username;isOutput=true]$registryUsername"
+#          echo "##vso[task.setvariable variable=staging_registry_password;isOutput=true;issecret=true]$registryPassword"
+#        name: getImage
+#        displayName: e2e Get Piper Built Image Info (Name & Tag)
+#      - bash: |
+#          docker login deploy-releases-hyperspace-docker.common.cdn.repositories.cloud.sap -u $(artifactoryconfig.user) -p $(artifactoryconfig.token)
+#          docker login $(getImage.staging_registry) -u $(getImage.staging_registry_username) -p $(getImage.staging_registry_password)
+#          docker pull $(getImage.staging_registry)/$(getImage.container_image_name):$(getImage.container_image_tag)
+#          docker tag $(getImage.staging_registry)/$(getImage.container_image_name):$(getImage.container_image_tag) co-bootstrap-operator:dev
+#        name: pullImage
+#        displayName: e2e Pull Piper Built Image
+#      - bash: |
+#          docker run -t --net=host -u 1000:$(getent group docker | cut -d: -f3) \
+#            -v /var/run/docker.sock:/var/run/docker.sock \
+#            -v $(pwd):/usr/src \
+#            -w /usr/src \
+#            -e GOPRIVATE="github.tools.sap" \
+#            -e TEST_REUSE_CLUSTER=0 \
+#            -e UUT_IMAGES='{"cloud-orchestration/co-bootstrap-operator":"co-bootstrap-operator:dev"}' \
+#            deploy-releases-hyperspace-docker.common.cdn.repositories.cloud.sap/cloudorchestration/kind:0.16.0-20230904133608 \
+#            bash -c 'git config --global url."https://$(githubconfig.access_token)@github.tools.sap/".insteadOf https://github.tools.sap/; gotestsum --format testname --junitfile=e2e-tests.junit.xml -- ./.../e2e --tags e2e -test.v -timeout 20m'
+#        name: e2eDockerRun
+#        displayName: e2e test in a kind cluster
+#      - bash: |
+#          tar -czvf king-logs.tar.gz $(pwd)/test/e2e/logs*
+#        name: debugkind
+#        displayName: debugkind
+#        condition: always()
+#      - task: PublishPipelineArtifact@1
+#        displayName: archive e2e logs from kind
+#        condition: always()
+#        inputs:
+#          targetPath: $(System.DefaultWorkingDirectory)/king-logs.tar.gz
+#          artifactName: kind-logs
+#      - task: piper@1
+#        displayName: sapCumulusUpload (e2e test report)
+#        inputs:
+#          stepName: sapCumulusUpload
+#          flags: "--filePattern e2e-tests.junit.xml --stepResultType e2e-test"
+#          gitHubConnection: "github.tools.sap"
+#          restorePipelineDefaults: $(sapDefaults_b64)
+#          restorePipelineStageConditions: $(stageConditions_b64)
+#          sapPiperVersion: $(sapPiperCacheVersion)
+#        condition: and(eq(variables.onProductiveBranch, 'true'), not(eq(variables.isOptimizedAndScheduled, 'true')))
