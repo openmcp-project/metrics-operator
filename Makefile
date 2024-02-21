@@ -186,7 +186,7 @@ $(GOTESTSUM): $(LOCALBIN)
 
 .PHONY: dev-deploy
 dev-deploy: manifests kustomize dev-clean
-	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
+	#$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
@@ -208,6 +208,10 @@ dev-local:
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(MAKE) install
 	$(MAKE) create-crate-secret
+
+.PHONY: dev-kind
+dev-kind:
+	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 
 .PHONY: dev-clean
 dev-clean:
@@ -244,3 +248,11 @@ helm-templates:
 	rm -rf charts/$(PROJECT_FULL_NAME)/templates
 	git clone --depth=1 https://github.tools.sap/cloud-orchestration/operator-helm-templates.git charts/$(PROJECT_FULL_NAME)/templates
 	rm -rf charts/$(PROJECT_FULL_NAME)/templates/.git
+
+.PHONY: crossplane-install
+crossplane-install:
+	helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait
+
+.PHONY: helm-work
+helm-work: dev-kind crossplane-install helm-install-local
+	echo "Helm work done"

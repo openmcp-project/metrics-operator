@@ -86,12 +86,22 @@ spec:
           {{- with .Values.init.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- range .Values.clusters }}
+            - name: {{ upper .name }}_CLUSTER_HOST
+              value: {{ quote .url }}
+            - name: {{ upper .name }}_CLUSTER_CONFIG_DIR
+              value: /var/run/secrets/{{ .name }}-cluster
+          {{- end }}
           volumeMounts:
           {{- with .Values.init.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with .Values.init.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- range .Values.clusters }}
+            - mountPath: /var/run/secrets/{{ .name }}-cluster
+              name: projected-token-{{ .name }}
           {{- end }}
       {{- end }}
       containers:
@@ -147,6 +157,10 @@ spec:
           {{- with .Values.manager.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- range .Values.clusters }}
+            - mountPath: /var/run/secrets/{{ .name }}-cluster
+              name: projected-token-{{ .name }}
+          {{- end }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -166,6 +180,12 @@ spec:
           {{- with .Values.manager.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- range .Values.clusters }}
+            - name: {{ upper .name }}_CLUSTER_HOST
+              value: {{ quote .url }}
+            - name: {{ upper .name }}_CLUSTER_CONFIG_DIR
+              value: /var/run/secrets/{{ .name }}-cluster
+          {{- end }}
       volumes:
       {{- if .Values.webhooks.listen }}
         - name: webhooks-tls
@@ -178,6 +198,20 @@ spec:
       {{- end }}
       {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- range .Values.clusters }}
+        - name: projected-token-{{ .name }}
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 7200
+                  audience: {{ .audience }}
+              - configMap:
+                  name: {{ .caConfigMapName }}
+                  items:
+                  - key: ca.crt
+                    path: ca.crt
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
