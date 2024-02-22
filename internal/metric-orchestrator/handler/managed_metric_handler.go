@@ -169,8 +169,15 @@ func (b *ManagedMetricHandler) getManagedResources() error {
 
 	var resources []unstructured.Unstructured
 	for _, crd := range resourceCRDs {
+
+		// Use the stored versions of the CRD
+		storedVersions := make(map[string]bool)
+		for _, v := range crd.Status.StoredVersions {
+			storedVersions[v] = true
+		}
+
 		for _, crdv := range crd.Spec.Versions {
-			if !crdv.Served {
+			if !crdv.Served || !storedVersions[crdv.Name] {
 				continue
 			}
 
@@ -185,7 +192,9 @@ func (b *ManagedMetricHandler) getManagedResources() error {
 				return err
 			}
 
-			resources = append(resources, list.Items...)
+			if len(list.Items) > 0 {
+				resources = append(resources, list.Items...)
+			}
 		}
 	}
 
@@ -214,28 +223,34 @@ func (b *ManagedMetricHandler) hasCategory(category string, crd apiextensionsv1.
 	return false
 }
 
+type ClusterResourceStatus struct {
+	MangedResource Managed
+	Status         map[string]bool
+}
+
 // Uses the managed resources from the cluster, to extract the status fields common for crossplane resources
 //
 // Ready: true | false
 //
 // Synced: true | false
-func (b *ManagedMetricHandler) getClusterResourceStatus() (map[*Managed]map[string]bool, error) {
+func (b *ManagedMetricHandler) getClusterResourceStatus() ([]ClusterResourceStatus, error) {
 	err := b.getManagedResources()
 	if err != nil {
-		return map[*Managed]map[string]bool{}, err
+		return []ClusterResourceStatus{}, err
 	}
 
-	resourcesStates := make(map[*Managed]map[string]bool)
+	crStatuses := make([]ClusterResourceStatus, 0)
 
 	for _, item := range b.managedResources {
-		resourcesStates[&item] = map[string]bool{}
+		rsStatus := ClusterResourceStatus{MangedResource: item, Status: make(map[string]bool)}
 		for _, condition := range item.Status.Conditions {
 			status, _ := strconv.ParseBool(condition.Status)
-			resourcesStates[&item][condition.Type] = status
+			rsStatus.Status[condition.Type] = status
 		}
+		crStatuses = append(crStatuses, rsStatus)
 	}
 
-	return resourcesStates, nil
+	return crStatuses, nil
 }
 
 // update the status of the resource on the cluster, so the cluster stays up to date
@@ -278,10 +293,15 @@ func (b *ManagedMetricHandler) SendStatusBasedMetric() (businessv1.ActivationTyp
 		return businessv1.ActivationDisabled, err
 	}
 
-	for man, resource := range resources {
+	for _, cr := range resources {
 		b.dynaMetric.ClearDimensions()
+		_ = b.dynaMetric.AddDimension("kind", cr.MangedResource.Kind)
+		_ = b.dynaMetric.AddDimension("apiVersion", cr.MangedResource.APIVersion)
 
-		for typ, state := range resource {
+		// TODO: add mcp name as well later
+		// b.dynaMetric.AddDimension("name", ...)
+
+		for typ, state := range cr.Status {
 			dimErr := b.dynaMetric.AddDimension(strings.ToLower(typ), strconv.FormatBool(state))
 			if dimErr != nil {
 				return businessv1.ActivationDisabled, dimErr
@@ -293,7 +313,7 @@ func (b *ManagedMetricHandler) SendStatusBasedMetric() (businessv1.ActivationTyp
 		if err != nil {
 			return businessv1.ActivationDisabled, err
 		}
-		fmt.Printf("%s	INFO	Metric %s with status is sent\n", time.Now().UTC().Format("2006-01-02T15:04:05+01:00"), man.Metadata.Name)
+		fmt.Printf("%s	INFO	Metric %s with status is sent\n", time.Now().UTC().Format("2006-01-02T15:04:05+01:00"), cr.MangedResource.Metadata.Name)
 	}
 
 	return businessv1.ActivationEnabled, nil
