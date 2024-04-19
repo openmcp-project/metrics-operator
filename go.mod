@@ -7,8 +7,8 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
-	github.tools.sap/cloud-orchestration/controller-utils v0.0.0-20240205153406-a4b0c19e994c
-	github.tools.sap/cloud-orchestration/controller-utils/api v0.0.0-20240205153406-a4b0c19e994c
+	github.tools.sap/cloud-orchestration/controller-utils v0.0.0-20240304155106-4edcab936d5e
+	github.tools.sap/cloud-orchestration/controller-utils/api v0.0.0-20240304155106-4edcab936d5e
 	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.4
 	k8s.io/apimachinery v0.28.4
