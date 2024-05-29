@@ -23,7 +23,7 @@ steps:
     dockerImage: 'debian:stable'
   golangBuild:
     privateModules: 'github.tools.sap/*'
-    dockerImage: &GOLANG_BUILDER 'golang:1.21'
+    dockerImage: &GOLANG_BUILDER 'golang:1.22'
     output: bin/manager
     packages:
       - './cmd/main.go'

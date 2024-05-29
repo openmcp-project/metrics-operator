@@ -5,8 +5,7 @@ metadata:
 spec:
   name: Status Metric
   description: Status metric created by an Operator
-  kind: objects
-  group: kubernetes.crossplane.io
-  version: v1alpha2
+  kind: Release
+  group: helm.crossplane.io
+  version: v1beta1
   frequency: 1 # in minutes
-  

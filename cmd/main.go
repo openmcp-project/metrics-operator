@@ -189,6 +189,7 @@ func setupMetricController(mgr ctrl.Manager) {
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
 		RestConfig: mgr.GetConfig(),
+		Recorder:   mgr.GetEventRecorderFor("metrics-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Metric")
 		os.Exit(1)
@@ -201,6 +202,7 @@ func setupManagedMetricController(mgr ctrl.Manager) {
 		Client:     mgr.GetClient(),
 		Scheme:     mgr.GetScheme(),
 		RestConfig: mgr.GetConfig(),
+		Recorder:   mgr.GetEventRecorderFor("managedmetrics-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ManagedMetric")
 		os.Exit(1)

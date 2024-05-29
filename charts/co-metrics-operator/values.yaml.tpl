@@ -106,7 +106,28 @@ webhooks:
 
 rbac:
   clusterRole:
-    rules: []
+    rules:
+      - apiGroups:
+          - business.orchestrate.cloud.sap
+        resources:
+          - managedmetrics
+          - metrics
+          - metrics/status
+          - managedmetrics/status
+        verbs:
+          - "*"
+      - apiGroups:
+          - ""
+        resources:
+          - secrets
+        verbs:
+          - get
+          - list
+          - watch
+      - apiGroups: [ "*" ]
+        resources: [ "*" ]
+        verbs: [ "get", "list", "watch" ]
+
   role:
     rules: []
 

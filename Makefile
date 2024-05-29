@@ -153,8 +153,8 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOTESTSUM ?= $(LOCALBIN)/gotestsum
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.0.1
-CONTROLLER_TOOLS_VERSION ?= v0.12.0
+KUSTOMIZE_VERSION ?= v5.4.1
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
@@ -184,12 +184,21 @@ $(GOTESTSUM): $(LOCALBIN)
 
 ### ------------------------------------ DEVELOPMENT - LOCAL ------------------------------------ ###
 
+.PHONY: dev-all
+dev-all-deploy:
+	$(MAKE) dev-deploy
+	$(MAKE) crossplane-install
+	$(MAKE) crossplane-provider-install
+	$(MAKE) crossplane-provider-sample
+
+
 .PHONY: dev-deploy
 dev-deploy: manifests kustomize dev-clean
-	#$(KIND) create cluster --name=$(PROJECT_NAME)-dev
+	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
+
 
 .PHONY: dev-build
 dev-build: docker-build
@@ -207,11 +216,39 @@ dev-cluster:
 dev-local:
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(MAKE) install
-	$(MAKE) create-crate-secret
+
+.PHONY: dev-local-all
+dev-local-all:
+	$(MAKE) dev-clean
+	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
+	$(MAKE) install
+	$(MAKE) crossplane-install
+	$(MAKE) crossplane-provider-install
+	$(MAKE) crossplane-provider-sample
+	$(MAKE) dev-namespace
+	$(MAKE) dev-secret
+	$(MAKE) dev-basic-metric
+	$(MAKE) dev-managed-metric
+
+.PHONY: dev-secret
+dev-secret:
+	kubectl apply -f examples/secret.yaml
+
+.PHONY: dev-namespace
+dev-namespace:
+	kubectl apply -f examples/namespace.yaml
+
+.PHONY: dev-basic-metric
+dev-basic-metric:
+	kubectl apply -f examples/basic_metric.yaml
+
+.PHONY: dev-managed-metric
+dev-managed-metric:
+	kubectl apply -f examples/managed_metric.yaml
 
 .PHONY: dev-kind
 dev-kind:
-	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
+	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 
 .PHONY: dev-clean
 dev-clean:
@@ -249,10 +286,29 @@ helm-templates:
 	git clone --depth=1 https://github.tools.sap/cloud-orchestration/operator-helm-templates.git charts/$(PROJECT_FULL_NAME)/templates
 	rm -rf charts/$(PROJECT_FULL_NAME)/templates/.git
 
-.PHONY: crossplane-install
-crossplane-install:
-	helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait
 
 .PHONY: helm-work
 helm-work: dev-kind crossplane-install helm-install-local
 	echo "Helm work done"
+
+
+### ------------------------------------ CROSSPLANE ------------------------------------ ###
+
+# Namespace where Crossplane is installed
+CROSSPLANE_NAMESPACE ?= crossplane-system
+
+.PHONY: crossplane-install
+crossplane-install:
+	helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait
+
+# Install the Kubernetes provider using kubectl
+crossplane-provider-install:
+	kubectl apply -f crossplane/provider.yaml -n $(CROSSPLANE_NAMESPACE)
+	kubectl wait --for=condition=Healthy provider/provider-helm --timeout=1m
+	kubectl apply -f crossplane/provider-config.yaml -n $(CROSSPLANE_NAMESPACE)
+
+.PHONY: install-k8s-provider
+
+.PHONY: helm-provider-sample
+crossplane-provider-sample:
+	kubectl apply -f crossplane/release.yaml -n $(CROSSPLANE_NAMESPACE)

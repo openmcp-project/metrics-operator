@@ -21,24 +21,33 @@ import (
 	"fmt"
 	"time"
 
+	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/common"
+	orc "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric_orchestratorV2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
 
-	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
-	orchestrator "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric-orchestrator"
+const (
+	RequeueAfterError = 2
 )
 
 // MetricReconciler reconciles a Metric object
 type MetricReconciler struct {
 	client.Client
-	RestConfig         *rest.Config
-	Scheme             *runtime.Scheme
-	MetricOrchestrator orchestrator.MetricOrchestrator
+	RestConfig *rest.Config
+	Scheme     *runtime.Scheme
+
+	Recorder record.EventRecorder
 }
 
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=metrics,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=metrics/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=metrics/finalizers,verbs=update
@@ -48,34 +57,95 @@ type MetricReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	var l = log.FromContext(ctx)
 
-	freq, err := r.handleCountMetric(ctx, req)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(freq*2) * time.Minute}, err
+	/*
+			1. Load the generic metric using the client
+		 	All method should take the context to allow for cancellation (like CancellationToken)
+	*/
+	metric := businessv1.Metric{}
+	if errLoad := r.Client.Get(ctx, req.NamespacedName, &metric); errLoad != nil {
+		// we'll ignore not-found errors, since they can't be fixed by an immediate
+		// requeue (we'll need to wait for a new notification), and we can also get them
+		// on delete requests.
+		if apierrors.IsNotFound(errLoad) {
+			l.Info("Generic Metric not found")
+			return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, nil
+		}
+		l.Error(errLoad, "unable to fetch Generic Metric")
+		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, errLoad
 	}
 
-	fmt.Printf("%s	INFO	Requeued for Execution in %v Minutes\n", time.Now().UTC().Format("2006-01-02T15:04:05+01:00"), freq)
+	/*
+		1.1 Get the Secret that holds the Dynatrace credentials
+	*/
+	secret, errSecret := common.GetCredentialsSecret(r.Client, ctx)
+	if errSecret != nil {
+		l.Error(errSecret, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
+		r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
+		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, errSecret
+	}
+
+	credentials := common.GetCredentialData(secret)
+
+	/*
+		2. Create a new orchestrator
+	*/
+	orchestrator, errOrch := orc.NewOrchestrator(r.RestConfig, credentials, r.Client).WithGeneric(metric)
+	if errOrch != nil {
+		l.Error(errOrch, "unable to create generic metric orchestrator monitor")
+		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
+		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, errOrch
+	}
+
+	result, errMon := orchestrator.Handler.Monitor()
+
+	if errMon != nil {
+		l.Error(errMon, fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, errMon
+	}
+
+	/*
+		3. Update the status of the metric with conditions and phase
+	*/
+	switch result.Phase {
+	case businessv1.PhaseActive:
+		metric.SetConditions(common.Available(result.Message))
+		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
+	case businessv1.PhaseFailed:
+		l.Error(result.Error, result.Message, "reason", result.Reason)
+		metric.SetConditions(common.Error(result.Message))
+		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
+	case businessv1.PhasePending:
+		metric.SetConditions(common.Creating())
+		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
+	}
+
+	metric.Status.Phase = result.Phase
+
+	// conditions are not persisted until the status is updated
+	errUp := r.Client.Status().Update(ctx, &metric)
+	if errUp != nil {
+		l.Error(errMon, fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, errUp
+	}
+
+	/*
+		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
+	*/
+	var requeueTime int
+	if result.Error != nil {
+		requeueTime = RequeueAfterError
+	} else {
+		requeueTime = metric.Spec.Frequency
+	}
+
+	l.Info(fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
+
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: time.Duration(freq) * time.Minute,
+		RequeueAfter: time.Duration(requeueTime) * time.Minute,
 	}, nil
-}
-
-func (r *MetricReconciler) handleCountMetric(ctx context.Context, req ctrl.Request) (int, error) {
-	var err error
-	r.MetricOrchestrator, err = orchestrator.NewMetricOrchestrator(ctx, req, r.Client, r.RestConfig)
-	if err != nil {
-		return -1, err
-	}
-
-	frequency, status, err := r.MetricOrchestrator.OrchestrateGenericMetric()
-	// check and return Metric
-	if err != nil || status == businessv1.ActivationDisabled {
-		return -1, err
-	}
-
-	return frequency, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

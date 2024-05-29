@@ -17,15 +17,19 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +kubebuilder:validation:Enum=Enabled;Disabled
-type ActivationType string
+// +kubebuilder:validation:Enum=Active;Failed;Pending
+type PhaseType string
 
 const (
-	ActivationEnabled  ActivationType = "Enabled"
-	ActivationDisabled ActivationType = "Disabled"
+	PhaseActive  PhaseType = "Active"
+	PhaseFailed  PhaseType = "Failed"
+	PhasePending PhaseType = "Pending"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -53,20 +57,24 @@ type MetricSpec struct {
 	// Define in what interval the query should be recorded (in minutes) # min: 1
 	// +optional
 	// +kubebuilder:default:=720
+	// +kubebuilder:validation:Minimum=1
 	Frequency int `json:"frequency,omitempty"`
 }
 
 // MetricStatus defines the observed state of ManagedMetric
 type MetricStatus struct {
-	// Is set when Metric is Successfully executed and keeps track of the current cycle.
-	// The cycle starts anew and the status will be set to active if execution was successfull
-	// +optional
-	Active ActivationType `json:"active,omitempty"`
+	// Phase is like a snapshot of the current state of the metric's lifecycle
+
+	// +kubebuilder:default:=Pending
+	Phase PhaseType `json:"phase,omitempty"`
+
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Current phase of the Metric"
 // Metric is the Schema for the metrics API
 type Metric struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -74,6 +82,19 @@ type Metric struct {
 
 	Spec   MetricSpec   `json:"spec,omitempty"`
 	Status MetricStatus `json:"status,omitempty"`
+}
+
+func (r *Metric) SetConditions(conditions ...metav1.Condition) {
+	for _, c := range conditions {
+		meta.SetStatusCondition(&r.Status.Conditions, c)
+	}
+}
+
+func (r *Metric) GvkToString() string {
+	if r.Spec.Group == "" {
+		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Version, r.Spec.Kind)
+	}
+	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Group, r.Spec.Version, r.Spec.Kind)
 }
 
 //+kubebuilder:object:root=true

@@ -17,6 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,6 +45,7 @@ type ManagedMetricSpec struct {
 	// Define in what interval the query should be recorded (in minutes) # min: 1
 	// +optional
 	// +kubebuilder:default:=720
+	// +kubebuilder:validation:Minimum=1
 	Frequency int `json:"frequency,omitempty"`
 }
 
@@ -49,12 +53,29 @@ type ManagedMetricSpec struct {
 type ManagedMetricStatus struct {
 	// Is set when Metric is Successfully executed and keeps track of the current cycle.
 	// The cycle starts anew and the status will be set to active if execution was successfull
-	// +optional
-	Active ActivationType `json:"active,omitempty"`
+	// +kubebuilder:default:=Pending
+	Phase PhaseType `json:"phase,omitempty"`
+
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+func (r *ManagedMetric) GvkToString() string {
+	if r.Spec.Group == "" {
+		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Version, r.Spec.Kind)
+	}
+	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Group, r.Spec.Version, r.Spec.Kind)
+}
+
+func (r *ManagedMetric) SetConditions(conditions ...metav1.Condition) {
+	for _, c := range conditions {
+		meta.SetStatusCondition(&r.Status.Conditions, c)
+	}
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Current phase of the Metric"
 
 // ManagedMetric is the Schema for the managedmetrics API
 type ManagedMetric struct {

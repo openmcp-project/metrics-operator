@@ -19,7 +19,7 @@ const (
 // Deployment of secret:
 //
 // you can deploy the metric through: kubectl apply -f sample/secret.yaml
-func GetClusterSecret(client client.Client, ctx context.Context) (*corev1.Secret, error) {
+func GetCredentialsSecret(client client.Client, ctx context.Context) (*corev1.Secret, error) {
 	secret := &corev1.Secret{}
 	namespace := types.NamespacedName{
 		Namespace: SecretNameSpace,
@@ -30,4 +30,20 @@ func GetClusterSecret(client client.Client, ctx context.Context) (*corev1.Secret
 		return &corev1.Secret{}, err
 	}
 	return secret, nil
+}
+
+func GetCredentialData(secret *corev1.Secret) DataSinkCredentials {
+	creds := DataSinkCredentials{
+		Host:  string(secret.Data["Host"]),
+		Path:  string(secret.Data["Path"]),
+		Token: string(secret.Data["Token"]),
+	}
+	return creds
+}
+
+// DataSinkCredentials holds the credentials to access the data sink (e.g. dynatrace)
+type DataSinkCredentials struct {
+	Host  string
+	Path  string
+	Token string
 }

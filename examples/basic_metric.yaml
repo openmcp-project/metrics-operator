@@ -3,10 +3,21 @@ kind: Metric
 metadata:
   name: basic-metric
 spec:
-  name: Pods Metric
-  description: Pods metric created by an Operator
-  kind: objects
-  group: kubernetes.crossplane.io
-  version: v1alpha2
+  name: helm-release-metric
+  description: Helm Release Metric Helm Crossplane Provider
+  kind: Release
+  group: helm.crossplane.io
+  version: v1beta1
   frequency: 1 # in minutes
-  
+#---
+#apiVersion: business.orchestrate.cloud.sap/v1
+#kind: Metric
+#metadata:
+#  name: basic-pods
+#spec:
+#  name: pods-metric
+#  description: Pods
+#  kind: Pod
+#  group: ""
+#  version: v1
+#  frequency: 1 # in minutes
