@@ -1,5 +1,50 @@
 # co-metrics-operator
 // TODO(user): Add simple overview of use/purpose
+Create metric insights for your Kubernetes cluster resources.
+
+## Examples
+
+#### Metric in Deployed Cluster (where operator runs)
+```yaml
+apiVersion: business.orchestrate.cloud.sap/v1
+kind: Metric
+metadata:
+  name: basic-metric
+spec:
+  name: helm-release-metric
+  description: Helm Release Metric Helm Crossplane Provider
+  kind: Release
+  group: helm.crossplane.io
+  version: v1beta1
+  frequency: 1 # in minutes
+```
+
+#### Metric in External Cluster accessed via kubeconfig secret
+```yaml
+apiVersion: business.orchestrate.cloud.sap/v1
+kind: Metric
+metadata:
+  name: ext-sa-metric
+spec:
+  name: ext-subaccount-metric
+  description: Subaccounts in mirza mcp cluster
+  kind: Subaccount
+  group: account.btp.orchestrate.cloud.sap
+  version: v1alpha1
+  frequency: 1 # in minutes
+  kubeConfigSecretRef:
+    name: co-mcp-mirza
+    namespace: default
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: co-mcp-mirza
+  namespace: default
+type: Opaque
+data:
+  kubeconfig: YXBpVmVyc2lvb...
+```
 
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
@@ -91,4 +136,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-

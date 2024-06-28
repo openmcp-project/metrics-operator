@@ -35,11 +35,28 @@ import (
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 )
 
+func NewManagedMetricReconciler(mgr ctrl.Manager) *ManagedMetricReconciler {
+	return &ManagedMetricReconciler{
+		inClient:     mgr.GetClient(),
+		inRestConfig: mgr.GetConfig(),
+		Scheme:       mgr.GetScheme(),
+		Recorder:     mgr.GetEventRecorderFor("managedmetrics-controller"),
+	}
+}
+
+func (r *ManagedMetricReconciler) GetClient() client.Client {
+	return r.inClient
+}
+
+func (r *ManagedMetricReconciler) GetRestConfig() *rest.Config {
+	return r.inRestConfig
+}
+
 // ManagedMetricReconciler reconciles a ManagedMetric object
 type ManagedMetricReconciler struct {
-	Client     client.Client
-	RestConfig *rest.Config
-	Scheme     *runtime.Scheme
+	inClient     client.Client
+	inRestConfig *rest.Config
+	Scheme       *runtime.Scheme
 
 	Recorder record.EventRecorder
 }
@@ -60,7 +77,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		 	All method should take the context to allow for cancellation (like CancellationToken)
 	*/
 	metric := businessv1.ManagedMetric{}
-	if errLoad := r.Client.Get(ctx, req.NamespacedName, &metric); errLoad != nil {
+	if errLoad := r.inClient.Get(ctx, req.NamespacedName, &metric); errLoad != nil {
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can also get them
 		// on delete requests.
@@ -75,7 +92,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.1 Get the Secret that holds the Dynatrace credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(r.Client, ctx)
+	secret, errSecret := common.GetCredentialsSecret(r.inClient, ctx)
 	if errSecret != nil {
 		l.Error(errSecret, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
 		r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
@@ -85,9 +102,17 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	credentials := common.GetCredentialData(secret)
 
 	/*
+		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
+	*/
+	queryConfig, err := createQueryConfig(ctx, metric.Spec.KubeConfigSecretRef, r)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, err
+	}
+
+	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(r.RestConfig, credentials, r.Client).WithManaged(metric)
+	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithManaged(metric)
 	if errOrch != nil {
 		l.Error(errOrch, "unable to create managed metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
@@ -120,7 +145,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	metric.Status.Phase = result.Phase
 
 	// conditions are not persisted until the status is updated
-	errUp := r.Client.Status().Update(ctx, &metric)
+	errUp := r.inClient.Status().Update(ctx, &metric)
 	if errUp != nil {
 		l.Error(errUp, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: 2 * time.Minute}, errUp

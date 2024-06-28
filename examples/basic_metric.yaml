@@ -21,3 +21,18 @@ spec:
 #  group: ""
 #  version: v1
 #  frequency: 1 # in minutes
+---
+apiVersion: business.orchestrate.cloud.sap/v1
+kind: Metric
+metadata:
+  name: ext-sa-metric
+spec:
+  name: ext-subaccount-metric
+  description: Subaccounts in mirza mcp cluster
+  kind: Subaccount
+  group: account.btp.orchestrate.cloud.sap
+  version: v1alpha1
+  frequency: 1 # in minutes
+  kubeConfigSecretRef:
+    name: co-mcp-mirza
+    namespace: default

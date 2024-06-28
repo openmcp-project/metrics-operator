@@ -24,9 +24,12 @@ import (
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/common"
 	orc "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric_orchestratorV2"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,14 +40,36 @@ const (
 	RequeueAfterError = 2
 )
 
+func NewMetricReconciler(mgr ctrl.Manager) *MetricReconciler {
+	return &MetricReconciler{
+		inClient:   mgr.GetClient(),
+		RestConfig: mgr.GetConfig(),
+		Scheme:     mgr.GetScheme(),
+		Recorder:   mgr.GetEventRecorderFor("metrics-controller"),
+	}
+}
+
+func (r *MetricReconciler) GetClient() client.Client {
+	return r.inClient
+}
+
+func (r *MetricReconciler) GetRestConfig() *rest.Config {
+	return r.RestConfig
+}
+
 // MetricReconciler reconciles a Metric object
 type MetricReconciler struct {
-	client.Client
+	// Internal client to K8S API. K8S cluster where the operator runs.
+	inClient   client.Client
 	RestConfig *rest.Config
 	Scheme     *runtime.Scheme
-
+	
 	Recorder record.EventRecorder
 }
+
+const (
+	kubeconfigKey = "kubeconfig"
+)
 
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
@@ -64,7 +89,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		 	All method should take the context to allow for cancellation (like CancellationToken)
 	*/
 	metric := businessv1.Metric{}
-	if errLoad := r.Client.Get(ctx, req.NamespacedName, &metric); errLoad != nil {
+	if errLoad := r.GetClient().Get(ctx, req.NamespacedName, &metric); errLoad != nil {
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can also get them
 		// on delete requests.
@@ -79,7 +104,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	/*
 		1.1 Get the Secret that holds the Dynatrace credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(r.Client, ctx)
+	secret, errSecret := common.GetCredentialsSecret(r.GetClient(), ctx)
 	if errSecret != nil {
 		l.Error(errSecret, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
 		r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
@@ -89,9 +114,17 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	credentials := common.GetCredentialData(secret)
 
 	/*
+		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
+	*/
+	queryConfig, err := createQueryConfig(ctx, metric.Spec.KubeConfigSecretRef, r)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, err
+	}
+
+	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(r.RestConfig, credentials, r.Client).WithGeneric(metric)
+	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithGeneric(metric)
 	if errOrch != nil {
 		l.Error(errOrch, "unable to create generic metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
@@ -124,7 +157,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	metric.Status.Phase = result.Phase
 
 	// conditions are not persisted until the status is updated
-	errUp := r.Client.Status().Update(ctx, &metric)
+	errUp := r.GetClient().Status().Update(ctx, &metric)
 	if errUp != nil {
 		l.Error(errMon, fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, errUp
@@ -148,9 +181,56 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}, nil
 }
 
+func createQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfigSecretRef, r InsightReconciler) (orc.QueryConfig, error) {
+	var queryConfig orc.QueryConfig
+	// Kubernetes client to the external cluster if defined
+	if kcRef != nil {
+		qc, err := createExternalQueryConfig(ctx, kcRef, r.GetClient())
+		if err != nil {
+			return orc.QueryConfig{}, err
+		}
+		queryConfig = *qc
+	} else {
+		queryConfig = orc.QueryConfig{Client: r.GetClient(), RestConfig: *r.GetRestConfig()}
+	}
+	return queryConfig, nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *MetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&businessv1.Metric{}).
 		Complete(r)
+}
+
+func createExternalQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfigSecretRef, inClient client.Client) (*orc.QueryConfig, error) {
+	var secretName = kcRef.Name
+	var secretNamespace = kcRef.Namespace
+
+	// Retrieve the Secret
+	secret := &corev1.Secret{}
+	err := inClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, secret)
+	if err != nil {
+		errSecret := fmt.Errorf("failed to retrieve KubeConfig Secret Ref with name %s in namespace %s: %v", secretName, secretNamespace, err)
+		return nil, errSecret
+	}
+
+	kubeconfigData, ok := secret.Data[kubeconfigKey]
+	if !ok {
+		return nil, fmt.Errorf("kubeconfig key %s not found in Secret", kubeconfigKey)
+	}
+
+	// Create a config from the kubeconfig data
+	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config from kubeconfig: %v", err)
+	}
+
+	// Create the client
+	externalClient, err := client.New(config, client.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	return &orc.QueryConfig{Client: externalClient, RestConfig: *config}, nil
 }
