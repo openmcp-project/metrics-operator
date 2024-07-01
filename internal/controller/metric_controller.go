@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
@@ -63,7 +65,7 @@ type MetricReconciler struct {
 	inClient   client.Client
 	RestConfig *rest.Config
 	Scheme     *runtime.Scheme
-	
+
 	Recorder record.EventRecorder
 }
 
@@ -191,9 +193,37 @@ func createQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfigSecretRe
 		}
 		queryConfig = *qc
 	} else {
-		queryConfig = orc.QueryConfig{Client: r.GetClient(), RestConfig: *r.GetRestConfig()}
+		// local cluster name (where operator is deployed)
+		clusterName, _ := getClusterInfo(r.GetRestConfig())
+		queryConfig = orc.QueryConfig{Client: r.GetClient(), RestConfig: *r.GetRestConfig(), ClusterName: &clusterName}
 	}
 	return queryConfig, nil
+}
+
+func getClusterInfo(config *rest.Config) (string, error) {
+	if config.Host == "" {
+		return "", fmt.Errorf("config.Host is empty")
+	}
+
+	// Parse the host URL
+	u, err := url.Parse(config.Host)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse host URL: %v", err)
+	}
+
+	// Extract the hostname
+	hostname := u.Hostname()
+
+	// debugging only
+	if hostname == "127.0.0.1" {
+		return "localhost", nil
+	}
+
+	// Remove any prefix (like "kubernetes" or "kubernetes.default.svc")
+	parts := strings.Split(hostname, ".")
+	clusterName := parts[0]
+
+	return clusterName, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -222,9 +252,17 @@ func createExternalQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfig
 
 	// Create a config from the kubeconfig data
 	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config from kubeconfig: %v", err)
 	}
+
+	kubeconfig, errKC := clientcmd.Load(kubeconfigData)
+	if errKC != nil {
+		return nil, fmt.Errorf("failed to load Config object from kubeconfigData: %v", errKC)
+	}
+
+	clusterName := kubeconfig.Contexts[kubeconfig.CurrentContext].Cluster
 
 	// Create the client
 	externalClient, err := client.New(config, client.Options{})
@@ -232,5 +270,5 @@ func createExternalQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfig
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
 
-	return &orc.QueryConfig{Client: externalClient, RestConfig: *config}, nil
+	return &orc.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName}, nil
 }

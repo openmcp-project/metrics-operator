@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,21 +24,23 @@ type ManagedHandler struct {
 	metric     v1.ManagedMetric
 	metricMeta client.MetricMetadata
 
-	dtClient client.DynatraceClient
+	dtClient    client.DynatraceClient
+	clusterName *string
 }
 
-func NewManagedHandler(metric v1.ManagedMetric, metricMeta client.MetricMetadata, restConfig *rest.Config, client rcli.Client, dtClient client.DynatraceClient) (*ManagedHandler, error) {
-	dynamicClient, errCli := dynamic.NewForConfig(restConfig)
+func NewManagedHandler(metric v1.ManagedMetric, metricMeta client.MetricMetadata, qc QueryConfig, dtClient client.DynatraceClient) (*ManagedHandler, error) {
+	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, fmt.Errorf("could not create dynamic client: %w", errCli)
 	}
 
 	var handler = &ManagedHandler{
-		client:     client,
-		dCli:       dynamicClient,
-		metric:     metric,
-		metricMeta: metricMeta,
-		dtClient:   dtClient,
+		client:      qc.Client,
+		dCli:        dynamicClient,
+		metric:      metric,
+		metricMeta:  metricMeta,
+		dtClient:    dtClient,
+		clusterName: qc.ClusterName,
 	}
 
 	return handler, nil
@@ -93,6 +94,13 @@ func (h *ManagedHandler) Monitor() (MonitorResult, error) {
 	versionDimErr := h.metricMeta.AddDimension(VERSION, h.metric.Spec.Version)
 	if versionDimErr != nil {
 		return MonitorResult{}, fmt.Errorf("could not initialize '"+VERSION+"' dimensions: %w", versionDimErr)
+	}
+
+	if h.clusterName != nil {
+		clusterDimErr := h.metricMeta.AddDimension(CLUSTER, *h.clusterName)
+		if clusterDimErr != nil {
+			return MonitorResult{}, fmt.Errorf("could not initialize '"+CLUSTER+"' dimensions: %w", clusterDimErr)
+		}
 	}
 
 	result := MonitorResult{}

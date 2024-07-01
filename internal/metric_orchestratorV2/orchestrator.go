@@ -22,8 +22,9 @@ type Orchestrator struct {
 
 // QueryConfig holds the configuration for the query client to query resources in a K8S cluster, may be internal or external cluster.
 type QueryConfig struct {
-	Client     rcli.Client
-	RestConfig rest.Config
+	Client      rcli.Client
+	RestConfig  rest.Config
+	ClusterName *string
 }
 
 func NewOrchestrator(creds common.DataSinkCredentials, qConfig QueryConfig) *Orchestrator {
@@ -35,7 +36,7 @@ func (o *Orchestrator) WithGeneric(metric v1.Metric) (*Orchestrator, error) {
 	metricMetadata := client.NewMetricMetadata(metric.ObjectMeta.Name, metric.Spec.Name, metric.Spec.Description)
 
 	var err error
-	o.Handler, err = NewGenericHandler(metric, metricMetadata, &o.queryConfig.RestConfig, dtClient)
+	o.Handler, err = NewGenericHandler(metric, metricMetadata, o.queryConfig, dtClient)
 	return o, err
 }
 
@@ -44,6 +45,6 @@ func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, err
 	metricMetadata := client.NewMetricMetadata(managed.ObjectMeta.Name, managed.Spec.Name, managed.Spec.Description)
 
 	var err error
-	o.Handler, err = NewManagedHandler(managed, metricMetadata, &o.queryConfig.RestConfig, o.queryConfig.Client, dtClient)
+	o.Handler, err = NewManagedHandler(managed, metricMetadata, o.queryConfig, dtClient)
 	return o, err
 }

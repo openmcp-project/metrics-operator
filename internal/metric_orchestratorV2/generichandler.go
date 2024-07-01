@@ -10,13 +10,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 )
 
 const (
 	KIND    string = "kind"
 	GROUP   string = "group"
 	VERSION string = "version"
+	CLUSTER string = "cluster"
 )
 
 type GenericHandler struct {
@@ -26,16 +26,17 @@ type GenericHandler struct {
 	metric     v1.Metric
 	metricMeta client.MetricMetadata
 
-	dtClient client.DynatraceClient
+	dtClient    client.DynatraceClient
+	clusterName *string
 }
 
-func NewGenericHandler(metric v1.Metric, metricMeta client.MetricMetadata, restConfig *rest.Config, dtClient client.DynatraceClient) (*GenericHandler, error) {
-	dynamicClient, errCli := dynamic.NewForConfig(restConfig)
+func NewGenericHandler(metric v1.Metric, metricMeta client.MetricMetadata, qc QueryConfig, dtClient client.DynatraceClient) (*GenericHandler, error) {
+	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, fmt.Errorf("could not create dynamic client: %w", errCli)
 	}
 
-	disco, errDisco := discovery.NewDiscoveryClientForConfig(restConfig)
+	disco, errDisco := discovery.NewDiscoveryClientForConfig(&qc.RestConfig)
 	if errDisco != nil {
 		return nil, fmt.Errorf("could not create discovery client: %w", errDisco)
 	}
@@ -46,6 +47,7 @@ func NewGenericHandler(metric v1.Metric, metricMeta client.MetricMetadata, restC
 		dCli:        dynamicClient,
 		discoClient: disco,
 		dtClient:    dtClient,
+		clusterName: qc.ClusterName,
 	}
 
 	return handler, nil
@@ -78,6 +80,13 @@ func (h *GenericHandler) Monitor() (MonitorResult, error) {
 	versionDimErr := h.metricMeta.AddDimension(VERSION, h.metric.Spec.Version)
 	if versionDimErr != nil {
 		return MonitorResult{}, fmt.Errorf("could not initialize '"+VERSION+"' dimensions: %w", versionDimErr)
+	}
+
+	if h.clusterName != nil {
+		clusterDimErr := h.metricMeta.AddDimension(CLUSTER, *h.clusterName)
+		if clusterDimErr != nil {
+			return MonitorResult{}, fmt.Errorf("could not initialize '"+CLUSTER+"' dimensions: %w", clusterDimErr)
+		}
 	}
 
 	result := MonitorResult{}
