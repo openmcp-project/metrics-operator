@@ -27,9 +27,12 @@ import (
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/common"
 	orc "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric_orchestratorV2"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
@@ -264,8 +267,13 @@ func createExternalQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfig
 
 	clusterName := kubeconfig.Contexts[kubeconfig.CurrentContext].Cluster
 
+	externalScheme := runtime.NewScheme()
+
+	utilruntime.Must(clientgoscheme.AddToScheme(externalScheme))
+	utilruntime.Must(apiextensionsv1.AddToScheme(externalScheme))
+
 	// Create the client
-	externalClient, err := client.New(config, client.Options{})
+	externalClient, err := client.New(config, client.Options{Scheme: externalScheme})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %v", err)
 	}
