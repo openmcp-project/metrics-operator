@@ -8,7 +8,7 @@ image:
   repository: deploy-releases-hyperspace-docker.common.cdn.repositories.cloud.sap/cloud-orchestration/co-metrics-operator
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 0.0.5
+  tag: 0.1.2
 
 imagePullSecrets: []
 nameOverride: ""

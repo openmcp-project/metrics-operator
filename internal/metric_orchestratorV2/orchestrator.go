@@ -33,7 +33,7 @@ func NewOrchestrator(creds common.DataSinkCredentials, qConfig QueryConfig) *Orc
 
 func (o *Orchestrator) WithGeneric(metric v1.Metric) (*Orchestrator, error) {
 	dtClient := client.NewClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)
-	metricMetadata := client.NewMetricMetadata(metric.ObjectMeta.Name, metric.Spec.Name, metric.Spec.Description)
+	metricMetadata := client.NewMetricMetadata(metric.Spec.Name, metric.Spec.Name, metric.Spec.Description)
 
 	var err error
 	o.Handler, err = NewGenericHandler(metric, metricMetadata, o.queryConfig, dtClient)
@@ -42,7 +42,7 @@ func (o *Orchestrator) WithGeneric(metric v1.Metric) (*Orchestrator, error) {
 
 func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, error) {
 	dtClient := client.NewClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)
-	metricMetadata := client.NewMetricMetadata(managed.ObjectMeta.Name, managed.Spec.Name, managed.Spec.Description)
+	metricMetadata := client.NewMetricMetadata(managed.Spec.Name, managed.Spec.Name, managed.Spec.Description)
 
 	var err error
 	o.Handler, err = NewManagedHandler(managed, metricMetadata, o.queryConfig, dtClient)
