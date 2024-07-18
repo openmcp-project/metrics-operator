@@ -33,6 +33,6 @@ spec:
   group: account.btp.orchestrate.cloud.sap
   version: v1alpha1
   frequency: 1 # in minutes
-  kubeConfigSecretRef:
-    name: co-mcp-mirza
+  remoteClusterAccessRef:
+    name: remote-cluster-access
     namespace: default

@@ -1,0 +1,14 @@
+apiVersion: business.orchestrate.cloud.sap/v1
+kind: Metric
+metadata:
+  name: crate-mcp-metric
+spec:
+  name: crate-mcp-metric
+  description: Number of ManagedControlPlanes in the Crate cluster
+  kind: ManagedControlPlane
+  group: cola.cloud.sap
+  version: v1alpha1
+  frequency: 1 # in minutes
+  remoteClusterAccessRef:
+    name: crate-cluster
+    namespace: test-monitoring

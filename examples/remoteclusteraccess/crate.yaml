@@ -1,0 +1,12 @@
+apiVersion: business.orchestrate.cloud.sap/v1
+kind: RemoteClusterAccess
+metadata:
+  name: crate-cluster
+  namespace: test-monitoring
+spec:
+  remoteClusterConfig:
+    clusterSecretRef:
+      name: crate-cluster
+      namespace: cola-system
+    serviceAccountName: mcp-operator
+    serviceAccountNamespace: cola-system

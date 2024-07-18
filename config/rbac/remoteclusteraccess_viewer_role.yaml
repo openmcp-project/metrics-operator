@@ -1,0 +1,23 @@
+# permissions for end users to view remoteclusteraccesses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: remoteclusteraccess-viewer-role
+rules:
+- apiGroups:
+  - orchestrate.cloud.sap
+  resources:
+  - remoteclusteraccesses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - orchestrate.cloud.sap
+  resources:
+  - remoteclusteraccesses/status
+  verbs:
+  - get

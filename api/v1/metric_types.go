@@ -60,16 +60,7 @@ type MetricSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	Frequency int `json:"frequency,omitempty"`
 
-	// Reference to the secret that contains the kubeconfig to access an external cluster other than the one the operator is running in
-	// +optional
-	KubeConfigSecretRef *KubeConfigSecretRef `json:"kubeConfigSecretRef,omitempty"`
-}
-
-type KubeConfigSecretRef struct {
-	// Name of the secret
-	Name string `json:"name,omitempty"`
-	// Namespace of the secret
-	Namespace string `json:"namespace,omitempty"`
+	RemoteClusterAccessFacade `json:",inline"`
 }
 
 // MetricStatus defines the observed state of ManagedMetric

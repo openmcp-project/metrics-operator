@@ -35,13 +35,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
-	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/controller"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/controller"
 
 	"github.tools.sap/cloud-orchestration/controller-utils/api"
 	"github.tools.sap/cloud-orchestration/controller-utils/init/crds"
 	"github.tools.sap/cloud-orchestration/controller-utils/init/webhooks"
+
+	cov1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -60,10 +62,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(businessv1.AddToScheme(scheme))
-
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+
+	utilruntime.Must(cov1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -83,8 +84,9 @@ func runInit(setupClient client.Client) {
 			setupClient,
 			scheme,
 			[]client.Object{
-				&businessv1.Metric{},
-				&businessv1.ManagedMetric{},
+				&cov1.Metric{},
+				&cov1.ManagedMetric{},
+				&cov1.RemoteClusterAccess{},
 			},
 			webhooksFlags.InstallOptions...,
 		)

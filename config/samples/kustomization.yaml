@@ -3,4 +3,5 @@ resources:
 - business_v1_metric.yaml
 - business_v1_managedmetric.yaml
 - business_v1_clientconfig.yaml
+- v1_remoteclusteraccess.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

@@ -66,18 +66,6 @@ spec:
                 description: Decide which kind the metric should keep track of (needs
                   to be plural version)
                 type: string
-              kubeConfigSecretRef:
-                description: Reference to the secret that contains the kubeconfig
-                  to access an external cluster other than the one the operator is
-                  running in
-                properties:
-                  name:
-                    description: Name of the secret
-                    type: string
-                  namespace:
-                    description: Namespace of the secret
-                    type: string
-                type: object
               labelSelector:
                 description: Define labels of your object to adapt filters of the
                   query
@@ -86,6 +74,16 @@ spec:
                 description: Sets the name that will be used to identify the metric
                   in Dynatrace(or other providers)
                 type: string
+              remoteClusterAccessRef:
+                description: Reference to the RemoteClusterAccess type that either
+                  reference a kubeconfig or a service account and cluster secret for
+                  remote access
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
               version:
                 description: Define version of the object you want to intrsument
                 type: string

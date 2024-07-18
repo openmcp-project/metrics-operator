@@ -25,16 +25,11 @@ import (
 
 	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/common"
+	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/config"
 	orc "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric_orchestratorV2"
-	corev1 "k8s.io/api/core/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,10 +66,6 @@ type MetricReconciler struct {
 
 	Recorder record.EventRecorder
 }
-
-const (
-	kubeconfigKey = "kubeconfig"
-)
 
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
@@ -121,7 +112,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfig, err := createQueryConfig(ctx, metric.Spec.KubeConfigSecretRef, r)
+	queryConfig, err := createQueryConfig(ctx, &metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, err
 	}
@@ -186,11 +177,11 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}, nil
 }
 
-func createQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfigSecretRef, r InsightReconciler) (orc.QueryConfig, error) {
+func createQueryConfig(ctx context.Context, rcaRef *businessv1.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
 	var queryConfig orc.QueryConfig
 	// Kubernetes client to the external cluster if defined
-	if kcRef != nil {
-		qc, err := createExternalQueryConfig(ctx, kcRef, r.GetClient())
+	if rcaRef != nil {
+		qc, err := config.CreateExternalQueryConfig(ctx, rcaRef, r.GetClient())
 		if err != nil {
 			return orc.QueryConfig{}, err
 		}
@@ -234,49 +225,4 @@ func (r *MetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&businessv1.Metric{}).
 		Complete(r)
-}
-
-func createExternalQueryConfig(ctx context.Context, kcRef *businessv1.KubeConfigSecretRef, inClient client.Client) (*orc.QueryConfig, error) {
-	var secretName = kcRef.Name
-	var secretNamespace = kcRef.Namespace
-
-	// Retrieve the Secret
-	secret := &corev1.Secret{}
-	err := inClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, secret)
-	if err != nil {
-		errSecret := fmt.Errorf("failed to retrieve KubeConfig Secret Ref with name %s in namespace %s: %v", secretName, secretNamespace, err)
-		return nil, errSecret
-	}
-
-	kubeconfigData, ok := secret.Data[kubeconfigKey]
-	if !ok {
-		return nil, fmt.Errorf("kubeconfig key %s not found in Secret", kubeconfigKey)
-	}
-
-	// Create a config from the kubeconfig data
-	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create config from kubeconfig: %v", err)
-	}
-
-	kubeconfig, errKC := clientcmd.Load(kubeconfigData)
-	if errKC != nil {
-		return nil, fmt.Errorf("failed to load Config object from kubeconfigData: %v", errKC)
-	}
-
-	clusterName := kubeconfig.Contexts[kubeconfig.CurrentContext].Cluster
-
-	externalScheme := runtime.NewScheme()
-
-	utilruntime.Must(clientgoscheme.AddToScheme(externalScheme))
-	utilruntime.Must(apiextensionsv1.AddToScheme(externalScheme))
-
-	// Create the client
-	externalClient, err := client.New(config, client.Options{Scheme: externalScheme})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %v", err)
-	}
-
-	return &orc.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName}, nil
 }
