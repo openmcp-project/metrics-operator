@@ -1,4 +1,4 @@
-apiVersion: business.orchestrate.cloud.sap/v1
+apiVersion: insight.orchestrate.cloud.sap/v1alpha1
 kind: Metric
 metadata:
   labels:

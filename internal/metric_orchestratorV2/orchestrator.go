@@ -1,7 +1,7 @@
 package metric_orchestratorV2
 
 import (
-	v1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+	v1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/client"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/common"
 	"k8s.io/client-go/rest"

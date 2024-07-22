@@ -1,9 +1,9 @@
-apiVersion: business.orchestrate.cloud.sap/v1
+apiVersion: insight.orchestrate.cloud.sap/v1alpha1
 kind: ManagedMetric
 metadata:
   name: managed-metric
 spec:
-  name: Status Metric
+  name: managed-metric
   description: Status metric created by an Operator
   kind: Release
   group: helm.crossplane.io

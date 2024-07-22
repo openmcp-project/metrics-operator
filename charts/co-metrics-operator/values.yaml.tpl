@@ -108,7 +108,7 @@ rbac:
   clusterRole:
     rules:
       - apiGroups:
-          - business.orchestrate.cloud.sap
+          - insight.orchestrate.cloud.sap
         resources:
           - managedmetrics
           - metrics

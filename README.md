@@ -6,7 +6,7 @@ Create metric insights for your Kubernetes cluster resources.
 
 #### Metric in Deployed Cluster (where operator runs)
 ```yaml
-apiVersion: business.orchestrate.cloud.sap/v1
+apiVersion: insight.orchestrate.cloud.sap/v1
 kind: Metric
 metadata:
   name: basic-metric
@@ -21,7 +21,7 @@ spec:
 
 #### Metric in External Cluster accessed via kubeconfig secret
 ```yaml
-apiVersion: business.orchestrate.cloud.sap/v1
+apiVersion: insight.orchestrate.cloud.sap/v1
 kind: Metric
 metadata:
   name: ext-sa-metric

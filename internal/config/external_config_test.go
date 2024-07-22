@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+	insight "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 	orc "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric_orchestratorV2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -98,7 +98,7 @@ func (m *MockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
 func TestCreateExternalQueryConfig(t *testing.T) {
 	tests := []struct {
 		name            string
-		racRef          *businessv1.RemoteClusterAccessRef
+		racRef          *insight.RemoteClusterAccessRef
 		mockGet         func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
 		mockSubResource func(subResource string) client.SubResourceClient
 		want            *orc.QueryConfig
@@ -106,16 +106,16 @@ func TestCreateExternalQueryConfig(t *testing.T) {
 	}{
 		{
 			name: "Successfully create query config from KubeConfig",
-			racRef: &businessv1.RemoteClusterAccessRef{
+			racRef: &insight.RemoteClusterAccessRef{
 				Name:      "test-rca",
 				Namespace: "default",
 			},
 			mockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 				switch obj := obj.(type) {
-				case *businessv1.RemoteClusterAccess:
-					*obj = businessv1.RemoteClusterAccess{
-						Spec: businessv1.RemoteClusterAccessSpec{
-							KubeConfigSecretRef: &businessv1.KubeConfigSecretRef{
+				case *insight.RemoteClusterAccess:
+					*obj = insight.RemoteClusterAccess{
+						Spec: insight.RemoteClusterAccessSpec{
+							KubeConfigSecretRef: &insight.KubeConfigSecretRef{
 								SecretReference: corev1.SecretReference{
 									Name:      "test-secret",
 									Namespace: "default",

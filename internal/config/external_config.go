@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+	insight "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 	orc "github.tools.sap/cloud-orchestration/co-metrics-operator/internal/metric_orchestratorV2"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -31,16 +31,16 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(externalScheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(externalScheme))
-	utilruntime.Must(businessv1.AddToScheme(externalScheme))
+	utilruntime.Must(insight.AddToScheme(externalScheme))
 
 }
 
-func CreateExternalQueryConfig(ctx context.Context, racRef *businessv1.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
+func CreateExternalQueryConfig(ctx context.Context, racRef *insight.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
 
 	rcaName := racRef.Name
 	rcaNamespace := racRef.Namespace
 
-	rca := &businessv1.RemoteClusterAccess{}
+	rca := &insight.RemoteClusterAccess{}
 	err := inClient.Get(ctx, types.NamespacedName{Name: rcaName, Namespace: rcaNamespace}, rca)
 	if err != nil {
 		errRCA := fmt.Errorf("failed to retrieve Remote Cluster Acces Ref with name %s in namespace %s: %v", rcaName, rcaNamespace, err)
@@ -60,7 +60,7 @@ func CreateExternalQueryConfig(ctx context.Context, racRef *businessv1.RemoteClu
 	return nil, fmt.Errorf("kubeconfigSecretRef and clusterAccessConfig are both nil")
 }
 
-func queryConfigFromClusterAccessConfig(ctx context.Context, cac *businessv1.ClusterAccessConfig, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
+func queryConfigFromClusterAccessConfig(ctx context.Context, cac *insight.ClusterAccessConfig, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
 	clsData, errData := getCusterDataFromSecret(ctx, cac, inClient)
 	if errData != nil {
 		return nil, errData
@@ -100,7 +100,7 @@ func queryConfigFromClusterAccessConfig(ctx context.Context, cac *businessv1.Clu
 	return &orc.QueryConfig{Client: externalClient, RestConfig: *restConfig, ClusterName: &hostName}, nil
 }
 
-func queryConfigFromKubeConfig(kcRef *businessv1.KubeConfigSecretRef, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
+func queryConfigFromKubeConfig(kcRef *insight.KubeConfigSecretRef, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
 	secretName := kcRef.SecretReference.Name
 	secretNamespace := kcRef.SecretReference.Namespace
 
@@ -156,7 +156,7 @@ func getTokenWithAPI(inClient client.Client, serviceAccount string, namespace, a
 	return token, nil
 }
 
-func getCusterDataFromSecret(ctx context.Context, cac *businessv1.ClusterAccessConfig, inClient client.Client) (*clusterData, error) {
+func getCusterDataFromSecret(ctx context.Context, cac *insight.ClusterAccessConfig, inClient client.Client) (*clusterData, error) {
 	clusterSecretName := cac.ClusterSecretRef.Name
 	clusterSecretNamespace := cac.ClusterSecretRef.Namespace
 

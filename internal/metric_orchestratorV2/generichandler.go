@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+	"github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/client"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -23,14 +23,14 @@ type GenericHandler struct {
 	dCli        dynamic.Interface
 	discoClient discovery.DiscoveryInterface
 
-	metric     v1.Metric
+	metric     v1alpha1.Metric
 	metricMeta client.MetricMetadata
 
 	dtClient    client.DynatraceClient
 	clusterName *string
 }
 
-func NewGenericHandler(metric v1.Metric, metricMeta client.MetricMetadata, qc QueryConfig, dtClient client.DynatraceClient) (*GenericHandler, error) {
+func NewGenericHandler(metric v1alpha1.Metric, metricMeta client.MetricMetadata, qc QueryConfig, dtClient client.DynatraceClient) (*GenericHandler, error) {
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, fmt.Errorf("could not create dynamic client: %w", errCli)
@@ -94,11 +94,11 @@ func (h *GenericHandler) Monitor() (MonitorResult, error) {
 
 	if err != nil {
 		result.Error = err
-		result.Phase = v1.PhaseFailed
+		result.Phase = v1alpha1.PhaseFailed
 		result.Reason = "SendMetricFailed"
 		result.Message = fmt.Sprintf("failed to send metric value to data sink. %s", err.Error())
 	} else {
-		result.Phase = v1.PhaseActive
+		result.Phase = v1alpha1.PhaseActive
 		result.Reason = "MonitoringActive"
 		result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.GvkToString())
 	}

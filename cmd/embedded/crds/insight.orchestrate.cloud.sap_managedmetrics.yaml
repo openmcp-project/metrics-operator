@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: managedmetrics.business.orchestrate.cloud.sap
+  name: managedmetrics.insight.orchestrate.cloud.sap
 spec:
-  group: business.orchestrate.cloud.sap
+  group: insight.orchestrate.cloud.sap
   names:
     kind: ManagedMetric
     listKind: ManagedMetricList
@@ -19,7 +19,7 @@ spec:
       jsonPath: .status.phase
       name: Phase
       type: string
-    name: v1
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ManagedMetric is the Schema for the managedmetrics API

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +24,7 @@ import (
 type RemoteClusterAccessFacade struct {
 	// Reference to the RemoteClusterAccess type that either reference a kubeconfig or a service account and cluster secret for remote access
 	// +optional
-	RemoteClusterAccessRef RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
+	RemoteClusterAccessRef *RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 }
 
 // RemoteClusterAccessRef is to be used by other types to reference a RemoteClusterAccess type

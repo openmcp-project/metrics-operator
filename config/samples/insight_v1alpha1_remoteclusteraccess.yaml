@@ -1,4 +1,4 @@
-apiVersion: orchestrate.cloud.sap/v1
+apiVersion: orchestrate.cloud.sap/v1alpha1
 kind: RemoteClusterAccess
 metadata:
   labels:

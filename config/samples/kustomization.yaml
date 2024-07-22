@@ -1,7 +1,7 @@
 ## Append samples of your project ##
 resources:
-- business_v1_metric.yaml
-- business_v1_managedmetric.yaml
-- business_v1_clientconfig.yaml
-- v1_remoteclusteraccess.yaml
+- insight_v1alpha1_metric.yaml
+- insight_v1alpha1_managedmetric.yaml
+- insight_v1alpha1_clientconfig.yaml
+- insight_v1alpha1_remoteclusteraccess.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

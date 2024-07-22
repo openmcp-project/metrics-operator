@@ -8,7 +8,7 @@ metadata:
   name: remoteclusteraccess-editor-role
 rules:
 - apiGroups:
-  - orchestrate.cloud.sap
+  - insight.orchestrate.cloud.sap
   resources:
   - remoteclusteraccesses
   verbs:
@@ -20,7 +20,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - orchestrate.cloud.sap
+  - insight.orchestrate.cloud.sap
   resources:
   - remoteclusteraccesses/status
   verbs:

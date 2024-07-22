@@ -32,7 +32,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	businessv1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+	insight "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 )
 
 func NewManagedMetricReconciler(mgr ctrl.Manager) *ManagedMetricReconciler {
@@ -61,9 +61,9 @@ type ManagedMetricReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=managedmetrics/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=business.orchestrate.cloud.sap,resources=managedmetrics/finalizers,verbs=update
+//+kubebuilder:rbac:groups=insight.orchestrate.cloud.sap,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=insight.orchestrate.cloud.sap,resources=managedmetrics/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=insight.orchestrate.cloud.sap,resources=managedmetrics/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -76,7 +76,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			1. Load the managed metric using the client
 		 	All method should take the context to allow for cancellation (like CancellationToken)
 	*/
-	metric := businessv1.ManagedMetric{}
+	metric := insight.ManagedMetric{}
 	if errLoad := r.inClient.Get(ctx, req.NamespacedName, &metric); errLoad != nil {
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can also get them
@@ -104,7 +104,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfig, err := createQueryConfig(ctx, &metric.Spec.RemoteClusterAccessRef, r)
+	queryConfig, err := createQueryConfig(ctx, metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError * time.Minute}, err
 	}
@@ -130,14 +130,14 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		3. Update the status of the metric with conditions and phase
 	*/
 	switch result.Phase {
-	case businessv1.PhaseActive:
+	case insight.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
 		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
-	case businessv1.PhaseFailed:
+	case insight.PhaseFailed:
 		l.Error(result.Error, result.Message, "reason", result.Reason)
 		metric.SetConditions(common.Error(result.Message))
 		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
-	case businessv1.PhasePending:
+	case insight.PhasePending:
 		metric.SetConditions(common.Creating())
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
@@ -172,6 +172,6 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManagedMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&businessv1.ManagedMetric{}).
+		For(&insight.ManagedMetric{}).
 		Complete(r)
 }

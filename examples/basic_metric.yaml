@@ -1,4 +1,4 @@
-apiVersion: business.orchestrate.cloud.sap/v1
+apiVersion: insight.orchestrate.cloud.sap/v1alpha1
 kind: Metric
 metadata:
   name: basic-metric
@@ -10,7 +10,7 @@ spec:
   version: v1beta1
   frequency: 1 # in minutes
 #---
-#apiVersion: business.orchestrate.cloud.sap/v1
+#apiVersion: insight.orchestrate.cloud.sap/v1
 #kind: Metric
 #metadata:
 #  name: basic-pods
@@ -22,7 +22,7 @@ spec:
 #  version: v1
 #  frequency: 1 # in minutes
 ---
-apiVersion: business.orchestrate.cloud.sap/v1
+apiVersion: insight.orchestrate.cloud.sap/v1alpha1
 kind: Metric
 metadata:
   name: ext-sa-metric

@@ -8,7 +8,7 @@ metadata:
   name: remoteclusteraccess-viewer-role
 rules:
 - apiGroups:
-  - orchestrate.cloud.sap
+  - insight.orchestrate.cloud.sap
   resources:
   - remoteclusteraccesses
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - orchestrate.cloud.sap
+  - insight.orchestrate.cloud.sap
   resources:
   - remoteclusteraccesses/status
   verbs:

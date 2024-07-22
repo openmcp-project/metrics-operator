@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: metrics.business.orchestrate.cloud.sap
+  name: managedmetrics.insight.orchestrate.cloud.sap
 spec:
-  group: business.orchestrate.cloud.sap
+  group: insight.orchestrate.cloud.sap
   names:
-    kind: Metric
-    listKind: MetricList
-    plural: metrics
-    singular: metric
+    kind: ManagedMetric
+    listKind: ManagedMetricList
+    plural: managedmetrics
+    singular: managedmetric
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -19,10 +19,10 @@ spec:
       jsonPath: .status.phase
       name: Phase
       type: string
-    name: v1
+    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Metric is the Schema for the metrics API
+        description: ManagedMetric is the Schema for the managedmetrics API
         properties:
           apiVersion:
             description: |-
@@ -42,7 +42,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: MetricSpec defines the desired state of Metric
+            description: ManagedMetricSpec defines the desired state of ManagedMetric
             properties:
               description:
                 description: Sets the description that will be used to identify the
@@ -89,7 +89,7 @@ spec:
                 type: string
             type: object
           status:
-            description: MetricStatus defines the observed state of ManagedMetric
+            description: ManagedMetricStatus defines the observed state of ManagedMetric
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -164,6 +164,9 @@ spec:
                 type: array
               phase:
                 default: Pending
+                description: |-
+                  Is set when Metric is Successfully executed and keeps track of the current cycle.
+                  The cycle starts anew and the status will be set to active if execution was successfull
                 enum:
                 - Active
                 - Failed

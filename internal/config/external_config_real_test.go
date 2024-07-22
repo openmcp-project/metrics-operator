@@ -6,7 +6,7 @@ package config
 //	"fmt"
 //	"testing"
 //
-//	v1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+//	v1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 //	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 //	"k8s.io/apimachinery/pkg/runtime/schema"
 //	"k8s.io/client-go/dynamic"

@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: metrics.business.orchestrate.cloud.sap
+  name: metrics.insight.orchestrate.cloud.sap
 spec:
-  group: business.orchestrate.cloud.sap
+  group: insight.orchestrate.cloud.sap
   names:
     kind: Metric
     listKind: MetricList

@@ -1,0 +1,12 @@
+apiVersion: insight.orchestrate.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: dev-core-landscaperdeployment
+spec:
+  name: dev-core-landscaperdeployment
+  description: Number of LandscapperDeplyoments in the LS-DEV-CORE cluster
+  kind: LandscaperDeployment
+  group: landscaper-service.gardener.cloud
+  version: v1alpha1
+  frequency: 1 # in minutes
+---

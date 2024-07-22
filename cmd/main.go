@@ -43,7 +43,7 @@ import (
 	"github.tools.sap/cloud-orchestration/controller-utils/init/crds"
 	"github.tools.sap/cloud-orchestration/controller-utils/init/webhooks"
 
-	cov1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1"
+	cov1 "github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

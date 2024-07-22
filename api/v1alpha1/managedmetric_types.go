@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"fmt"
@@ -23,20 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +kubebuilder:validation:Enum=Active;Failed;Pending
-type PhaseType string
-
-const (
-	PhaseActive  PhaseType = "Active"
-	PhaseFailed  PhaseType = "Failed"
-	PhasePending PhaseType = "Pending"
-)
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// MetricSpec defines the desired state of Metric
-type MetricSpec struct {
+// ManagedMetricSpec defines the desired state of ManagedMetric
+type ManagedMetricSpec struct {
 	// Sets the name that will be used to identify the metric in Dynatrace(or other providers)
 	Name string `json:"name,omitempty"`
 	// Sets the description that will be used to identify the metric in Dynatrace(or other providers)
@@ -63,10 +51,10 @@ type MetricSpec struct {
 	RemoteClusterAccessFacade `json:",inline"`
 }
 
-// MetricStatus defines the observed state of ManagedMetric
-type MetricStatus struct {
-	// Phase is like a snapshot of the current state of the metric's lifecycle
-
+// ManagedMetricStatus defines the observed state of ManagedMetric
+type ManagedMetricStatus struct {
+	// Is set when Metric is Successfully executed and keeps track of the current cycle.
+	// The cycle starts anew and the status will be set to active if execution was successfull
 	// +kubebuilder:default:=Pending
 	Phase PhaseType `json:"phase,omitempty"`
 
@@ -74,40 +62,41 @@ type MetricStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Current phase of the Metric"
-// Metric is the Schema for the metrics API
-type Metric struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   MetricSpec   `json:"spec,omitempty"`
-	Status MetricStatus `json:"status,omitempty"`
-}
-
-func (r *Metric) SetConditions(conditions ...metav1.Condition) {
-	for _, c := range conditions {
-		meta.SetStatusCondition(&r.Status.Conditions, c)
-	}
-}
-
-func (r *Metric) GvkToString() string {
+func (r *ManagedMetric) GvkToString() string {
 	if r.Spec.Group == "" {
 		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Version, r.Spec.Kind)
 	}
 	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Group, r.Spec.Version, r.Spec.Kind)
 }
 
+func (r *ManagedMetric) SetConditions(conditions ...metav1.Condition) {
+	for _, c := range conditions {
+		meta.SetStatusCondition(&r.Status.Conditions, c)
+	}
+}
+
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Current phase of the Metric"
+
+// ManagedMetric is the Schema for the managedmetrics API
+type ManagedMetric struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ManagedMetricSpec   `json:"spec,omitempty"`
+	Status ManagedMetricStatus `json:"status,omitempty"`
+}
+
 //+kubebuilder:object:root=true
 
-// MetricList contains a list of Metric
-type MetricList struct {
+// ManagedMetricList contains a list of ManagedMetric
+type ManagedMetricList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Metric `json:"items"`
+	Items           []ManagedMetric `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Metric{}, &MetricList{})
+	SchemeBuilder.Register(&ManagedMetric{}, &ManagedMetricList{})
 }
