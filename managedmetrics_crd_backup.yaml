@@ -1,11 +1,14 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+  creationTimestamp: "2024-07-22T13:45:51Z"
+  generation: 1
   name: managedmetrics.insight.orchestrate.cloud.sap
+  resourceVersion: "916"
+  uid: a2fe02ec-1f46-4bdb-8a93-341cae584481
 spec:
+  conversion:
+    strategy: None
   group: insight.orchestrate.cloud.sap
   names:
     kind: ManagedMetric
@@ -178,3 +181,22 @@ spec:
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ManagedMetric
+    listKind: ManagedMetricList
+    plural: managedmetrics
+    singular: managedmetric
+  conditions:
+  - lastTransitionTime: "2024-07-22T13:45:51Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2024-07-22T13:45:51Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1
