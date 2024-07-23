@@ -142,7 +142,8 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	metric.Status.Phase = result.Phase
+	metric.Status.Ready = boolToString(result.Phase == insight.PhaseActive)
+	metric.Status.Observation = insight.ManagedObservation{Timestamp: result.Observation.GetTimestamp(), Resources: result.Observation.GetValue()}
 
 	// conditions are not persisted until the status is updated
 	errUp := r.inClient.Status().Update(ctx, &metric)

@@ -150,7 +150,8 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	metric.Status.Phase = result.Phase
+	metric.Status.Ready = boolToString(result.Phase == insight.PhaseActive)
+	metric.Status.Observation = insight.MetricObservation{Timestamp: result.Observation.GetTimestamp(), LatestValue: result.Observation.GetValue()}
 
 	// conditions are not persisted until the status is updated
 	errUp := r.GetClient().Status().Update(ctx, &metric)
@@ -175,6 +176,14 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Requeue:      true,
 		RequeueAfter: time.Duration(requeueTime) * time.Minute,
 	}, nil
+}
+
+func boolToString(b bool) string {
+	if b {
+		return "True"
+	}
+	return "False"
+
 }
 
 func createQueryConfig(ctx context.Context, rcaRef *insight.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {

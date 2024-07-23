@@ -15,10 +15,15 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Current phase of the Metric
-      jsonPath: .status.phase
-      name: Phase
+    - jsonPath: .status.ready
+      name: READY
       type: string
+    - jsonPath: .status.observation.latestValue
+      name: VALUE
+      type: string
+    - jsonPath: .status.observation.timestamp
+      name: OBSERVED
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -162,12 +167,21 @@ spec:
                   - type
                   type: object
                 type: array
-              phase:
-                default: Pending
-                enum:
-                - Active
-                - Failed
-                - Pending
+              observation:
+                description: Observation represent the latest available observation
+                  of an object's state
+                properties:
+                  latestValue:
+                    description: The latest value of the metric
+                    type: string
+                  timestamp:
+                    description: The timestamp of the observation
+                    format: date-time
+                    type: string
+                type: object
+              ready:
+                description: Ready is like a snapshot of the current state of the
+                  metric's lifecycle
                 type: string
             type: object
         type: object

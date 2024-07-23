@@ -23,11 +23,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +kubebuilder:validation:Enum=Active;Failed;Pending
+// +kubebuilder:validation:Enum=Ready;Failed;Pending
 type PhaseType string
 
 const (
-	PhaseActive  PhaseType = "Active"
+	PhaseActive  PhaseType = "Ready"
 	PhaseFailed  PhaseType = "Failed"
 	PhasePending PhaseType = "Pending"
 )
@@ -63,12 +63,30 @@ type MetricSpec struct {
 	RemoteClusterAccessFacade `json:",inline"`
 }
 
+type MetricObservation struct {
+	// The timestamp of the observation
+	Timestamp metav1.Time `json:"timestamp,omitempty"`
+
+	// The latest value of the metric
+	LatestValue string `json:"latestValue,omitempty"`
+}
+
+func (mo *MetricObservation) GetTimestamp() metav1.Time {
+	return mo.Timestamp
+}
+
+func (mo *MetricObservation) GetValue() string {
+	return mo.LatestValue
+}
+
 // MetricStatus defines the observed state of ManagedMetric
 type MetricStatus struct {
-	// Phase is like a snapshot of the current state of the metric's lifecycle
 
-	// +kubebuilder:default:=Pending
-	Phase PhaseType `json:"phase,omitempty"`
+	// Observation represent the latest available observation of an object's state
+	Observation MetricObservation `json:"observation,omitempty"`
+
+	// Ready is like a snapshot of the current state of the metric's lifecycle
+	Ready string `json:"ready,omitempty"`
 
 	// Conditions represent the latest available observations of an object's state
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -76,7 +94,9 @@ type MetricStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Current phase of the Metric"
+// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.ready"
+// +kubebuilder:printcolumn:name="VALUE",type="string",JSONPath=".status.observation.latestValue"
+// +kubebuilder:printcolumn:name="OBSERVED",type="date",JSONPath=".status.observation.timestamp"
 // Metric is the Schema for the metrics API
 type Metric struct {
 	metav1.TypeMeta   `json:",inline"`

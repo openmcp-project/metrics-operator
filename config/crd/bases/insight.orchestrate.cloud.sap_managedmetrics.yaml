@@ -15,10 +15,15 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Current phase of the Metric
-      jsonPath: .status.phase
-      name: Phase
+    - jsonPath: .status.ready
+      name: READY
       type: string
+    - jsonPath: .status.observation.resources
+      name: VALUE
+      type: string
+    - jsonPath: .status.observation.timestamp
+      name: OBSERVED
+      type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -162,15 +167,23 @@ spec:
                   - type
                   type: object
                 type: array
-              phase:
-                default: Pending
+              observation:
+                description: Observation represent the latest available observation
+                  of an object's state
+                properties:
+                  resources:
+                    description: Number of resources of the managed metric (i.e. how
+                      many managed resource are there that match the query)
+                    type: string
+                  timestamp:
+                    description: The timestamp of the observation
+                    format: date-time
+                    type: string
+                type: object
+              ready:
                 description: |-
                   Is set when Metric is Successfully executed and keeps track of the current cycle.
                   The cycle starts anew and the status will be set to active if execution was successfull
-                enum:
-                - Active
-                - Failed
-                - Pending
                 type: string
             type: object
         type: object

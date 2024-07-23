@@ -46,12 +46,12 @@ func NewManagedHandler(metric v1alpha1.ManagedMetric, metricMeta client.MetricMe
 	return handler, nil
 }
 
-func (h *ManagedHandler) sendStatusBasedMetricValue() error {
+func (h *ManagedHandler) sendStatusBasedMetricValue() (string, error) {
 	// add the Datapoint for the metric
 	h.metricMeta.AddDatapoint(1)
 	resources, err := h.getResourcesStatus()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// data point split by dimensions
@@ -66,19 +66,21 @@ func (h *ManagedHandler) sendStatusBasedMetricValue() error {
 		for typ, state := range cr.Status {
 			dimErr := h.metricMeta.AddDimension(strings.ToLower(typ), strconv.FormatBool(state))
 			if dimErr != nil {
-				return dimErr
+				return "", dimErr
 			}
 		}
 
 		// Send Metric
 		_, err = h.dtClient.SendMetric(h.metricMeta)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
+	resourcesCount := len(resources)
+
 	// if no err, returns nil...duh!
-	return err
+	return strconv.Itoa(resourcesCount), err
 }
 
 func (h *ManagedHandler) Monitor() (MonitorResult, error) {
@@ -104,7 +106,7 @@ func (h *ManagedHandler) Monitor() (MonitorResult, error) {
 	}
 
 	result := MonitorResult{}
-	err := h.sendStatusBasedMetricValue()
+	resources, err := h.sendStatusBasedMetricValue()
 
 	if err != nil {
 		result.Error = err
@@ -113,6 +115,7 @@ func (h *ManagedHandler) Monitor() (MonitorResult, error) {
 		result.Message = fmt.Sprintf("failed to send metric value to data sink. %s", err.Error())
 	} else {
 		result.Phase = v1alpha1.PhaseActive
+		result.Observation = &v1alpha1.ManagedObservation{Timestamp: metav1.Now(), Resources: resources}
 		result.Reason = "MonitoringActive"
 		result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.GvkToString())
 	}

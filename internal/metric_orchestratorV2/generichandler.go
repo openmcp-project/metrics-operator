@@ -3,6 +3,7 @@ package metric_orchestratorV2
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1"
 	"github.tools.sap/cloud-orchestration/co-metrics-operator/internal/client"
@@ -53,18 +54,18 @@ func NewGenericHandler(metric v1alpha1.Metric, metricMeta client.MetricMetadata,
 	return handler, nil
 }
 
-func (h *GenericHandler) sendMetricValue() error {
+func (h *GenericHandler) sendMetricValue() (string, error) {
 
 	count, err := h.getResourceCount(h.dCli)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	h.metricMeta.AddDatapoint(float64(count))
 	_, err = h.dtClient.SendMetric(h.metricMeta)
 
 	// if no err, returns nil...duh!
-	return err
+	return strconv.Itoa(count), err
 }
 
 func (h *GenericHandler) Monitor() (MonitorResult, error) {
@@ -90,7 +91,8 @@ func (h *GenericHandler) Monitor() (MonitorResult, error) {
 	}
 
 	result := MonitorResult{}
-	err := h.sendMetricValue()
+
+	value, err := h.sendMetricValue()
 
 	if err != nil {
 		result.Error = err
@@ -101,6 +103,7 @@ func (h *GenericHandler) Monitor() (MonitorResult, error) {
 		result.Phase = v1alpha1.PhaseActive
 		result.Reason = "MonitoringActive"
 		result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.GvkToString())
+		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), LatestValue: value}
 	}
 
 	return result, nil

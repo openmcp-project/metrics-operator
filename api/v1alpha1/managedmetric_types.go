@@ -51,12 +51,31 @@ type ManagedMetricSpec struct {
 	RemoteClusterAccessFacade `json:",inline"`
 }
 
+type ManagedObservation struct {
+	// The timestamp of the observation
+	Timestamp metav1.Time `json:"timestamp,omitempty"`
+
+	// Number of resources of the managed metric (i.e. how many managed resource are there that match the query)
+	Resources string `json:"resources,omitempty"`
+}
+
+func (mo *ManagedObservation) GetTimestamp() metav1.Time {
+	return mo.Timestamp
+}
+
+func (mo *ManagedObservation) GetValue() string {
+	return mo.Resources
+}
+
 // ManagedMetricStatus defines the observed state of ManagedMetric
 type ManagedMetricStatus struct {
+
+	// Observation represent the latest available observation of an object's state
+	Observation ManagedObservation `json:"observation,omitempty"`
+
 	// Is set when Metric is Successfully executed and keeps track of the current cycle.
 	// The cycle starts anew and the status will be set to active if execution was successfull
-	// +kubebuilder:default:=Pending
-	Phase PhaseType `json:"phase,omitempty"`
+	Ready string `json:"ready,omitempty"`
 
 	// Conditions represent the latest available observations of an object's state
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -75,10 +94,11 @@ func (r *ManagedMetric) SetConditions(conditions ...metav1.Condition) {
 	}
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Current phase of the Metric"
-
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.ready"
+// +kubebuilder:printcolumn:name="VALUE",type="string",JSONPath=".status.observation.resources"
+// +kubebuilder:printcolumn:name="OBSERVED",type="date",JSONPath=".status.observation.timestamp"
 // ManagedMetric is the Schema for the managedmetrics API
 type ManagedMetric struct {
 	metav1.TypeMeta   `json:",inline"`

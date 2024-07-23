@@ -9,30 +9,30 @@ spec:
   group: helm.crossplane.io
   version: v1beta1
   frequency: 1 # in minutes
-#---
-#apiVersion: insight.orchestrate.cloud.sap/v1
-#kind: Metric
-#metadata:
-#  name: basic-pods
-#spec:
-#  name: pods-metric
-#  description: Pods
-#  kind: Pod
-#  group: ""
-#  version: v1
-#  frequency: 1 # in minutes
 ---
 apiVersion: insight.orchestrate.cloud.sap/v1alpha1
 kind: Metric
 metadata:
-  name: ext-sa-metric
+  name: basic-pods
 spec:
-  name: ext-subaccount-metric
-  description: Subaccounts in mirza mcp cluster
-  kind: Subaccount
-  group: account.btp.orchestrate.cloud.sap
-  version: v1alpha1
+  name: pods-metric
+  description: Pods
+  kind: Pod
+  group: ""
+  version: v1
   frequency: 1 # in minutes
-  remoteClusterAccessRef:
-    name: remote-cluster-access
-    namespace: default
+---
+#apiVersion: insight.orchestrate.cloud.sap/v1alpha1
+#kind: Metric
+#metadata:
+#  name: ext-sa-metric
+#spec:
+#  name: ext-subaccount-metric
+#  description: Subaccounts in mirza mcp cluster
+#  kind: Subaccount
+#  group: account.btp.orchestrate.cloud.sap
+#  version: v1alpha1
+#  frequency: 1 # in minutes
+#  remoteClusterAccessRef:
+#    name: remote-cluster-access
+#    namespace: default
