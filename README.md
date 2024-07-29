@@ -1,53 +1,151 @@
-# co-metrics-operator
-// TODO(user): Add simple overview of use/purpose
-Create metric insights for your Kubernetes cluster resources.
+# Metrics Operator
 
-## Examples
+The Metrics Operator is a powerful tool designed to monitor and provide insights into the state, usage, patterns, and trends of distributed systems and their associated components.
 
-#### Metric in Deployed Cluster (where operator runs)
-```yaml
-apiVersion: insight.orchestrate.cloud.sap/v1
-kind: Metric
-metadata:
-  name: basic-metric
-spec:
-  name: helm-release-metric
-  description: Helm Release Metric Helm Crossplane Provider
-  kind: Release
-  group: helm.crossplane.io
-  version: v1beta1
-  frequency: 1 # in minutes
+## Table of Contents
+
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [RBAC Configuration](#rbac-configuration)
+- [Remote Cluster Access](#remote-cluster-access)
+- [Data Sink Integration](#data-sink-integration)
+
+## Key Features
+
+- **Comprehensive Resource Tracking**: Quantifies and catalogs various resource types, providing a holistic view of resource distribution and utilization.
+- **Multi-dimensional Analysis**: Examines specific attributes and dimensions of resources, generating nuanced metrics for deeper understanding of system behavior.
+- **Comparative Analytics**: Enables side-by-side analysis of different resource configurations, highlighting patterns and potential imbalances in resource allocation.
+- **Custom Component Focus**: Tailored to monitor and analyze complex, custom-defined resources across your infrastructure.
+- **Predictive Insights**: Aggregates data over time to identify emerging trends, supporting data-driven decision making for future system enhancements.
+- **Strategic Decision Support**: Offers data-backed insights to guide product evolution.
+- **Customizable Alerting System**: Allows defining alerts based on specific metric thresholds, enabling proactive response to potential issues or significant changes in system state.
+
+## Installation
+
+### Prerequisites
+
+1. Create a namespace for the Metrics Operator.
+2. Create a secret containing the credentials for the artifactory (read-only) in the operator's namespace.
+3. Create a secret containing the data sink credentials in the operator's namespace.
+
+### Deployment
+
+Deploy the Metrics Operator using the Helm chart:
+
+```bash
+helm upgrade --install co-metrics-operator deploy-releases-hyperspace-helm/co-metrics-operator \
+  --namespace <operator-namespace> \
+  --create-namespace \
+  --set imagePullSecrets[0].name=<artifactory-secret-name> \
+  --version=<version>
 ```
 
-#### Metric in External Cluster accessed via kubeconfig secret
+Replace `<operator-namespace>`, `<artifactory-secret-name>`, and `<version>` with appropriate values.
+
+## Usage
+
+To create a new metric, deploy a `Metric` resource in your desired namespace. The Metrics Operator will pick up the resource and start monitoring it, periodically sending data points to the configured data sink.
+
+Example `Metric` resource:
+
 ```yaml
-apiVersion: insight.orchestrate.cloud.sap/v1
+apiVersion: insight.orchestrate.cloud.sap/v1alpha1
 kind: Metric
 metadata:
-  name: ext-sa-metric
+    name: example-metric
+    namespace: <metric-namespace>
 spec:
-  name: ext-subaccount-metric
-  description: Subaccounts in mirza mcp cluster
-  kind: Subaccount
-  group: account.btp.orchestrate.cloud.sap
-  version: v1alpha1
-  frequency: 1 # in minutes
-  kubeConfigSecretRef:
-    name: co-mcp-mirza
-    namespace: default
+    description: Description of the metric
+    frequency: 1
+    group: example.group
+    kind: ExampleResource
+    name: example-metric-name
+    version: v1
+```
+
+Apply the metric:
+
+```bash
+kubectl apply -f metric.yaml
+```
+
+## RBAC Configuration
+
+The Metrics Operator requires appropriate permissions to monitor the resources you specify. You need to configure RBAC (Role-Based Access Control) to grant these permissions. Here's an example of how to create a ClusterRole and ClusterRoleBinding for the Metrics Operator:
+
+```yaml
 ---
-apiVersion: v1
-kind: Secret
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
 metadata:
-  name: co-mcp-mirza
-  namespace: default
-type: Opaque
-data:
-  kubeconfig: YXBpVmVyc2lvb...
+  name: metrics-operator-role
+rules:
+- apiGroups:
+  - "example.group"
+  resources:
+  - "exampleresources"
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-operator-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: metrics-operator-sa
+  namespace: <operator-namespace>
+roleRef:
+  kind: ClusterRole
+  name: metrics-operator-role
+  apiGroup: rbac.authorization.k8s.io
 ```
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+Replace `<operator-namespace>` with the namespace where the Metrics Operator is deployed. Adjust the `apiGroups` and `resources` fields to match the resources you want to monitor.
+
+Apply the RBAC configuration:
+
+```bash
+kubectl apply -f rbac-config.yaml
+```
+
+Remember to update this RBAC configuration whenever you add new resource types to monitor.
+
+## Remote Cluster Access
+
+The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `RemoteClusterAccess` resource:
+
+```yaml
+apiVersion: insight.orchestrate.cloud.sap/v1alpha1
+kind: RemoteClusterAccess
+metadata:
+  name: remote-cluster
+  namespace: <monitoring-namespace>
+spec:
+  remoteClusterConfig:
+    clusterSecretRef:
+      name: remote-cluster-secret
+      namespace: <secret-namespace>
+    serviceAccountName: <service-account-name>
+    serviceAccountNamespace: <service-account-namespace>
+```
+
+## Data Sink Integration
+
+The Metrics Operator sends collected data to a configured data sink for storage and analysis. The data sink (e.g., Dynatrace) provides tools for data aggregation, filtering, and visualization.
+
+To make the most of your metrics:
+
+1. Configure your data sink according to its documentation.
+2. Use the data sink's query language or UI to create custom views of your metrics.
+3. Set up alerts based on metric thresholds or patterns.
+4. Leverage the data sink's analysis tools to gain insights into your system's behavior and performance.
+
+For specific instructions on using your data sink's features, refer to its documentation. For example, if using Dynatrace, consult the Dynatrace documentation for information on creating custom charts, setting up alerts, and performing advanced analytics on your metric data.
+
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
@@ -57,82 +155,25 @@ You’ll need a Kubernetes cluster to run against. You can use [KIND](https://si
 1. Install Instances of Custom Resources:
 
 ```sh
-kubectl apply -f config/samples/
+make dev-local-all
 ```
 
-2. Build and push your image to the location specified by `IMG`:
+2. Run the controller:
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/co-metrics-operator:tag
+make dev-run
 ```
+Or run it from your IDE.
 
-3. Deploy the controller to the cluster with the image specified by `IMG`:
-
+### Delete Kind Cluster
+Delete Kind cluster 
 ```sh
-make deploy IMG=<some-registry>/co-metrics-operator:tag
+make dev-clean
 ```
-
-### Uninstall CRDs
-To delete the CRDs from the cluster:
-
-```sh
-make uninstall
-```
-
-### Undeploy controller
-UnDeploy the controller from the cluster:
-
-```sh
-make undeploy
-```
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
-
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
-which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
-
-### Test It Out
-1. Install the CRDs into the cluster:
-
-```sh
-make install
-```
-
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
-
-```sh
-make run
-```
-
-**NOTE:** You can also run this in one step by running: `make install run`
 
 ### Modifying the API definitions
 If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
 
 ```sh
-make manifests
+make manifests generate
 ```
-
-**NOTE:** Run `make --help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
