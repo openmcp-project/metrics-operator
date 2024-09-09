@@ -34,4 +34,57 @@ resources:
   kind: RemoteClusterAccess
   path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: orchestrate.cloud.sap
+  group: insight
+  kind: SingleMetric
+  path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1beta1
+  version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: orchestrate.cloud.sap
+  group: insight
+  kind: CompoundMetric
+  path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1beta1
+  version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: orchestrate.cloud.sap
+  group: insight
+  kind: FederatedMetric
+  path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1beta1
+  version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: orchestrate.cloud.sap
+  group: insight
+  kind: ClusterAccess
+  path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1beta1
+  version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: orchestrate.cloud.sap
+  group: insight
+  kind: FederatedClusterAccess
+  path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1beta1
+  version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: orchestrate.cloud.sap
+  group: insight
+  kind: FederatedManagedMetric
+  path: github.tools.sap/cloud-orchestration/co-metrics-operator/api/v1beta1
+  version: v1beta1
 version: "3"

@@ -1,0 +1,23 @@
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: FederatedClusterAccess
+metadata:
+  name: federate-ca-sample
+  namespace: default
+spec:
+  target:
+    group: core.orchestrate.cloud.sap
+    resource: controlplanes #plural always, lowecase only
+    version: v1beta1
+  kubeConfigPath: spec.target.kubeconfig #case sensitive
+#---
+#apiVersion: insight.orchestrate.cloud.sap/v1beta1
+#kind: FederatedClusterAccess
+#metadata:
+#  name: federate-ca-sample
+#  namespace: default
+#spec:
+#  target:
+#    group: example.com
+#    resource: kubeconfigs #plural always, lowecase only
+#    version: v1
+#  kubeConfigPath: spec.kubeConfig #case sensitive

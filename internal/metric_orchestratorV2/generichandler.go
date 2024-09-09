@@ -14,10 +14,12 @@ import (
 )
 
 const (
-	KIND    string = "kind"
-	GROUP   string = "group"
-	VERSION string = "version"
-	CLUSTER string = "cluster"
+	KIND       string = "kind"
+	GROUP      string = "group"
+	VERSION    string = "version"
+	CLUSTER    string = "cluster"
+	RESOURCE   string = "resource"
+	APIVERSION string = "apiVersion"
 )
 
 type GenericHandler struct {

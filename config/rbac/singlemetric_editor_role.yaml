@@ -1,0 +1,27 @@
+# permissions for end users to edit singlemetrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: singlemetric-editor-role
+rules:
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - singlemetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - singlemetrics/status
+  verbs:
+  - get

@@ -158,7 +158,7 @@ func (m *MetricMetadata) AddDatapoint(point float64) {
 	m.Metric.datapoints = append(m.Metric.datapoints, point)
 	m.Metric.Min = slices.Min(m.Metric.datapoints)
 	m.Metric.max = slices.Max(m.Metric.datapoints)
-	m.Metric.count = uint64(len((m.Metric.datapoints)))
+	m.Metric.count = uint64(len(m.Metric.datapoints))
 	m.Metric.valueType = GAUGE
 
 	for _, value := range m.Metric.datapoints {

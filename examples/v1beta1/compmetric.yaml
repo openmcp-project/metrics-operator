@@ -1,0 +1,16 @@
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: CompoundMetric
+metadata:
+  name: comp-pod
+spec:
+  name: comp-metric-pods
+  description: Pods
+  target:
+    resource: pods
+    group: ""
+    version: v1
+  frequency: 1 # in minutes
+  projections:
+    - name: pod-namespace
+      fieldPath: "metadata.namespace"
+---

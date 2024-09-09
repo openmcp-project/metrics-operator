@@ -1,0 +1,27 @@
+# permissions for end users to edit compoundmetrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: compoundmetric-editor-role
+rules:
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - compoundmetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - compoundmetrics/status
+  verbs:
+  - get

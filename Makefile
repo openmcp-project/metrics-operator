@@ -229,6 +229,12 @@ dev-local-all:
 	$(MAKE) dev-secret
 	$(MAKE) dev-basic-metric
 	$(MAKE) dev-managed-metric
+	$(MAKE) dev-v1beta1-singlemetric
+	$(MAKE) dev-v1beta1-compmetric
+
+
+
+
 
 .PHONY: dev-secret
 dev-secret:
@@ -245,6 +251,16 @@ dev-basic-metric:
 .PHONY: dev-managed-metric
 dev-managed-metric:
 	kubectl apply -f examples/managed_metric.yaml
+
+
+.PHONY: dev-v1beta1-singlemetric
+dev-v1beta1-singlemetric:
+	kubectl apply -f examples/v1beta1/singlemetric.yaml
+
+.PHONY: dev-v1beta1-compmetric
+dev-v1beta1-compmetric:
+	kubectl apply -f examples/v1beta1/compmetric.yaml
+
 
 .PHONY: dev-kind
 dev-kind:

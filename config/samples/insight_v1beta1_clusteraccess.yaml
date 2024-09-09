@@ -1,0 +1,9 @@
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: ClusterAccess
+metadata:
+  labels:
+    app.kubernetes.io/name: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: clusteraccess-sample
+spec:
+  # TODO(user): Add fields here

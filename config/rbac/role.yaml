@@ -23,6 +23,110 @@ rules:
 - apiGroups:
   - insight.orchestrate.cloud.sap
   resources:
+  - clusteraccesses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - clusteraccesses/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - clusteraccesses/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - compoundmetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - compoundmetrics/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - compoundmetrics/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - federatedmanagedmetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - federatedmanagedmetrics/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - federatedmanagedmetrics/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - federatedmetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - federatedmetrics/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - federatedmetrics/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
   - managedmetrics
   verbs:
   - create
@@ -68,6 +172,32 @@ rules:
   - insight.orchestrate.cloud.sap
   resources:
   - metrics/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - singlemetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - singlemetrics/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - insight.orchestrate.cloud.sap
+  resources:
+  - singlemetrics/status
   verbs:
   - get
   - patch

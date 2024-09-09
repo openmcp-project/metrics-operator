@@ -20,6 +20,18 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- federatedmanagedmetric_editor_role.yaml
+- federatedmanagedmetric_viewer_role.yaml
+- federatedclusteraccess_editor_role.yaml
+- federatedclusteraccess_viewer_role.yaml
+- clusteraccess_editor_role.yaml
+- clusteraccess_viewer_role.yaml
+- federatedmetric_editor_role.yaml
+- federatedmetric_viewer_role.yaml
+- compoundmetric_editor_role.yaml
+- compoundmetric_viewer_role.yaml
+- singlemetric_editor_role.yaml
+- singlemetric_viewer_role.yaml
 - remoteclusteraccess_editor_role.yaml
 - remoteclusteraccess_viewer_role.yaml
 

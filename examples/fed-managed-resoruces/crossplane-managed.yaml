@@ -1,0 +1,12 @@
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: FederatedManagedMetric
+metadata:
+  name: xfed-managed
+spec:
+  name: xfed-managed
+  description: crossplane managed resources
+  frequency: 1 # in minutes
+  federateCaRef:
+    name: federate-ca-sample
+    namespace: default
+---
