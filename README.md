@@ -45,30 +45,147 @@ Replace `<operator-namespace>`, `<artifactory-secret-name>`, and `<version>` wit
 
 ## Usage
 
-To create a new metric, deploy a `Metric` resource in your desired namespace. The Metrics Operator will pick up the resource and start monitoring it, periodically sending data points to the configured data sink.
 
-Example `Metric` resource:
+### Single Metric
+To create a basic metric, deploy a `SingleMetric` resource in your desired namespace. The Metrics Operator will pick up the resource and start monitoring it, periodically sending data points to the configured data sink.
+
+Example `SingleMetric` resource:
 
 ```yaml
-apiVersion: insight.orchestrate.cloud.sap/v1alpha1
-kind: Metric
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: SingleMetric
 metadata:
-    name: example-metric
-    namespace: <metric-namespace>
+  name: single-pod
 spec:
-    description: Description of the metric
-    frequency: 1
-    group: example.group
-    kind: ExampleResource
-    name: example-metric-name
+  name: single-metric-pods
+  description: Pods
+  target:
+    kind: Pod
+    group: ""
     version: v1
+  frequency: 1 # in minutes
+---
 ```
 
 Apply the metric:
 
 ```bash
-kubectl apply -f metric.yaml
+kubectl apply -f singlemetric.yaml
 ```
+
+### Compound Metric
+
+Compound metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data. 
+This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation to access nested fields.
+The projections are then translated to dimensions in the metric.
+
+```yaml
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: CompoundMetric
+metadata:
+  name: comp-pod
+spec:
+  name: comp-metric-pods
+  description: Pods
+  target:
+    resource: pods
+    group: ""
+    version: v1
+  frequency: 1 # in minutes
+  projections:
+    - name: pod-namespace
+      fieldPath: "metadata.namespace"
+---
+```
+
+### Federated Metric
+Federated metrics deal with resources that are spread across multiple clusters. To monitor these resources, you need to define a `FederatedMetric` resource.
+They offer capabilities to aggregate data as well as filtering down to a specific cluster or field using projections.
+```yaml
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: FederatedMetric
+metadata:
+  name: xfed-prov
+spec:
+  name: xfed-prov
+  description: crossplane providers
+  target:
+    group:  pkg.crossplane.io
+    resource: providers
+    version: v1
+  frequency: 1 # in minutes
+  projections:
+    - name: package
+      fieldPath: "spec.package"
+  federateCaRef:
+    name: federate-ca-sample
+    namespace: default
+---
+
+```
+
+### Federated Managed Metric
+This is a special use case metric, it is looking at all the crossplane managed resource across all clusters. 
+The pre-condition here is that if a resource comes from a crossplane provider, its CRD should have categories "crossplane" and "managed".
+
+
+```yaml
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: FederatedManagedMetric
+metadata:
+  name: xfed-managed
+spec:
+  name: xfed-managed
+  description: crossplane managed resources
+  frequency: 1 # in minutes
+  federateCaRef:
+    name: federate-ca-sample
+    namespace: default
+---
+```
+
+## Remote Cluster Access
+
+
+### Cluster Access
+The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `ClusterAccess` resource:
+
+This cluster access resource can be used by `SingleMetric` and `CompoundMetric` resources to monitor resources in the remote cluster.
+
+```yaml
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: ClusterAccess
+metadata:
+  name: remote-cluster
+  namespace: <monitoring-namespace>
+spec:
+  remoteClusterConfig:
+    clusterSecretRef:
+      name: remote-cluster-secret
+      namespace: <secret-namespace>
+    serviceAccountName: <service-account-name>
+    serviceAccountNamespace: <service-account-namespace>
+```
+
+
+### Federated Cluster Access
+
+To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource:
+
+```yaml
+apiVersion: insight.orchestrate.cloud.sap/v1beta1
+kind: FederatedClusterAccess
+metadata:
+  name: federate-ca-sample
+  namespace: default
+spec:
+  target:
+    group: core.orchestrate.cloud.sap
+    resource: controlplanes #plural always, lowecase only
+    version: v1beta1
+  kubeConfigPath: spec.target.kubeconfig #case sensitive
+```
+
 
 ## RBAC Configuration
 
@@ -114,24 +231,6 @@ kubectl apply -f rbac-config.yaml
 
 Remember to update this RBAC configuration whenever you add new resource types to monitor.
 
-## Remote Cluster Access
-
-The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `RemoteClusterAccess` resource:
-
-```yaml
-apiVersion: insight.orchestrate.cloud.sap/v1alpha1
-kind: RemoteClusterAccess
-metadata:
-  name: remote-cluster
-  namespace: <monitoring-namespace>
-spec:
-  remoteClusterConfig:
-    clusterSecretRef:
-      name: remote-cluster-secret
-      namespace: <secret-namespace>
-    serviceAccountName: <service-account-name>
-    serviceAccountNamespace: <service-account-namespace>
-```
 
 ## Data Sink Integration
 
