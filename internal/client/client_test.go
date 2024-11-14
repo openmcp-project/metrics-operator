@@ -35,7 +35,7 @@ func TestMetricAddDimension(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.Metric.dimensions)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -63,7 +63,7 @@ func TestMetricAddDimensions(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.Metric.dimensions)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -94,7 +94,7 @@ func TestMetricClearDimensions(t *testing.T) {
 			metric.ClearDimensions()
 			diff := cmp.Diff(tc.want, metric.Metric.dimensions)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -121,7 +121,7 @@ func TestMetricAddDatapoint(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.Metric.datapoints)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -146,7 +146,7 @@ func TestMetricAddDatapoints(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.Metric.datapoints)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -172,7 +172,7 @@ func TestMetricClearDatapoints(t *testing.T) {
 			metric.ClearDatapoints()
 			diff := cmp.Diff(tc.want, metric.Metric.datapoints)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -199,7 +199,7 @@ func TestMetricSetTimestamp(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.Metric.timestamp)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -225,7 +225,7 @@ func TestMetricSetTypeCount(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.Metric.valueType)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -250,7 +250,7 @@ func TestMetricSetUnit(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.Unit)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -275,7 +275,7 @@ func TestMetricAddTags(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.Tags)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -302,7 +302,7 @@ func TestMetricAddTag(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.Tags)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -327,7 +327,7 @@ func TestMetricSetMaxValue(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.MetricProperties.MaxValue)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -352,7 +352,7 @@ func TestMetricSetMinValue(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.MetricProperties.MinValue)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -375,7 +375,7 @@ func TestMetricSetRootCauseRelevant(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.MetricProperties.RootCauseRelevant)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -398,7 +398,7 @@ func TestMetricSetImpactRelevant(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.MetricProperties.ImpactRelevant)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -421,7 +421,7 @@ func TestMetricSetValueType(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.MetricProperties.ValueType)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -445,7 +445,7 @@ func TestMetricSetLatency(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.MetricProperties.Latency)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
@@ -470,7 +470,7 @@ func TestMetricAddMetadataDimension(t *testing.T) {
 
 			diff := cmp.Diff(tc.want, metric.value.Dimensions)
 			if diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("%s", diff)
 			}
 		})
 	}
