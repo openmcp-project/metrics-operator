@@ -35,7 +35,7 @@ func (h *CompoundHandler) Monitor() (MonitorResult, error) {
 		mrTotal.AddDimension(CLUSTER, *h.clusterName)
 	}
 
-	result := MonitorResult{}
+	result := MonitorResult{Observation: &v1beta1.MetricObservation{Timestamp: metav1.Now()}}
 
 	list, err := h.getResources()
 	if err != nil {
@@ -78,10 +78,7 @@ func (h *CompoundHandler) Monitor() (MonitorResult, error) {
 
 		if dimensions != nil {
 			result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1beta1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(list.Items))}}}
-		} else {
-			result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now()}
 		}
-
 	}
 
 	return result, nil

@@ -83,7 +83,7 @@ func (m *Metric) format() string {
 
 	var dimPairs []string
 	for k, v := range m.dimensions {
-		dimPairs = append(dimPairs, fmt.Sprintf("%s=%s", k, v))
+		dimPairs = append(dimPairs, fmt.Sprintf("%s=\"%s\"", k, v)) // Note: need to add quotes for multi-word values, otherwise an exception is thrown
 	}
 	dimensions := strings.Join(dimPairs, ",")
 
