@@ -44,8 +44,12 @@ type SingleMetricSpec struct {
 	// +kubebuilder:validation:Required
 	Target GroupVersionKind `json:"target,omitempty"`
 
+	// Define labels of your object to adapt filters of the query
 	// +optional
-	Selectors Selectors `json:"selectors,inline"`
+	LabelSelector string `json:"labelSelector,omitempty"`
+	// Define fields of your object to adapt filters of the query
+	// +optional
+	FieldSelector string `json:"fieldSelector,omitempty"`
 
 	// Define in what interval the query should be recorded (in minutes) # min: 1
 	// +optional
@@ -54,15 +58,6 @@ type SingleMetricSpec struct {
 	Frequency int `json:"frequency,omitempty"`
 
 	ClusterAccessFacade `json:",inline"`
-}
-
-type Selectors struct {
-	// Define labels of your object to adapt filters of the query
-	// +optional
-	LabelSelector string `json:"labelSelector,omitempty"`
-	// Define fields of your object to adapt filters of the query
-	// +optional
-	FieldSelector string `json:"fieldSelector,omitempty"`
 }
 
 type GroupVersionKind struct {

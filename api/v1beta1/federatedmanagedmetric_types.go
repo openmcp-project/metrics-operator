@@ -28,8 +28,12 @@ type FederatedManagedMetricSpec struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 
+	// Define labels of your object to adapt filters of the query
 	// +optional
-	Selectors Selectors `json:"selectors,inline"`
+	LabelSelector string `json:"labelSelector,omitempty"`
+	// Define fields of your object to adapt filters of the query
+	// +optional
+	FieldSelector string `json:"fieldSelector,omitempty"`
 
 	//Projections []Projection `json:"projections,omitempty"`
 

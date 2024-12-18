@@ -146,9 +146,16 @@ func (h *FederatedHandler) extractProjectionGroupsFrom(list *unstructured.Unstru
 func (h *FederatedHandler) getResources() (*unstructured.UnstructuredList, bool, error) {
 	var options = metav1.ListOptions{}
 	// if not defined in the metric, the list options need to be empty to get resources based on GVR only
-	if h.metric.Spec.Selectors.LabelSelector != "" && h.metric.Spec.Selectors.FieldSelector != "" {
-		options = metav1.ListOptions{LabelSelector: h.metric.Spec.Selectors.LabelSelector, FieldSelector: h.metric.Spec.Selectors.FieldSelector}
+	// Add label selector if present
+	if h.metric.Spec.LabelSelector != "" {
+		options.LabelSelector = h.metric.Spec.LabelSelector
 	}
+
+	// Add field selector if present
+	if h.metric.Spec.FieldSelector != "" {
+		options.FieldSelector = h.metric.Spec.FieldSelector
+	}
+
 	gvr := schema.GroupVersionResource{
 		Group:    h.metric.Spec.Target.Group,
 		Version:  h.metric.Spec.Target.Version,

@@ -5,6 +5,7 @@ metadata:
 spec:
   name: comp-metric-pods
   description: Pods
+  fieldSelector: "status.phase=Running"
   target:
     resource: pods
     group: ""

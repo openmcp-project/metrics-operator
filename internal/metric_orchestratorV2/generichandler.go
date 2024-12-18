@@ -114,8 +114,14 @@ func (h *GenericHandler) Monitor() (MonitorResult, error) {
 func (h *GenericHandler) getResourceCount(dCli dynamic.Interface) (int, error) {
 	var options = metav1.ListOptions{}
 	// if not defined in the metric, the list options need to be empty to get resources based on GVR only
-	if h.metric.Spec.LabelSelector != "" && h.metric.Spec.FieldSelector != "" {
-		options = metav1.ListOptions{LabelSelector: h.metric.Spec.LabelSelector, FieldSelector: h.metric.Spec.FieldSelector}
+	// Add label selector if present
+	if h.metric.Spec.LabelSelector != "" {
+		options.LabelSelector = h.metric.Spec.LabelSelector
+	}
+
+	// Add field selector if present
+	if h.metric.Spec.FieldSelector != "" {
+		options.FieldSelector = h.metric.Spec.FieldSelector
 	}
 
 	gvk := schema.GroupVersionKind{Group: h.metric.Spec.Group, Version: h.metric.Spec.Version, Kind: h.metric.Spec.Kind}
