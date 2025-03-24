@@ -1,0 +1,19 @@
+apiVersion: metrics.cloud.sap/v1beta1
+kind: FederatedMetric
+metadata:
+  name: xfed-prov
+spec:
+  name: xfed-prov
+  description: crossplane providers
+  target:
+    group:  pkg.crossplane.io
+    resource: providers
+    version: v1
+  frequency: 1 # in minutes
+  projections:
+    - name: package
+      fieldPath: "spec.package"
+  federateCaRef:
+    name: federate-ca-sample
+    namespace: default
+---

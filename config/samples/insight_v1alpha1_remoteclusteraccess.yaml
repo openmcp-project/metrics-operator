@@ -1,0 +1,9 @@
+apiVersion: orchestrate.cloud.sap/v1alpha1
+kind: RemoteClusterAccess
+metadata:
+  labels:
+    app.kubernetes.io/name: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: remoteclusteraccess-sample
+spec:
+  # TODO(user): Add fields here

@@ -1,0 +1,12 @@
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: ManagedMetric
+metadata:
+  labels:
+    app.kubernetes.io/name: managedmetric
+    app.kubernetes.io/instance: managedmetric-sample
+    app.kubernetes.io/part-of: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: co-metrics-operator
+  name: managedmetric-sample
+spec:
+  # TODO(user): Add fields here

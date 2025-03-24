@@ -1,0 +1,45 @@
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: crate-mcp-metric
+spec:
+  name: crate-mcp-metric
+  description: Number of ManagedControlPlanes in the Crate cluster
+  kind: ManagedControlPlane
+  group: cola.cloud.sap
+  version: v1alpha1
+  frequency: 1 # in minutes
+  remoteClusterAccessRef:
+    name: crate-cluster
+    namespace: test-monitoring
+---
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: crate-co-metric
+spec:
+  name: crate-co-metric
+  description: Number of CloudOrchestrators in the Crate cluster
+  kind: CloudOrchestrator
+  group: cola.cloud.sap
+  version: v1alpha1
+  frequency: 1 # in minutes
+  remoteClusterAccessRef:
+    name: crate-cluster
+    namespace: test-monitoring
+---
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: crate-dataplane-metric
+spec:
+  name: crate-dataplane-metric
+  description: Number of DataPlanes in the Crate cluster
+  kind: DataPlane
+  group: cola.cloud.sap
+  version: v1alpha1
+  frequency: 1 # in minutes
+  remoteClusterAccessRef:
+    name: crate-cluster
+    namespace: test-monitoring
+---

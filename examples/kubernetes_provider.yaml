@@ -1,0 +1,34 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: kubernetes-provider
+  namespace: default
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v0.11.4
+
+---
+#apiVersion: kubernetes.crossplane.io/v1alpha1
+#kind: ProviderConfig
+#metadata:
+#  name: kubernetes-provider
+#  namespace: default
+#spec:
+#  credentials:
+#    source: InjectedIdentity
+#
+#---
+#
+#apiVersion: kubernetes.crossplane.io/v1alpha2
+#kind: Object
+#metadata:
+#  name: foo
+#  namespace: default
+#spec:
+#  forProvider:
+#    manifest:
+#      apiVersion: v1
+#      kind: ConfigMap
+#      metadata:
+#        namespace: default
+#  providerConfigRef:
+#    name: kubernetes-provider
