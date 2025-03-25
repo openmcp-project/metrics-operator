@@ -158,7 +158,7 @@ GOLANGCILINT ?= $(LOCALBIN)/golangci-lint
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.1
 CONTROLLER_TOOLS_VERSION ?= v0.17.2
-GOLANGCILINT_VERSION ?= v1.64.8
+GOLANGCILINT_VERSION ?= v2.0.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
@@ -289,7 +289,7 @@ $(GOLANGCILINT): $(LOCALBIN)
 		echo "$(LOCALBIN)/golangci-lint version is not expected $(GOLANGCILINT_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/golangci-lint; \
 	fi
-	test -s $(golangci-lint)/golangci-lint || GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
+	test -s $(golangci-lint)/golangci-lint || GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
 
 
 .PHONY: lint
