@@ -5,7 +5,7 @@
 domain: cloud.sap
 layout:
 - go.kubebuilder.io/v4
-projectName: co-metrics-operator
+projectName: metrics-operator
 repo: github.com/SAP/metrics-operator
 resources:
 - api:
