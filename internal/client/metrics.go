@@ -1,13 +1,10 @@
 package client
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	dyn "github.com/dynatrace-ace/dynatrace-go-api-client/api/v2/environment/dynatrace"
 )
@@ -38,7 +35,6 @@ type Metric struct {
 	id         *string
 	dimensions map[string]string
 	datapoints []float64
-	timestamp  int64 // UTC Milliseconds Timestamp
 	valueType  MetricType
 	Min        float64
 	max        float64
@@ -142,11 +138,6 @@ func (m *MetricMetadata) AddDimensions(dimension map[string]string) error {
 	return nil
 }
 
-// RemoveDimension remove dimension by key
-func (m *MetricMetadata) RemoveDimension(key string) {
-	delete(m.Metric.dimensions, key)
-}
-
 // ClearDimensions empty all dimensions and replaces them with an empty map
 func (m *MetricMetadata) ClearDimensions() {
 	m.Metric.dimensions = map[string]string{}
@@ -173,174 +164,6 @@ func (m *MetricMetadata) AddDatapoint(point float64) {
 	}
 }
 
-// AddDatapoints Add multiple datapoints that will be the value displayed on the graph in dynatrace
-// This function only appends to a list of datapoints.
-// The payload if multiple datapoints exist consist of multiple statistics calculated from the list of points.
-// Payload consists of: minimum, maximum, count and sum
-//
-// Type regarding the number of Datapoints:
-// When Adding more than one datapoint the Type of the Metric will automatically be set to GAUGE
-//
-// If there is only one datapoint the type will still be GAUGE, but can be manually set to COUNT via "SetValueType()"
-func (m *MetricMetadata) AddDatapoints(points ...float64) {
-	if len(points) == 0 {
-		return
-	}
-	m.Metric.datapoints = append(m.Metric.datapoints, points...)
-	m.Metric.Min = slices.Min(m.Metric.datapoints)
-	m.Metric.max = slices.Max(m.Metric.datapoints)
-	m.Metric.count = uint64(len(m.Metric.datapoints))
-	m.Metric.valueType = GAUGE
-	for _, value := range m.Metric.datapoints {
-		m.Metric.sum += value
-	}
-}
-
-// ClearDatapoints replaces list of datapoints with an empty array
-func (m *MetricMetadata) ClearDatapoints() {
-	m.Metric.datapoints = []float64{}
-}
-
-// SetTimestamp Set the timestamp of the metric manually
-// if not set the timestamp when the metric is received will be used
-//
-// Rules:
-//
-// - Up to 10 minutes in the future
-//
-// - Up to 1 hour in the past
-func (m *MetricMetadata) SetTimestamp(timestamp int64) error {
-	pastLimit := int64(time.Now().Add(time.Hour*-1).UTC().Nanosecond()) / int64(time.Millisecond)
-	futureLimit := int64(time.Now().Add(time.Minute*10).UTC().Nanosecond()) / int64(time.Millisecond)
-	if timestamp > pastLimit || timestamp < futureLimit {
-		m.Metric.timestamp = timestamp
-		return nil
-	}
-	return errors.New("timestamp can only be 10 minutes into the future or 1 hour into the past")
-}
-
-// SetTypeCount Set type to COUNT
-//
-// Type count can only be set if one datapoint exists
-// the reason being, that count will add a delta to the current datapoint and records this in dynatrace
-func (m *MetricMetadata) SetTypeCount(delta float64) error {
-	if len(m.Metric.datapoints) == 1 {
-		m.Metric.valueType = COUNT
-		m.Metric.delta = delta
-		return nil
-	}
-	return fmt.Errorf("using type count is only possible with one datapoint: current count %v", len(m.Metric.datapoints))
-}
-
-// SetUnit Set the unit of measure for your metric
-//
-// This is also only send via metric metadata
-func (m *MetricMetadata) SetUnit(unit string) {
-	m.value.Unit = unit
-}
-
-// AddTags Add tags for your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to filter for your metric in the dynatrace UI
-func (m *MetricMetadata) AddTags(tags []string) {
-	m.value.Tags = append(m.value.Tags, tags...)
-
-}
-
-// AddTag Add a tag to your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to filter for your metric in the dynatrace UI
-func (m *MetricMetadata) AddTag(tag string) {
-	m.value.Tags = append(m.value.Tags, tag)
-
-}
-
-// SetMaxValue Add a maximum value to your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to limit the value (useful if a metric is used that sums up over a long period of time)
-func (m *MetricMetadata) SetMaxValue(value float64) {
-	m.value.MetricProperties.MaxValue = value
-
-}
-
-// SetMinValue Add a minimum value to your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to limit the value (useful if a metric is used that sums up over a long period of time)
-func (m *MetricMetadata) SetMinValue(value float64) {
-	m.value.MetricProperties.MinValue = value
-
-}
-
-// SetRootCauseRelevant Add a rootcause relevant flag to your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to filter for your metric
-func (m *MetricMetadata) SetRootCauseRelevant(value bool) {
-	m.value.MetricProperties.RootCauseRelevant = value
-
-}
-
-// SetImpactRelevant Add a impact relevant flag to your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to filter for your metric
-func (m *MetricMetadata) SetImpactRelevant(value bool) {
-	m.value.MetricProperties.ImpactRelevant = value
-
-}
-
-// SetValueType Set the Value type of your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to filter for your metric
-func (m *MetricMetadata) SetValueType(value ValueType) {
-	m.value.MetricProperties.ValueType = value
-
-}
-
-// SetLatency Set the latency of your metric
-//
-// This is also only send via metric metadata
-func (m *MetricMetadata) SetLatency(latency int) {
-	if latency > 0 {
-		m.value.MetricProperties.Latency = latency
-	}
-
-}
-
-// AddMetadataDimension Add a dimension to your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to predefine the available metrics without sending a datapoint
-func (m *MetricMetadata) AddMetadataDimension(key string, displayName string) {
-	if key != "" && displayName != "" {
-		m.value.Dimensions = append(m.value.Dimensions, Dimension{Key: key, DisplayName: displayName})
-	}
-
-}
-
-// AddMetadataDimensions Add dimensions to your metric
-//
-// # This is also only send via metric metadata
-//
-// This can be used to predefine the available metrics without sending a datapoint
-func (m *MetricMetadata) AddMetadataDimensions(dimensions []Dimension) {
-	m.value.Dimensions = append(m.value.Dimensions, dimensions...)
-
-}
-
 // GenerateMetricBody Generate the payload body that can be used to send a datapoint with dimensions to the backend
 //
 // This will generate a body to send a datapoint to the backend (please use the client-api if you want to send something)
@@ -365,50 +188,4 @@ func (m *MetricMetadata) GenerateMetricBody() string {
 	body := *m.Metric.id + dimensionsString + " " + formatString + "," + datapointString
 
 	return body
-}
-
-// GenerateSettingsObjects Generate the payload body that can be used to send metric metadata to the backend
-//
-// This will generate a SettingsObject to send metadata for a sepcific metric to the backend (PLEASE use the client-api if you want to send something)
-// This can be used to check if the body is correctly generated
-func (m *MetricMetadata) GenerateSettingsObjects() ([]dyn.SettingsObjectCreate, error) {
-	val := m.value
-	js, err := json.Marshal(val)
-	if err != nil {
-		return []dyn.SettingsObjectCreate{}, err
-	}
-	var mapped map[string]interface{}
-	err = json.Unmarshal(js, &mapped)
-	if err != nil {
-		return []dyn.SettingsObjectCreate{}, err
-	}
-	m.Setting.Value = mapped
-
-	return []dyn.SettingsObjectCreate{m.Setting}, nil
-}
-
-// GenerateUpdateSettings Generate the payload body that can be used to send metric metadata to the backend
-//
-// This will generate a SettingsObjectUpdate to send updated metadata for a sepcific metric to the backend (PLEASE use the client-api if you want to send something)
-// This can be used to check if the body is correctly generated
-func (m *MetricMetadata) GenerateUpdateSettings(_ string, metric MetricMetadata, updateToken string) (dyn.SettingsObjectUpdate, error) {
-	val := metric.value
-	js, err := json.Marshal(val)
-	if err != nil {
-		return dyn.SettingsObjectUpdate{}, err
-	}
-	var mapped map[string]interface{}
-	err = json.Unmarshal(js, &mapped)
-	if err != nil {
-		return dyn.SettingsObjectUpdate{}, err
-	}
-	var setting dyn.SettingsObjectUpdate
-
-	if updateToken != "" {
-		setting = dyn.SettingsObjectUpdate{UpdateToken: &updateToken, Value: mapped}
-		return setting, nil
-	}
-	setting = dyn.SettingsObjectUpdate{Value: mapped}
-	return setting, nil
-
 }
