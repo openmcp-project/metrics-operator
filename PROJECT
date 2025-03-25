@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: cloud.sap
+domain: metrics.cloud.sap
 layout:
 - go.kubebuilder.io/v4
 projectName: metrics-operator
@@ -12,8 +12,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: Metric
   path: github.com/SAP/metrics-operator/api/v1alpha1
   version: v1alpha1
@@ -21,16 +20,14 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: ManagedMetric
   path: github.com/SAP/metrics-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: RemoteClusterAccess
   path: github.com/SAP/metrics-operator/api/v1alpha1
   version: v1alpha1
@@ -38,8 +35,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: SingleMetric
   path: github.com/SAP/metrics-operator/api/v1beta1
   version: v1beta1
@@ -47,8 +43,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: CompoundMetric
   path: github.com/SAP/metrics-operator/api/v1beta1
   version: v1beta1
@@ -56,8 +51,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: FederatedMetric
   path: github.com/SAP/metrics-operator/api/v1beta1
   version: v1beta1
@@ -65,16 +59,14 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: ClusterAccess
   path: github.com/SAP/metrics-operator/api/v1beta1
   version: v1beta1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: FederatedClusterAccess
   path: github.com/SAP/metrics-operator/api/v1beta1
   version: v1beta1
@@ -82,8 +74,7 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: cloud.sap
-  group: metrics
+  domain: metrics.cloud.sap
   kind: FederatedManagedMetric
   path: github.com/SAP/metrics-operator/api/v1beta1
   version: v1beta1
