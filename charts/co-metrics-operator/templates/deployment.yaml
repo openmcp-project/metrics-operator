@@ -1,0 +1,227 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "operator.fullname" . }}
+  labels:
+    {{- include "operator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "operator.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "operator.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.init.enabled }}
+      initContainers:
+        - name: {{ .Chart.Name }}-init
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - init
+            {{- if .Values.crds.manage }}
+            - "--install-crds"
+            {{- end }}
+            {{- if .Values.webhooks.manage }}
+            - "--install-webhooks"
+            {{- if .Values.webhooks.url }}
+            - "--webhooks-base-url={{ .Values.webhooks.url }}"
+            - "--webhooks-without-ca"
+            {{- end }}
+            {{- end }}
+            {{- with .Values.init.args }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .Values.init.extraArgs }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            {{- if .Values.webhooks.manage }}
+            - name: WEBHOOK_SECRET_NAME
+              value: {{ include "operator.fullname" . }}-webhooks-tls
+            - name: WEBHOOK_SECRET_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: WEBHOOK_SERVICE_NAME
+              value: {{ include "operator.fullname" . }}-webhooks
+            - name: WEBHOOK_SERVICE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- end }}
+          {{- with .Values.init.env }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.init.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- range .Values.clusters }}
+            - name: {{ upper .name }}_CLUSTER_HOST
+              value: {{ quote .url }}
+            - name: {{ upper .name }}_CLUSTER_CONFIG_DIR
+              value: /var/run/secrets/{{ .name }}-cluster
+          {{- end }}
+          volumeMounts:
+          {{- with .Values.init.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.init.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- range .Values.clusters }}
+            - mountPath: /var/run/secrets/{{ .name }}-cluster
+              name: projected-token-{{ .name }}
+          {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - start
+            - "--metrics-bind-address={{ .Values.metrics.listen.host }}:{{ .Values.metrics.listen.port }}"
+            {{- if .Values.webhooks.listen }}
+            - "--webhooks-bind-address={{ .Values.webhooks.listen.host }}:{{ .Values.webhooks.listen.port }}"
+            {{- end }}
+            {{- with .Values.manager.args }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .Values.manager.extraArgs }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+          {{- if .Values.webhooks.listen }}
+            - name: webhooks-https
+              containerPort: {{ .Values.webhooks.listen.port }}
+              protocol: TCP
+          {{- end }}
+            - name: metrics-http
+              containerPort: {{ .Values.metrics.listen.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          {{- if .Values.webhooks.listen }}
+            - name: webhooks-tls
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+          {{- end }}
+          {{- with .Values.manager.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.manager.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- range .Values.clusters }}
+            - mountPath: /var/run/secrets/{{ .name }}-cluster
+              name: projected-token-{{ .name }}
+          {{- end }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+          {{- with .Values.manager.env }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.manager.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- range .Values.clusters }}
+            - name: {{ upper .name }}_CLUSTER_HOST
+              value: {{ quote .url }}
+            - name: {{ upper .name }}_CLUSTER_CONFIG_DIR
+              value: /var/run/secrets/{{ .name }}-cluster
+          {{- end }}
+      volumes:
+      {{- if .Values.webhooks.listen }}
+        - name: webhooks-tls
+          secret:
+            defaultMode: 420
+            secretName: {{ include "operator.fullname" . }}-webhooks-tls
+      {{- end }}
+      {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- range .Values.clusters }}
+        - name: projected-token-{{ .name }}
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 7200
+                  audience: {{ .audience }}
+              - configMap:
+                  name: {{ .caConfigMapName }}
+                  items:
+                  - key: ca.crt
+                    path: ca.crt
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

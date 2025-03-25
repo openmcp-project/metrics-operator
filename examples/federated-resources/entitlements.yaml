@@ -1,0 +1,19 @@
+apiVersion: metrics.cloud.sap/v1beta1
+kind: FederatedMetric
+metadata:
+  name: xfed-entitlements
+spec:
+  name: xfed-entitlements
+  description: entitlements
+  target:
+    group:  account.btp.orchestrate.cloud.sap
+    resource: entitlements
+    version: v1alpha1
+  frequency: 1 # in minutes
+  projections:
+    - name: servicename
+      fieldPath: "spec.forProvider.serviceName"
+  federateCaRef:
+    name: federate-ca-sample
+    namespace: default
+---

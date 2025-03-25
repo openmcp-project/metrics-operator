@@ -1,0 +1,31 @@
+# permissions for end users to edit managedmetrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: managedmetric-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: co-metrics-operator
+    app.kubernetes.io/part-of: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: managedmetric-editor-role
+rules:
+- apiGroups:
+  - metrics.cloud.sap
+  resources:
+  - managedmetrics
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metrics.cloud.sap
+  resources:
+  - managedmetrics/status
+  verbs:
+  - get

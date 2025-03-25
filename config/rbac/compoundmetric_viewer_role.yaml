@@ -1,0 +1,23 @@
+# permissions for end users to view compoundmetrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: co-metrics-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: compoundmetric-viewer-role
+rules:
+- apiGroups:
+  - metrics.cloud.sap
+  resources:
+  - compoundmetrics
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.cloud.sap
+  resources:
+  - compoundmetrics/status
+  verbs:
+  - get

@@ -1,0 +1,11 @@
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: managed-metric
+spec:
+  name: managed-metric
+  description: Status metric created by an Operator
+  kind: Release
+  group: helm.crossplane.io
+  version: v1beta1
+  frequency: 1 # in minutes
