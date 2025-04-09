@@ -2,8 +2,6 @@ module github.com/SAP/metrics-operator
 
 go 1.23.0
 
-toolchain go1.24.0
-
 require (
 	github.com/dynatrace-ace/dynatrace-go-api-client/api/v2/environment/dynatrace v0.0.0-20210816162345-de2eacc8ac9a
 	github.com/go-logr/logr v1.4.2

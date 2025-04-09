@@ -283,13 +283,12 @@ dev-run:
 	## todo: add flag --debug
 	go run ./cmd/main.go
 
-
 $(GOLANGCILINT): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/golangci-lint && ! $(LOCALBIN)/golangci-lint version | grep -q $(GOLANGCILINT_VERSION); then \
 		echo "$(LOCALBIN)/golangci-lint version is not expected $(GOLANGCILINT_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/golangci-lint; \
 	fi
-	test -s $(golangci-lint)/golangci-lint || GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
+	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
 
 
 .PHONY: lint
