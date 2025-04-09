@@ -1,14 +1,283 @@
 [![REUSE status](https://api.reuse.software/badge/github.com/SAP/metrics-operator)](https://api.reuse.software/info/github.com/SAP/metrics-operator)
 
-# metrics-operator
+# Metrics Operator
 
-## About this project
+The Metrics Operator is a powerful tool designed to monitor and provide insights into the state, usage, patterns, and trends of distributed systems and their associated components.
 
-This project enables insights into the state, usage, patterns and trends of distributed systems with particular focus on the k8s clusters (one or many) and their associated components.
+## Table of Contents
 
-## Requirements and Setup
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [RBAC Configuration](#rbac-configuration)
+- [Remote Cluster Access](#remote-cluster-access)
+- [Data Sink Integration](#data-sink-integration)
 
-*Insert a short description what is required to get your project running...*
+## Key Features
+
+- **Comprehensive Resource Tracking**: Quantifies and catalogs various resource types, providing a holistic view of resource distribution and utilization.
+- **Multi-dimensional Analysis**: Examines specific attributes and dimensions of resources, generating nuanced metrics for deeper understanding of system behavior.
+- **Comparative Analytics**: Enables side-by-side analysis of different resource configurations, highlighting patterns and potential imbalances in resource allocation.
+- **Custom Component Focus**: Tailored to monitor and analyze complex, custom-defined resources across your infrastructure.
+- **Predictive Insights**: Aggregates data over time to identify emerging trends, supporting data-driven decision making for future system enhancements.
+- **Strategic Decision Support**: Offers data-backed insights to guide product evolution.
+- **Customizable Alerting System**: Allows defining alerts based on specific metric thresholds, enabling proactive response to potential issues or significant changes in system state.
+
+## Installation
+
+### Prerequisites
+
+1. Create a namespace for the Metrics Operator.
+2. Create a secret containing the credentials for the artifactory (read-only) in the operator's namespace.
+3. Create a secret containing the data sink credentials in the operator's namespace.
+
+### Deployment
+
+Deploy the Metrics Operator using the Helm chart:
+
+```bash
+helm upgrade --install co-metrics-operator deploy-releases-hyperspace-helm/co-metrics-operator \
+  --namespace <operator-namespace> \
+  --create-namespace \
+  --set imagePullSecrets[0].name=<artifactory-secret-name> \
+  --version=<version>
+```
+
+Replace `<operator-namespace>`, `<artifactory-secret-name>`, and `<version>` with appropriate values.
+
+## Usage
+
+
+### Single Metric
+To create a basic metric, deploy a `SingleMetric` resource in your desired namespace. The Metrics Operator will pick up the resource and start monitoring it, periodically sending data points to the configured data sink.
+
+Example `SingleMetric` resource:
+
+```yaml
+apiVersion: metrics.cloud.sap/v1beta1
+kind: SingleMetric
+metadata:
+  name: single-pod
+spec:
+  name: single-metric-pods
+  description: Pods
+  target:
+    kind: Pod
+    group: ""
+    version: v1
+  frequency: 1 # in minutes
+---
+```
+
+Apply the metric:
+
+```bash
+kubectl apply -f singlemetric.yaml
+```
+
+### Compound Metric
+
+Compound metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
+This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation to access nested fields.
+The projections are then translated to dimensions in the metric.
+
+```yaml
+apiVersion: metrics.cloud.sap/v1beta1
+kind: CompoundMetric
+metadata:
+  name: comp-pod
+spec:
+  name: comp-metric-pods
+  description: Pods
+  target:
+    resource: pods
+    group: ""
+    version: v1
+  frequency: 1 # in minutes
+  projections:
+    - name: pod-namespace
+      fieldPath: "metadata.namespace"
+---
+```
+
+### Federated Metric
+Federated metrics deal with resources that are spread across multiple clusters. To monitor these resources, you need to define a `FederatedMetric` resource.
+They offer capabilities to aggregate data as well as filtering down to a specific cluster or field using projections.
+```yaml
+apiVersion: metrics.cloud.sap/v1beta1
+kind: FederatedMetric
+metadata:
+  name: xfed-prov
+spec:
+  name: xfed-prov
+  description: crossplane providers
+  target:
+    group:  pkg.crossplane.io
+    resource: providers
+    version: v1
+  frequency: 1 # in minutes
+  projections:
+    - name: package
+      fieldPath: "spec.package"
+  federateCaRef:
+    name: federate-ca-sample
+    namespace: default
+---
+
+```
+
+### Federated Managed Metric
+This is a special use case metric, it is looking at all the crossplane managed resource across all clusters.
+The pre-condition here is that if a resource comes from a crossplane provider, its CRD should have categories "crossplane" and "managed".
+
+
+```yaml
+apiVersion: metrics.cloud.sap/v1beta1
+kind: FederatedManagedMetric
+metadata:
+  name: xfed-managed
+spec:
+  name: xfed-managed
+  description: crossplane managed resources
+  frequency: 1 # in minutes
+  federateCaRef:
+    name: federate-ca-sample
+    namespace: default
+---
+```
+
+## Remote Cluster Access
+
+
+### Cluster Access
+The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `ClusterAccess` resource:
+
+This cluster access resource can be used by `SingleMetric` and `CompoundMetric` resources to monitor resources in the remote cluster.
+
+```yaml
+apiVersion: metrics.cloud.sap/v1beta1
+kind: ClusterAccess
+metadata:
+  name: remote-cluster
+  namespace: <monitoring-namespace>
+spec:
+  remoteClusterConfig:
+    clusterSecretRef:
+      name: remote-cluster-secret
+      namespace: <secret-namespace>
+    serviceAccountName: <service-account-name>
+    serviceAccountNamespace: <service-account-namespace>
+```
+
+
+### Federated Cluster Access
+
+To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource:
+
+```yaml
+apiVersion: metrics.cloud.sap/v1beta1
+kind: FederatedClusterAccess
+metadata:
+  name: federate-ca-sample
+  namespace: default
+spec:
+  target:
+    group: core.orchestrate.cloud.sap
+    resource: controlplanes #plural always, lowecase only
+    version: v1beta1
+  kubeConfigPath: spec.target.kubeconfig #case sensitive
+```
+
+
+## RBAC Configuration
+
+The Metrics Operator requires appropriate permissions to monitor the resources you specify. You need to configure RBAC (Role-Based Access Control) to grant these permissions. Here's an example of how to create a ClusterRole and ClusterRoleBinding for the Metrics Operator:
+
+```yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metrics-operator-role
+rules:
+- apiGroups:
+  - "example.group"
+  resources:
+  - "exampleresources"
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-operator-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: metrics-operator-sa
+  namespace: <operator-namespace>
+roleRef:
+  kind: ClusterRole
+  name: metrics-operator-role
+  apiGroup: rbac.authorization.k8s.io
+```
+
+Replace `<operator-namespace>` with the namespace where the Metrics Operator is deployed. Adjust the `apiGroups` and `resources` fields to match the resources you want to monitor.
+
+Apply the RBAC configuration:
+
+```bash
+kubectl apply -f rbac-config.yaml
+```
+
+Remember to update this RBAC configuration whenever you add new resource types to monitor.
+
+
+## Data Sink Integration
+
+The Metrics Operator sends collected data to a configured data sink for storage and analysis. The data sink (e.g., Dynatrace) provides tools for data aggregation, filtering, and visualization.
+
+To make the most of your metrics:
+
+1. Configure your data sink according to its documentation.
+2. Use the data sink's query language or UI to create custom views of your metrics.
+3. Set up alerts based on metric thresholds or patterns.
+4. Leverage the data sink's analysis tools to gain insights into your system's behavior and performance.
+
+For specific instructions on using your data sink's features, refer to its documentation. For example, if using Dynatrace, consult the Dynatrace documentation for information on creating custom charts, setting up alerts, and performing advanced analytics on your metric data.
+
+
+## Getting Started
+You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
+**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+
+### Running on the cluster
+1. Install Instances of Custom Resources:
+
+```sh
+make dev-local-all
+```
+
+2. Run the controller:
+
+```sh
+make dev-run
+```
+Or run it from your IDE.
+
+### Delete Kind Cluster
+Delete Kind cluster
+```sh
+make dev-clean
+```
+
+### Modifying the API definitions
+If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
+
+```sh
+make manifests generate
+```
 
 ## Support, Feedback, Contributing
 
