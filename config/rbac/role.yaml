@@ -28,7 +28,6 @@ rules:
   - federatedmetrics
   - managedmetrics
   - metrics
-  - singlemetrics
   verbs:
   - create
   - delete
@@ -45,7 +44,6 @@ rules:
   - federatedmetrics/finalizers
   - managedmetrics/finalizers
   - metrics/finalizers
-  - singlemetrics/finalizers
   verbs:
   - update
 - apiGroups:
@@ -56,7 +54,6 @@ rules:
   - federatedmetrics/status
   - managedmetrics/status
   - metrics/status
-  - singlemetrics/status
   verbs:
   - get
   - patch

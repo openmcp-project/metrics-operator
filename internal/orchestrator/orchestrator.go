@@ -51,16 +51,6 @@ func (o *Orchestrator) WithGeneric(metric v1.Metric) (*Orchestrator, error) {
 	return o, err
 }
 
-// WithSingle creates a new Orchestrator with a SingleMetric handler
-func (o *Orchestrator) WithSingle(metric v1beta1.SingleMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
-	// dtClient creation removed, as it's handled by the controller
-
-	var err error
-	// Pass gaugeMetric instead of dtClient
-	o.Handler, err = NewSingleHandler(metric, o.queryConfig, gaugeMetric)
-	return o, err
-}
-
 // WithManaged creates a new Orchestrator with a ManagedMetric handler
 func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, error) {
 	dtClient := client.NewClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)

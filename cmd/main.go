@@ -43,8 +43,8 @@ import (
 
 	"github.com/SAP/metrics-operator/internal/controller"
 
-	cov1 "github.com/SAP/metrics-operator/api/v1alpha1"
-	insightv1beta1 "github.com/SAP/metrics-operator/api/v1beta1"
+	metricsv1alpha1 "github.com/SAP/metrics-operator/api/v1alpha1"
+	metricsv1beta1 "github.com/SAP/metrics-operator/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -65,8 +65,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
-	utilruntime.Must(cov1.AddToScheme(scheme))
-	utilruntime.Must(insightv1beta1.AddToScheme(scheme))
+	utilruntime.Must(metricsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(metricsv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -86,12 +86,11 @@ func runInit(setupClient client.Client) {
 			setupClient,
 			scheme,
 			[]client.Object{
-				&cov1.Metric{},
-				&cov1.ManagedMetric{},
-				&cov1.RemoteClusterAccess{},
-				&insightv1beta1.SingleMetric{},
-				&insightv1beta1.CompoundMetric{},
-				&insightv1beta1.FederatedMetric{},
+				&metricsv1alpha1.Metric{},
+				&metricsv1alpha1.ManagedMetric{},
+				&metricsv1alpha1.RemoteClusterAccess{},
+				&metricsv1beta1.CompoundMetric{},
+				&metricsv1beta1.FederatedMetric{},
 			},
 			webhooksFlags.InstallOptions...,
 		)
@@ -204,11 +203,6 @@ func main() {
 }
 
 func setupReconcilersV1beta1(mgr ctrl.Manager) {
-	if err := (controller.NewSingleMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create reconciler", "controller", "single metric")
-		os.Exit(1)
-	}
-
 	if err := (controller.NewCompoundMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create reconciler", "controller", "compound metric")
 		os.Exit(1)
@@ -226,7 +220,7 @@ func setupReconcilersV1beta1(mgr ctrl.Manager) {
 }
 
 func setupMetricController(mgr ctrl.Manager) {
-	if err := (controller.NewMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
+	if err := controller.NewMetricReconciler(mgr).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Metric")
 		os.Exit(1)
 	}

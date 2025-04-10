@@ -34,6 +34,7 @@ import (
 	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
 	"github.com/SAP/metrics-operator/internal/common"
+	"github.com/SAP/metrics-operator/internal/config"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
 )
 
@@ -251,4 +252,21 @@ func (r *CompoundMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.CompoundMetric{}).
 		Complete(r)
+}
+
+func createQC(ctx context.Context, rcaRef *v1beta1.ClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
+	var queryConfig orc.QueryConfig
+	// Kubernetes client to the external cluster if defined
+	if rcaRef != nil {
+		qc, err := config.CreateExternalQC(ctx, rcaRef, r.getClient())
+		if err != nil {
+			return orc.QueryConfig{}, err
+		}
+		queryConfig = *qc
+	} else {
+		// local cluster name (where operator is deployed)
+		clusterName, _ := getClusterInfo(r.getRestConfig())
+		queryConfig = orc.QueryConfig{Client: r.getClient(), RestConfig: *r.getRestConfig(), ClusterName: &clusterName}
+	}
+	return queryConfig, nil
 }

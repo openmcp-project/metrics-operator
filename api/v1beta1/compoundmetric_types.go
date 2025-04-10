@@ -122,3 +122,23 @@ type CompoundMetricList struct {
 func init() {
 	SchemeBuilder.Register(&CompoundMetric{}, &CompoundMetricList{})
 }
+
+type MetricObservation struct {
+	// The timestamp of the observation
+	Timestamp metav1.Time `json:"timestamp,omitempty"`
+
+	// The latest value of the metric
+	LatestValue string `json:"latestValue,omitempty"`
+
+	Dimensions []Dimension `json:"dimensions,omitempty"`
+}
+
+// GetTimestamp returns the timestamp of the observation
+func (mo *MetricObservation) GetTimestamp() metav1.Time {
+	return mo.Timestamp
+}
+
+// GetValue returns the latest value of the metric
+func (mo *MetricObservation) GetValue() string {
+	return mo.LatestValue
+}
