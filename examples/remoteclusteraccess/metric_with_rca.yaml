@@ -8,7 +8,7 @@ spec:
   kind: ManagedControlPlane
   group: cola.cloud.sap
   version: v1alpha1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring
@@ -23,7 +23,7 @@ spec:
   kind: CloudOrchestrator
   group: cola.cloud.sap
   version: v1alpha1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring
@@ -38,7 +38,7 @@ spec:
   kind: DataPlane
   group: cola.cloud.sap
   version: v1alpha1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring

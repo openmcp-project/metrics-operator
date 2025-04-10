@@ -9,7 +9,7 @@ spec:
     group:  services.cloud.sap.com
     resource: serviceinstances
     version: v1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   federateCaRef:
     name: federate-ca-sample
     namespace: default

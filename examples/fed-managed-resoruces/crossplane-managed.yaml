@@ -5,7 +5,7 @@ metadata:
 spec:
   name: xfed-managed
   description: crossplane managed resources
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   federateCaRef:
     name: federate-ca-sample
     namespace: default

@@ -8,7 +8,7 @@ spec:
   kind: Release
   group: helm.crossplane.io
   version: v1beta1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
 ---
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
@@ -20,7 +20,7 @@ spec:
   kind: Pod
   group: ""
   version: v1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
 ---
 #apiVersion: metrics.cloud.sap/v1alpha1
 #kind: Metric

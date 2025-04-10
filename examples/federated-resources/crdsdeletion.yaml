@@ -10,7 +10,7 @@ spec:
     resource: customresourcedefinitions
     version: v1
   fieldSelector: "metadata.deletionTimestamp"
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   projections:
     - name: deletion
       fieldPath: "metadata.deletionTimestamp"
