@@ -151,7 +151,11 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		// TODO: Update status?
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
-	defer metricClient.Close(ctx) // Ensure exporter is shut down
+	defer func() {
+		if err := metricClient.Close(ctx); err != nil {
+			l.Error(err, "Failed to close metric client during compound metric reconciliation", "metric", metric.Name)
+		}
+	}() // Ensure exporter is shut down
 
 	metricClient.SetMeter("compound")
 
@@ -174,7 +178,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	result, errMon := orchestrator.Handler.Monitor(ctx)
 
 	if errMon != nil {
-		metric.Status.Ready = "False"
+		metric.Status.Ready = v1beta1.StatusFalse
 		l.Error(errMon, fmt.Sprintf("compound metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		// Update status before returning
 		_ = r.getClient().Status().Update(ctx, &metric) // Best effort status update on error
@@ -183,10 +187,10 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	errExport := metricClient.ExportMetrics(ctx)
 	if errExport != nil {
-		metric.Status.Ready = "False"
+		metric.Status.Ready = v1beta1.StatusFalse
 		l.Error(errExport, fmt.Sprintf("compound metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 	} else {
-		metric.Status.Ready = "True"
+		metric.Status.Ready = v1beta1.StatusTrue
 	}
 
 	/*

@@ -152,7 +152,11 @@ func (r *SingleMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// TODO: Update status?
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
-	defer metricClient.Close(ctx) // Ensure exporter is shut down
+	defer func() {
+		if err := metricClient.Close(ctx); err != nil {
+			l.Error(err, "Failed to close metric client during single metric reconciliation", "metric", metric.Name)
+		}
+	}() // Ensure exporter is shut down
 
 	metricClient.SetMeter("single")
 
@@ -175,7 +179,7 @@ func (r *SingleMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	result, errMon := orchestrator.Handler.Monitor(ctx)
 
 	if errMon != nil {
-		metric.Status.Ready = "False"
+		metric.Status.Ready = v1beta1.StatusFalse
 		l.Error(errMon, fmt.Sprintf("single metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		// Update status before returning
 		_ = r.getClient().Status().Update(ctx, &metric) // Best effort status update on error
@@ -184,10 +188,10 @@ func (r *SingleMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	errExport := metricClient.ExportMetrics(ctx)
 	if errExport != nil {
-		metric.Status.Ready = "False"
+		metric.Status.Ready = v1beta1.StatusFalse
 		l.Error(errExport, fmt.Sprintf("single metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 	} else {
-		metric.Status.Ready = "True"
+		metric.Status.Ready = v1beta1.StatusTrue
 	}
 
 	/*
@@ -208,7 +212,7 @@ func (r *SingleMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Override Ready status if export failed
 	if errExport != nil {
-		metric.Status.Ready = "False"
+		metric.Status.Ready = v1beta1.StatusFalse
 	}
 	metric.Status.Observation = v1beta1.MetricObservation{Timestamp: result.Observation.GetTimestamp(), LatestValue: result.Observation.GetValue()}
 
