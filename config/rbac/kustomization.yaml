@@ -30,8 +30,6 @@ resources:
 - federatedmetric_viewer_role.yaml
 - compoundmetric_editor_role.yaml
 - compoundmetric_viewer_role.yaml
-- singlemetric_editor_role.yaml
-- singlemetric_viewer_role.yaml
 - remoteclusteraccess_editor_role.yaml
 - remoteclusteraccess_viewer_role.yaml
 

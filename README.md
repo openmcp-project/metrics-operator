@@ -47,34 +47,6 @@ Replace `<operator-namespace>`, `<artifactory-secret-name>`, and `<version>` wit
 
 ## Usage
 
-
-### Single Metric
-To create a basic metric, deploy a `SingleMetric` resource in your desired namespace. The Metrics Operator will pick up the resource and start monitoring it, periodically sending data points to the configured data sink.
-
-Example `SingleMetric` resource:
-
-```yaml
-apiVersion: metrics.cloud.sap/v1beta1
-kind: SingleMetric
-metadata:
-  name: single-pod
-spec:
-  name: single-metric-pods
-  description: Pods
-  target:
-    kind: Pod
-    group: ""
-    version: v1
-  frequency: 1 # in minutes
----
-```
-
-Apply the metric:
-
-```bash
-kubectl apply -f singlemetric.yaml
-```
-
 ### Compound Metric
 
 Compound metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
@@ -152,7 +124,7 @@ spec:
 ### Cluster Access
 The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `ClusterAccess` resource:
 
-This cluster access resource can be used by `SingleMetric` and `CompoundMetric` resources to monitor resources in the remote cluster.
+This cluster access resource can be used by `CompoundMetric` resources to monitor resources in the remote cluster.
 
 ```yaml
 apiVersion: metrics.cloud.sap/v1beta1
