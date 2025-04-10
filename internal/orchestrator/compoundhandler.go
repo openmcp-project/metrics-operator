@@ -52,19 +52,26 @@ func (h *CompoundHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	for _, group := range groups {
 		groupCount := len(group)
-		dataPoint := clientoptl.NewDataPoint().
-			AddDimension(RESOURCE, h.metric.Spec.Target.Resource).
-			AddDimension(GROUP, h.metric.Spec.Target.Group).
-			AddDimension(VERSION, h.metric.Spec.Target.Version).
-			SetValue(int64(groupCount))
+		dataPoint := clientoptl.NewDataPoint().SetValue(int64(groupCount))
 
-		if h.clusterName != nil {
+		// Add base dimensions only if they have a non-empty value
+		if h.metric.Spec.Target.Resource != "" {
+			dataPoint.AddDimension(RESOURCE, h.metric.Spec.Target.Resource)
+		}
+		if h.metric.Spec.Target.Group != "" {
+			dataPoint.AddDimension(GROUP, h.metric.Spec.Target.Group)
+		}
+		if h.metric.Spec.Target.Version != "" {
+			dataPoint.AddDimension(VERSION, h.metric.Spec.Target.Version)
+		}
+		if h.clusterName != nil && *h.clusterName != "" {
 			dataPoint.AddDimension(CLUSTER, *h.clusterName)
 		}
 
 		// Add projected dimensions for this specific group
 		for _, pField := range group {
-			if pField.error == nil {
+			// Add projected dimension only if the value is non-empty and no error occurred
+			if pField.error == nil && pField.value != "" {
 				dataPoint.AddDimension(pField.name, pField.value)
 			} else {
 				// Optionally log or handle projection errors

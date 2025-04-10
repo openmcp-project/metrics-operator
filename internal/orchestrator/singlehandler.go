@@ -46,13 +46,19 @@ func (h *SingleHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	primaryCount := len(list.Items)
 	// Create DataPoint and record it
-	dataPoint := clientoptl.NewDataPoint().
-		AddDimension(GROUP, h.metric.Spec.Target.Group).
-		AddDimension(VERSION, h.metric.Spec.Target.Version).
-		AddDimension(KIND, h.metric.Spec.Target.Kind).
-		SetValue(int64(primaryCount))
+	dataPoint := clientoptl.NewDataPoint().SetValue(int64(primaryCount))
 
-	if h.clusterName != nil {
+	// Add dimensions only if they have a non-empty value
+	if h.metric.Spec.Target.Group != "" {
+		dataPoint.AddDimension(GROUP, h.metric.Spec.Target.Group)
+	}
+	if h.metric.Spec.Target.Version != "" {
+		dataPoint.AddDimension(VERSION, h.metric.Spec.Target.Version)
+	}
+	if h.metric.Spec.Target.Kind != "" {
+		dataPoint.AddDimension(KIND, h.metric.Spec.Target.Kind)
+	}
+	if h.clusterName != nil && *h.clusterName != "" {
 		dataPoint.AddDimension(CLUSTER, *h.clusterName)
 	}
 
