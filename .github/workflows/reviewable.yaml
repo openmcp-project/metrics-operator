@@ -32,5 +32,15 @@ jobs:
         run: make reviewable
         env:
           RUNNING_IN_CI: 'true'
+
+      - name: tidy
+        run: go mod tidy
+        
       - name: make check-diff
         run: make check-diff
+      
+      - name: run tests
+        run: make tests
+      
+      - name: build
+        run: make build
