@@ -13,7 +13,7 @@ import (
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
-	"github.com/SAP/metrics-operator/internal/clientlite"
+	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
 )
 
 // SingleHandler is used to monitor a single metric
@@ -23,42 +23,60 @@ type SingleHandler struct {
 
 	metric v1beta1.SingleMetric
 
-	dtClient    *clientlite.MetricClient
+	gaugeMetric *clientoptl.Metric // Changed from dtClient
 	clusterName *string
 }
 
 // Monitor is used to monitor the metric
 func (h *SingleHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
-	mrTotal := h.createGvkBaseMetric()
-
-	if h.clusterName != nil {
-		mrTotal.AddDimension(CLUSTER, *h.clusterName)
-	}
+	// Metric creation and export are handled by the controller.
+	// This handler focuses on fetching the value and recording it.
 
 	result := MonitorResult{}
 
-	list, err := h.getResources(ctx)
-	if err != nil {
-		return MonitorResult{}, fmt.Errorf("could not retrieve target resource(s) %w", err)
+	list, errGet := h.getResources(ctx)
+	if errGet != nil {
+		result.Error = errGet
+		result.Phase = v1alpha1.PhaseFailed
+		result.Reason = "GetResourcesFailed"
+		result.Message = fmt.Sprintf("failed to retrieve target resource(s): %s", errGet.Error())
+		return result, nil // Return error state, but not the error itself to controller
 	}
 
 	primaryCount := len(list.Items)
-	mrTotal.SetGaugeValue(float64(primaryCount))
+	// Create DataPoint and record it
+	dataPoint := clientoptl.NewDataPoint().SetValue(int64(primaryCount))
 
-	errMetric := h.dtClient.SendMetrics(ctx, mrTotal)
+	// Add dimensions only if they have a non-empty value
+	if h.metric.Spec.Target.Group != "" {
+		dataPoint.AddDimension(GROUP, h.metric.Spec.Target.Group)
+	}
+	if h.metric.Spec.Target.Version != "" {
+		dataPoint.AddDimension(VERSION, h.metric.Spec.Target.Version)
+	}
+	if h.metric.Spec.Target.Kind != "" {
+		dataPoint.AddDimension(KIND, h.metric.Spec.Target.Kind)
+	}
+	if h.clusterName != nil && *h.clusterName != "" {
+		dataPoint.AddDimension(CLUSTER, *h.clusterName)
+	}
 
-	if errMetric != nil {
-		result.Error = err
+	errRecord := h.gaugeMetric.RecordMetrics(ctx, dataPoint)
+
+	if errRecord != nil {
+		result.Error = errRecord
 		result.Phase = v1alpha1.PhaseFailed
-		result.Reason = "SendMetricFailed"
-		result.Message = fmt.Sprintf("failed to send metric value to data sink. %s", errMetric.Error())
+		result.Reason = "RecordMetricFailed"
+		result.Message = fmt.Sprintf("failed to record metric value: %s", errRecord.Error())
 	} else {
 		result.Phase = v1alpha1.PhaseActive
 		result.Reason = "MonitoringActive"
-		result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.GvkToString())
+		result.Message = fmt.Sprintf("metric value recorded for resource '%s'", h.metric.GvkToString())
 		result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(primaryCount)}
 	}
+
+	// Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
 	return result, nil
 
 }
@@ -92,15 +110,10 @@ func (h *SingleHandler) getResources(ctx context.Context) (*unstructured.Unstruc
 	return list, nil
 }
 
-func (h *SingleHandler) createGvkBaseMetric() *clientlite.Metric {
-	return clientlite.NewMetric(h.metric.Name).
-		AddDimension(GROUP, h.metric.Spec.Target.Group).
-		AddDimension(VERSION, h.metric.Spec.Target.Version).
-		AddDimension(KIND, h.metric.Spec.Target.Kind)
-}
+// Removed createGvkBaseMetric as it's clientlite specific
 
 // NewSingleHandler creates a new SingleHandler
-func NewSingleHandler(metric v1beta1.SingleMetric, qc QueryConfig, dtClient *clientlite.MetricClient) (*SingleHandler, error) {
+func NewSingleHandler(metric v1beta1.SingleMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*SingleHandler, error) { // Changed dtClient to gaugeMetric
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, errCli
@@ -115,7 +128,7 @@ func NewSingleHandler(metric v1beta1.SingleMetric, qc QueryConfig, dtClient *cli
 		metric:      metric,
 		dCli:        dynamicClient,
 		discoClient: disco,
-		dtClient:    dtClient,
+		gaugeMetric: gaugeMetric, // Changed dtClient to gaugeMetric
 		clusterName: qc.ClusterName,
 	}
 

@@ -343,9 +343,9 @@ crossplane-install:
 
 # Install the Kubernetes provider using kubectl
 crossplane-provider-install:
-	kubectl apply -f crossplane/provider.yaml -n $(CROSSPLANE_NAMESPACE)
+	kubectl apply -f examples/crossplane/provider.yaml -n $(CROSSPLANE_NAMESPACE)
 	kubectl wait --for=condition=Healthy provider/provider-helm --timeout=1m
-	kubectl apply -f crossplane/provider-config.yaml -n $(CROSSPLANE_NAMESPACE)
+	kubectl apply -f examples/crossplane/provider-config.yaml -n $(CROSSPLANE_NAMESPACE)
 
 
 
@@ -353,4 +353,4 @@ crossplane-provider-install:
 
 .PHONY: helm-provider-sample
 crossplane-provider-sample:
-	kubectl apply -f crossplane/release.yaml -n $(CROSSPLANE_NAMESPACE)
+	kubectl apply -f examples/crossplane/release.yaml -n $(CROSSPLANE_NAMESPACE)

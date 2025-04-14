@@ -10,7 +10,7 @@ spec:
     resource: pods
     group: ""
     version: v1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   projections:
     - name: pod-namespace
       fieldPath: "metadata.namespace"

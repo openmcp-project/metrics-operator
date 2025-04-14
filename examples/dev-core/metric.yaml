@@ -8,5 +8,5 @@ spec:
   kind: LandscaperDeployment
   group: landscaper-service.gardener.cloud
   version: v1alpha1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
 ---

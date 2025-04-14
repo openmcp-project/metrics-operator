@@ -8,4 +8,4 @@ spec:
   kind: Release
   group: helm.crossplane.io
   version: v1beta1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes

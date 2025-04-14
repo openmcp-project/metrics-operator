@@ -9,7 +9,8 @@ import (
 	v1 "github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/client"
-	"github.com/SAP/metrics-operator/internal/clientlite"
+
+	// "github.com/SAP/metrics-operator/internal/clientlite" // Removed
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 )
@@ -51,11 +52,12 @@ func (o *Orchestrator) WithGeneric(metric v1.Metric) (*Orchestrator, error) {
 }
 
 // WithSingle creates a new Orchestrator with a SingleMetric handler
-func (o *Orchestrator) WithSingle(metric v1beta1.SingleMetric) (*Orchestrator, error) {
-	dtClient := clientlite.NewMetricClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)
+func (o *Orchestrator) WithSingle(metric v1beta1.SingleMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
+	// dtClient creation removed, as it's handled by the controller
 
 	var err error
-	o.Handler, err = NewSingleHandler(metric, o.queryConfig, dtClient)
+	// Pass gaugeMetric instead of dtClient
+	o.Handler, err = NewSingleHandler(metric, o.queryConfig, gaugeMetric)
 	return o, err
 }
 
@@ -70,11 +72,12 @@ func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, err
 }
 
 // WithCompound creates a new Orchestrator with a CompoundMetric handler
-func (o *Orchestrator) WithCompound(metric v1beta1.CompoundMetric) (*Orchestrator, error) {
-	dtClient := clientlite.NewMetricClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)
+func (o *Orchestrator) WithCompound(metric v1beta1.CompoundMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
+	// dtClient creation removed, as it's handled by the controller
 
 	var err error
-	o.Handler, err = NewCompoundHandler(metric, o.queryConfig, dtClient)
+	// Pass gaugeMetric instead of dtClient
+	o.Handler, err = NewCompoundHandler(metric, o.queryConfig, gaugeMetric)
 	return o, err
 }
 

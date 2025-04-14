@@ -9,7 +9,7 @@ spec:
     group:  pkg.crossplane.io
     resource: providers
     version: v1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   projections:
     - name: package
       fieldPath: "spec.package"

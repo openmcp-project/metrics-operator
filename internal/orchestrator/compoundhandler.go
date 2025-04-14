@@ -15,7 +15,7 @@ import (
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
-	"github.com/SAP/metrics-operator/internal/clientlite"
+	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
 )
 
 // CompoundHandler is used to monitor a compound metric
@@ -25,65 +25,87 @@ type CompoundHandler struct {
 
 	metric v1beta1.CompoundMetric
 
-	dtClient    *clientlite.MetricClient
+	gaugeMetric *clientoptl.Metric // Changed from dtClient
 	clusterName *string
 }
 
 // Monitor is used to monitor the metric
+//
+//nolint:gocyclo
 func (h *CompoundHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
-	mrTotal := h.createGvrBaseMetric()
-
-	if h.clusterName != nil {
-		mrTotal.AddDimension(CLUSTER, *h.clusterName)
-	}
-
+	// Metric creation and export are handled by the controller.
+	// This handler focuses on fetching resources, grouping, and recording data points.
 	result := MonitorResult{Observation: &v1beta1.MetricObservation{Timestamp: metav1.Now()}}
 
-	list, err := h.getResources(ctx)
-	if err != nil {
-		return MonitorResult{}, fmt.Errorf("could not retrieve target resource(s) %w", err)
+	list, errGet := h.getResources(ctx)
+	if errGet != nil {
+		result.Error = errGet
+		result.Phase = v1alpha1.PhaseFailed
+		result.Reason = "GetResourcesFailed"
+		result.Message = fmt.Sprintf("failed to retrieve target resource(s): %s", errGet.Error())
+		return result, nil // Return error state, but not the error itself to controller
 	}
 
 	groups := h.extractProjectionGroupsFrom(list)
 
-	var dimensions []v1beta1.Dimension
-
-	clMetrics := make([]*clientlite.Metric, 0, len(groups)+1)
-	clMetrics = append(clMetrics, mrTotal)
+	dataPoints := make([]*clientoptl.DataPoint, 0, len(groups))
+	var recordErrors []error
 
 	for _, group := range groups {
+		groupCount := len(group)
+		dataPoint := clientoptl.NewDataPoint().SetValue(int64(groupCount))
 
-		mrGroup := h.createGvrBaseMetric()
-		mrGroup.SetGaugeValue(float64(len(group)))
-		clMetrics = append(clMetrics, mrGroup)
-
-		for _, pField := range group {
-			if pField.error == nil {
-				mrGroup.AddDimension(pField.name, pField.value)
-				dimensions = append(dimensions, v1beta1.Dimension{Name: pField.name, Value: pField.value})
-			}
+		// Add base dimensions only if they have a non-empty value
+		if h.metric.Spec.Target.Resource != "" {
+			dataPoint.AddDimension(RESOURCE, h.metric.Spec.Target.Resource)
+		}
+		if h.metric.Spec.Target.Group != "" {
+			dataPoint.AddDimension(GROUP, h.metric.Spec.Target.Group)
+		}
+		if h.metric.Spec.Target.Version != "" {
+			dataPoint.AddDimension(VERSION, h.metric.Spec.Target.Version)
+		}
+		if h.clusterName != nil && *h.clusterName != "" {
+			dataPoint.AddDimension(CLUSTER, *h.clusterName)
 		}
 
+		// Add projected dimensions for this specific group
+		for _, pField := range group {
+			// Add projected dimension only if the value is non-empty and no error occurred
+			if pField.error == nil && pField.value != "" {
+				dataPoint.AddDimension(pField.name, pField.value)
+			} else {
+				// Optionally log or handle projection errors
+				recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.name, pField.error))
+			}
+		}
+		dataPoints = append(dataPoints, dataPoint)
 	}
 
-	err = h.dtClient.SendMetrics(ctx, clMetrics...)
+	// Record all collected data points
+	errRecord := h.gaugeMetric.RecordMetrics(ctx, dataPoints...)
+	if errRecord != nil {
+		recordErrors = append(recordErrors, errRecord)
+	}
 
-	if err != nil {
-		result.Error = err
+	// Update result based on errors during projection or recording
+	if len(recordErrors) > 0 {
+		// Combine errors for reporting
+		combinedError := fmt.Errorf("errors during metric recording: %v", recordErrors)
+		result.Error = combinedError
 		result.Phase = v1alpha1.PhaseFailed
-		result.Reason = v1alpha1.ReasonSendMetricFailed
-		result.Message = fmt.Sprintf("failed to send metric value to data sink. %s", err.Error())
+		result.Reason = "RecordMetricFailed"
+		result.Message = fmt.Sprintf("failed to record metric value(s): %s", combinedError.Error())
 	} else {
 		result.Phase = v1alpha1.PhaseActive
 		result.Reason = v1alpha1.ReasonMonitoringActive
-		result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.Spec.Target.String())
-
-		if dimensions != nil {
-			result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1beta1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(list.Items))}}}
-		}
+		result.Message = fmt.Sprintf("metric values recorded for resource '%s'", h.metric.Spec.Target.String())
+		// Observation might need adjustment depending on how compound results should be represented in status
+		result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(len(list.Items))} // Report total count for now
 	}
 
+	// Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
 	return result, nil
 }
 
@@ -127,12 +149,7 @@ func (h *CompoundHandler) extractProjectionGroupsFrom(list *unstructured.Unstruc
 	return groups
 }
 
-func (h *CompoundHandler) createGvrBaseMetric() *clientlite.Metric {
-	return clientlite.NewMetric(h.metric.Name).
-		AddDimension(RESOURCE, h.metric.Spec.Target.Resource).
-		AddDimension(GROUP, h.metric.Spec.Target.Group).
-		AddDimension(VERSION, h.metric.Spec.Target.Version)
-}
+// Removed createGvrBaseMetric as it's clientlite specific
 
 func (h *CompoundHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {
 	var options = metav1.ListOptions{}
@@ -161,7 +178,7 @@ func (h *CompoundHandler) getResources(ctx context.Context) (*unstructured.Unstr
 }
 
 // NewCompoundHandler creates a new CompoundHandler
-func NewCompoundHandler(metric v1beta1.CompoundMetric, qc QueryConfig, dtClient *clientlite.MetricClient) (*CompoundHandler, error) {
+func NewCompoundHandler(metric v1beta1.CompoundMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*CompoundHandler, error) { // Changed dtClient to gaugeMetric
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, errCli
@@ -176,7 +193,7 @@ func NewCompoundHandler(metric v1beta1.CompoundMetric, qc QueryConfig, dtClient 
 		metric:      metric,
 		dCli:        dynamicClient,
 		discoClient: disco,
-		dtClient:    dtClient,
+		gaugeMetric: gaugeMetric, // Changed dtClient to gaugeMetric
 		clusterName: qc.ClusterName,
 	}
 

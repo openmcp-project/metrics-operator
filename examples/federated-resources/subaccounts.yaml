@@ -9,7 +9,7 @@ spec:
     group:  account.btp.orchestrate.cloud.sap
     resource: subaccounts
     version: v1alpha1
-  frequency: 1 # in minutes
+  checkInterval: "1m" # in minutes
   projections:
     - name: region
       fieldPath: "spec.forProvider.region"

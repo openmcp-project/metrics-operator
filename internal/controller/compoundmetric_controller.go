@@ -32,6 +32,7 @@ import (
 
 	insight "github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
+	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
 	"github.com/SAP/metrics-operator/internal/common"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
 )
@@ -144,10 +145,30 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	if errCli != nil {
+		l.Error(errCli, fmt.Sprintf("compound metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		// TODO: Update status?
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+	}
+	defer func() {
+		if err := metricClient.Close(ctx); err != nil {
+			l.Error(err, "Failed to close metric client during compound metric reconciliation", "metric", metric.Name)
+		}
+	}() // Ensure exporter is shut down
+
+	metricClient.SetMeter("compound")
+
+	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
+	if errGauge != nil {
+		l.Error(errGauge, fmt.Sprintf("compound metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		// TODO: Update status?
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
+	}
 	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithCompound(metric)
+	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithCompound(metric, gaugeMetric) // Pass gaugeMetric
 	if errOrch != nil {
 		l.Error(errOrch, "unable to create compound metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
@@ -157,8 +178,19 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	result, errMon := orchestrator.Handler.Monitor(ctx)
 
 	if errMon != nil {
+		metric.Status.Ready = v1beta1.StatusFalse
 		l.Error(errMon, fmt.Sprintf("compound metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		// Update status before returning
+		_ = r.getClient().Status().Update(ctx, &metric) // Best effort status update on error
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
+	}
+
+	errExport := metricClient.ExportMetrics(ctx)
+	if errExport != nil {
+		metric.Status.Ready = v1beta1.StatusFalse
+		l.Error(errExport, fmt.Sprintf("compound metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+	} else {
+		metric.Status.Ready = v1beta1.StatusTrue
 	}
 
 	/*
@@ -179,7 +211,10 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	cObs := result.Observation.(*v1beta1.MetricObservation)
 
-	metric.Status.Ready = boolToString(result.Phase == insight.PhaseActive)
+	// Override Ready status if export failed
+	if errExport != nil {
+		metric.Status.Ready = "False"
+	}
 	metric.Status.Observation = v1beta1.MetricObservation{Timestamp: result.Observation.GetTimestamp(), Dimensions: cObs.Dimensions, LatestValue: cObs.LatestValue}
 
 	// Update LastReconcileTime
@@ -189,7 +224,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// conditions are not persisted until the status is updated
 	errUp := r.getClient().Status().Update(ctx, &metric)
 	if errUp != nil {
-		l.Error(errMon, fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		l.Error(errUp, fmt.Sprintf("compound metric '%s' failed to update status, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errUp
 	}
 
@@ -197,13 +232,13 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
 	*/
 	var requeueTime time.Duration
-	if result.Error != nil {
+	if result.Error != nil || errExport != nil { // Requeue faster on monitor or export error
 		requeueTime = RequeueAfterError
 	} else {
 		requeueTime = metric.Spec.CheckInterval.Duration
 	}
 
-	l.Info(fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
+	l.Info(fmt.Sprintf("compound metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
 		Requeue:      true,
