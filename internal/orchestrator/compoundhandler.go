@@ -30,6 +30,8 @@ type CompoundHandler struct {
 }
 
 // Monitor is used to monitor the metric
+//
+//nolint:gocyclo
 func (h *CompoundHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	// Metric creation and export are handled by the controller.
