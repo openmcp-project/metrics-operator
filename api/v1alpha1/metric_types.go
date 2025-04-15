@@ -36,8 +36,20 @@ const (
 	PhasePending PhaseType = "Pending"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// Projection defines the projection of the metric
+type Projection struct {
+	// Define the name of the field that should be extracted
+	Name string `json:"name,omitempty"`
+
+	// Define the path to the field that should be extracted
+	FieldPath string `json:"fieldPath,omitempty"`
+}
+
+// Dimension defines the dimension of the metric
+type Dimension struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
 
 // MetricSpec defines the desired state of Metric
 type MetricSpec struct {
@@ -63,6 +75,8 @@ type MetricSpec struct {
 	CheckInterval metav1.Duration `json:"checkInterval,omitempty"`
 
 	RemoteClusterAccessFacade `json:",inline"`
+
+	Projections []Projection `json:"projections,omitempty"`
 }
 
 // MetricObservation represents the latest available observation of an object's state

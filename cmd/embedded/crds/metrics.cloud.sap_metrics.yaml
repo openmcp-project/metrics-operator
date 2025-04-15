@@ -77,6 +77,18 @@ spec:
                 description: Sets the name that will be used to identify the metric
                   in Dynatrace(or other providers)
                 type: string
+              projections:
+                items:
+                  description: Projection defines the projection of the metric
+                  properties:
+                    fieldPath:
+                      description: Define the path to the field that should be extracted
+                      type: string
+                    name:
+                      description: Define the name of the field that should be extracted
+                      type: string
+                  type: object
+                type: array
               remoteClusterAccessRef:
                 description: Reference to the RemoteClusterAccess type that either
                   reference a kubeconfig or a service account and cluster secret for
