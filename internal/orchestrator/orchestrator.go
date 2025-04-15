@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/rest"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 	v1 "github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/client"
@@ -62,7 +63,7 @@ func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, err
 }
 
 // WithCompound creates a new Orchestrator with a CompoundMetric handler
-func (o *Orchestrator) WithCompound(metric v1beta1.CompoundMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
+func (o *Orchestrator) WithCompound(metric v1alpha1.Metric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
 	// dtClient creation removed, as it's handled by the controller
 
 	var err error

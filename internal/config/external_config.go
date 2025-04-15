@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 	insight "github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
@@ -44,7 +45,7 @@ func init() {
 }
 
 // CreateExternalQC creates an external query config from a remote cluster access reference
-func CreateExternalQC(ctx context.Context, racRef *v1beta1.ClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
+func CreateExternalQC(ctx context.Context, racRef *v1alpha1.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
 
 	rcaName := racRef.Name
 	rcaNamespace := racRef.Namespace

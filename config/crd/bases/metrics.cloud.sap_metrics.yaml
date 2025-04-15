@@ -168,6 +168,16 @@ spec:
                 description: Observation represent the latest available observation
                   of an object's state
                 properties:
+                  dimensions:
+                    items:
+                      description: Dimension defines the dimension of the metric
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
+                      type: object
+                    type: array
                   latestValue:
                     description: The latest value of the metric
                     type: string

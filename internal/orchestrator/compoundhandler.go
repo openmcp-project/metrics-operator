@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
 )
 
@@ -23,7 +22,7 @@ type CompoundHandler struct {
 	dCli        dynamic.Interface
 	discoClient discovery.DiscoveryInterface
 
-	metric v1beta1.CompoundMetric
+	metric v1alpha1.Metric
 
 	gaugeMetric *clientoptl.Metric // Changed from dtClient
 	clusterName *string
@@ -36,7 +35,7 @@ func (h *CompoundHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	// Metric creation and export are handled by the controller.
 	// This handler focuses on fetching resources, grouping, and recording data points.
-	result := MonitorResult{Observation: &v1beta1.MetricObservation{Timestamp: metav1.Now()}}
+	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
 	list, errGet := h.getResources(ctx)
 	if errGet != nil {
@@ -57,14 +56,14 @@ func (h *CompoundHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		dataPoint := clientoptl.NewDataPoint().SetValue(int64(groupCount))
 
 		// Add base dimensions only if they have a non-empty value
-		if h.metric.Spec.Target.Resource != "" {
-			dataPoint.AddDimension(RESOURCE, h.metric.Spec.Target.Resource)
+		if h.metric.Spec.Kind != "" {
+			dataPoint.AddDimension(RESOURCE, h.metric.Spec.Kind)
 		}
-		if h.metric.Spec.Target.Group != "" {
-			dataPoint.AddDimension(GROUP, h.metric.Spec.Target.Group)
+		if h.metric.Spec.Group != "" {
+			dataPoint.AddDimension(GROUP, h.metric.Spec.Group)
 		}
-		if h.metric.Spec.Target.Version != "" {
-			dataPoint.AddDimension(VERSION, h.metric.Spec.Target.Version)
+		if h.metric.Spec.Version != "" {
+			dataPoint.AddDimension(VERSION, h.metric.Spec.Version)
 		}
 		if h.clusterName != nil && *h.clusterName != "" {
 			dataPoint.AddDimension(CLUSTER, *h.clusterName)
@@ -100,9 +99,9 @@ func (h *CompoundHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	} else {
 		result.Phase = v1alpha1.PhaseActive
 		result.Reason = v1alpha1.ReasonMonitoringActive
-		result.Message = fmt.Sprintf("metric values recorded for resource '%s'", h.metric.Spec.Target.String())
-		// Observation might need adjustment depending on how compound results should be represented in status
-		result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(len(list.Items))} // Report total count for now
+		result.Message = fmt.Sprintf("metric values recorded for resource '%s'", h.metric.GvkToString())
+		// Observation might need adjustment depending on how results should be represented in status
+		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(len(list.Items))} // Report total count for now
 	}
 
 	// Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
@@ -130,7 +129,7 @@ func (h *CompoundHandler) extractProjectionGroupsFrom(list *unstructured.Unstruc
 
 	for _, obj := range list.Items {
 
-		projection := lo.FirstOr(h.metric.Spec.Projections, v1beta1.Projection{})
+		projection := lo.FirstOr(h.metric.Spec.Projections, v1alpha1.Projection{})
 
 		if projection.Name != "" && projection.FieldPath != "" {
 			name := projection.Name
@@ -164,9 +163,9 @@ func (h *CompoundHandler) getResources(ctx context.Context) (*unstructured.Unstr
 		options.FieldSelector = h.metric.Spec.FieldSelector
 	}
 	gvr := schema.GroupVersionResource{
-		Group:    h.metric.Spec.Target.Group,
-		Version:  h.metric.Spec.Target.Version,
-		Resource: h.metric.Spec.Target.Resource,
+		Group:    h.metric.Spec.Group,
+		Version:  h.metric.Spec.Version,
+		Resource: strings.ToLower(h.metric.Spec.Kind), // this must be plural and lower case
 	}
 	list, err := h.dCli.Resource(gvr).List(ctx, options)
 
@@ -178,7 +177,7 @@ func (h *CompoundHandler) getResources(ctx context.Context) (*unstructured.Unstr
 }
 
 // NewCompoundHandler creates a new CompoundHandler
-func NewCompoundHandler(metric v1beta1.CompoundMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*CompoundHandler, error) { // Changed dtClient to gaugeMetric
+func NewCompoundHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*CompoundHandler, error) { // Changed dtClient to gaugeMetric
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, errCli

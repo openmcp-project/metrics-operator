@@ -86,6 +86,8 @@ type MetricObservation struct {
 
 	// The latest value of the metric
 	LatestValue string `json:"latestValue,omitempty"`
+
+	Dimensions []Dimension `json:"dimensions,omitempty"`
 }
 
 // GetTimestamp returns the timestamp of the observation

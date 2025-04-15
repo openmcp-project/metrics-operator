@@ -89,7 +89,7 @@ func runInit(setupClient client.Client) {
 				&metricsv1alpha1.Metric{},
 				&metricsv1alpha1.ManagedMetric{},
 				&metricsv1alpha1.RemoteClusterAccess{},
-				&metricsv1beta1.CompoundMetric{},
+				// &metricsv1beta1.CompoundMetric{},
 				&metricsv1beta1.FederatedMetric{},
 			},
 			webhooksFlags.InstallOptions...,
@@ -172,7 +172,7 @@ func main() {
 	}
 
 	// TODO: to deprecate v1alpha1 resources
-	setupMetricController(mgr)
+	// setupMetricController(mgr)
 	setupManagedMetricController(mgr)
 
 	setupReconcilersV1beta1(mgr)

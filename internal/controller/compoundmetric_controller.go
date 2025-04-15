@@ -30,7 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	insight "github.com/SAP/metrics-operator/api/v1alpha1"
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
 	"github.com/SAP/metrics-operator/internal/common"
@@ -41,12 +41,12 @@ import (
 // NewCompoundMetricReconciler creates a new CompoundMetricReconciler
 func NewCompoundMetricReconciler(mgr ctrl.Manager) *CompoundMetricReconciler {
 	return &CompoundMetricReconciler{
-		log: mgr.GetLogger().WithName("controllers").WithName("CompoundMetric"),
+		log: mgr.GetLogger().WithName("controllers").WithName("Metric"),
 
 		inCli:      mgr.GetClient(),
 		RestConfig: mgr.GetConfig(),
 		Scheme:     mgr.GetScheme(),
-		Recorder:   mgr.GetEventRecorderFor("compound-controller"),
+		Recorder:   mgr.GetEventRecorderFor("Metric-controller"),
 	}
 }
 
@@ -70,20 +70,20 @@ func (r *CompoundMetricReconciler) getRestConfig() *rest.Config {
 	return r.RestConfig
 }
 
-func (r *CompoundMetricReconciler) scheduleNextReconciliation(metric *v1beta1.CompoundMetric) (ctrl.Result, error) {
+func (r *CompoundMetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (ctrl.Result, error) {
 
-	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
+	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
 	return ctrl.Result{
 		Requeue:      true,
 		RequeueAfter: metric.Spec.CheckInterval.Duration - elapsed,
 	}, nil
 }
 
-func (r *CompoundMetricReconciler) shouldReconcile(metric *v1beta1.CompoundMetric) bool {
-	if metric.Status.LastReconcileTime == nil {
+func (r *CompoundMetricReconciler) shouldReconcile(metric *v1alpha1.Metric) bool {
+	if metric.Status.Observation.LatestValue == "" || metric.Status.Observation.Timestamp.Time.IsZero() {
 		return true
 	}
-	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
+	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
 	return elapsed >= metric.Spec.CheckInterval.Duration
 }
 
@@ -116,7 +116,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			1. Load the generic metric using the client
 		 	All method should take the context to allow for cancellation (like CancellationToken)
 	*/
-	metric := v1beta1.CompoundMetric{}
+	metric := v1alpha1.Metric{}
 	if errLoad := r.getClient().Get(ctx, req.NamespacedName, &metric); errLoad != nil {
 		return r.handleGetError(errLoad, l)
 	}
@@ -141,28 +141,28 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfig, err := createQC(ctx, metric.Spec.ClusterAccessRef, r)
+	queryConfig, err := createQC(ctx, metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
 	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
 	if errCli != nil {
-		l.Error(errCli, fmt.Sprintf("compound metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		l.Error(errCli, fmt.Sprintf("metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		// TODO: Update status?
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
 	defer func() {
 		if err := metricClient.Close(ctx); err != nil {
-			l.Error(err, "Failed to close metric client during compound metric reconciliation", "metric", metric.Name)
+			l.Error(err, "Failed to close metric client during metric reconciliation", "metric", metric.Name)
 		}
 	}() // Ensure exporter is shut down
 
-	metricClient.SetMeter("compound")
+	metricClient.SetMeter("metric")
 
 	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
 	if errGauge != nil {
-		l.Error(errGauge, fmt.Sprintf("compound metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		l.Error(errGauge, fmt.Sprintf("metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		// TODO: Update status?
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
@@ -171,7 +171,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	*/
 	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithCompound(metric, gaugeMetric) // Pass gaugeMetric
 	if errOrch != nil {
-		l.Error(errOrch, "unable to create compound metric orchestrator monitor")
+		l.Error(errOrch, "unable to create metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
 	}
@@ -180,7 +180,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	if errMon != nil {
 		metric.Status.Ready = v1beta1.StatusFalse
-		l.Error(errMon, fmt.Sprintf("compound metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		l.Error(errMon, fmt.Sprintf("metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		// Update status before returning
 		_ = r.getClient().Status().Update(ctx, &metric) // Best effort status update on error
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
@@ -189,7 +189,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	errExport := metricClient.ExportMetrics(ctx)
 	if errExport != nil {
 		metric.Status.Ready = v1beta1.StatusFalse
-		l.Error(errExport, fmt.Sprintf("compound metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		l.Error(errExport, fmt.Sprintf("metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 	} else {
 		metric.Status.Ready = v1beta1.StatusTrue
 	}
@@ -198,34 +198,38 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		3. Update the status of the metric with conditions and phase
 	*/
 	switch result.Phase {
-	case insight.PhaseActive:
+	case v1alpha1.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
 		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
-	case insight.PhaseFailed:
+	case v1alpha1.PhaseFailed:
 		l.Error(result.Error, result.Message, "reason", result.Reason)
 		metric.SetConditions(common.Error(result.Message))
 		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
-	case insight.PhasePending:
+	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	cObs := result.Observation.(*v1beta1.MetricObservation)
+	cObs := result.Observation.(*v1alpha1.MetricObservation)
 
 	// Override Ready status if export failed
 	if errExport != nil {
 		metric.Status.Ready = "False"
 	}
-	metric.Status.Observation = v1beta1.MetricObservation{Timestamp: result.Observation.GetTimestamp(), Dimensions: cObs.Dimensions, LatestValue: cObs.LatestValue}
+	// metric.Status.Observation = v1beta1.MetricObservation{Timestamp: result.Observation.GetTimestamp(), Dimensions: cObs.Dimensions, LatestValue: cObs.LatestValue}
+	metric.Status.Observation = v1alpha1.MetricObservation{
+		Timestamp:   result.Observation.GetTimestamp(),
+		LatestValue: cObs.LatestValue,
+		Dimensions:  cObs.Dimensions,
+	}
 
 	// Update LastReconcileTime
-	now := metav1.Now()
-	metric.Status.LastReconcileTime = &now
+	metric.Status.Observation.Timestamp.Time = metav1.Now().Time
 
 	// conditions are not persisted until the status is updated
 	errUp := r.getClient().Status().Update(ctx, &metric)
 	if errUp != nil {
-		l.Error(errUp, fmt.Sprintf("compound metric '%s' failed to update status, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		l.Error(errUp, fmt.Sprintf("metric '%s' failed to update status, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errUp
 	}
 
@@ -239,7 +243,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		requeueTime = metric.Spec.CheckInterval.Duration
 	}
 
-	l.Info(fmt.Sprintf("compound metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
+	l.Info(fmt.Sprintf("metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
 		Requeue:      true,
@@ -250,11 +254,11 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // SetupWithManager sets up the controller with the Manager.
 func (r *CompoundMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1beta1.CompoundMetric{}).
+		For(&v1alpha1.Metric{}).
 		Complete(r)
 }
 
-func createQC(ctx context.Context, rcaRef *v1beta1.ClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
+func createQC(ctx context.Context, rcaRef *v1alpha1.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
 	var queryConfig orc.QueryConfig
 	// Kubernetes client to the external cluster if defined
 	if rcaRef != nil {
