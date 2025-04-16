@@ -89,7 +89,6 @@ func runInit(setupClient client.Client) {
 				&metricsv1alpha1.Metric{},
 				&metricsv1alpha1.ManagedMetric{},
 				&metricsv1alpha1.RemoteClusterAccess{},
-				// &metricsv1beta1.CompoundMetric{},
 				&metricsv1beta1.FederatedMetric{},
 			},
 			webhooksFlags.InstallOptions...,
@@ -171,8 +170,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: to deprecate v1alpha1 resources
-	// setupMetricController(mgr)
+	// TODO: to deprecate v1beta1 resources
+	setupMetricController(mgr)
 	setupManagedMetricController(mgr)
 
 	setupReconcilersV1beta1(mgr)
@@ -203,10 +202,6 @@ func main() {
 }
 
 func setupReconcilersV1beta1(mgr ctrl.Manager) {
-	if err := (controller.NewCompoundMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create reconciler", "controller", "compound metric")
-		os.Exit(1)
-	}
 	if err := (controller.NewFederatedMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create reconciler", "controller", "federated metric")
 		os.Exit(1)
@@ -221,13 +216,13 @@ func setupReconcilersV1beta1(mgr ctrl.Manager) {
 
 func setupMetricController(mgr ctrl.Manager) {
 	if err := controller.NewMetricReconciler(mgr).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Metric")
+		setupLog.Error(err, "unable to create reconciler", "controller", "compound metric")
 		os.Exit(1)
 	}
 }
 
 func setupManagedMetricController(mgr ctrl.Manager) {
-	if err := (controller.NewManagedMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
+	if err := controller.NewManagedMetricReconciler(mgr).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ManagedMetric")
 		os.Exit(1)
 	}

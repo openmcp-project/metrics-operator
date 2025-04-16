@@ -17,8 +17,8 @@ import (
 	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
 )
 
-// CompoundHandler is used to monitor a compound metric
-type CompoundHandler struct {
+// MetricHandler is used to monitor a metric
+type MetricHandler struct {
 	dCli        dynamic.Interface
 	discoClient discovery.DiscoveryInterface
 
@@ -31,7 +31,7 @@ type CompoundHandler struct {
 // Monitor is used to monitor the metric
 //
 //nolint:gocyclo
-func (h *CompoundHandler) Monitor(ctx context.Context) (MonitorResult, error) {
+func (h *MetricHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	// Metric creation and export are handled by the controller.
 	// This handler focuses on fetching resources, grouping, and recording data points.
@@ -119,7 +119,7 @@ func (e *projectedField) GetID() string {
 	return fmt.Sprintf("%s: %s", e.name, e.value)
 }
 
-func (h *CompoundHandler) extractProjectionGroupsFrom(list *unstructured.UnstructuredList) map[string][]projectedField {
+func (h *MetricHandler) extractProjectionGroupsFrom(list *unstructured.UnstructuredList) map[string][]projectedField {
 
 	// note: for now we only allow one projection, so we can use the first one
 	// the reason for this is that if we have multiple projections, we need to create a cartesian product of all projections
@@ -150,7 +150,7 @@ func (h *CompoundHandler) extractProjectionGroupsFrom(list *unstructured.Unstruc
 
 // Removed createGvrBaseMetric as it's clientlite specific
 
-func (h *CompoundHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {
+func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {
 	var options = metav1.ListOptions{}
 	// if not defined in the metric, the list options need to be empty to get resources based on GVR only
 	// Add label selector if present
@@ -177,7 +177,7 @@ func (h *CompoundHandler) getResources(ctx context.Context) (*unstructured.Unstr
 }
 
 // NewCompoundHandler creates a new CompoundHandler
-func NewCompoundHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*CompoundHandler, error) { // Changed dtClient to gaugeMetric
+func NewCompoundHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*MetricHandler, error) { // Changed dtClient to gaugeMetric
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, errCli
@@ -188,7 +188,7 @@ func NewCompoundHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *cli
 		return nil, errDisco
 	}
 
-	var handler = &CompoundHandler{
+	var handler = &MetricHandler{
 		metric:      metric,
 		dCli:        dynamicClient,
 		discoClient: disco,

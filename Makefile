@@ -236,8 +236,8 @@ dev-local-all:
 	$(MAKE) dev-namespace
 	$(MAKE) dev-secret
 	$(MAKE) dev-basic-metric
-	$(MAKE) dev-managed-metric
-	$(MAKE) dev-v1beta1-compmetric
+	# $(MAKE) dev-managed-metric
+	# $(MAKE) dev-v1beta1-compmetric
 
 
 
@@ -305,7 +305,7 @@ helm-chart:
 .PHONY: helm-install-local
 helm-install-local: docker-build
 	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
-	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
+	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
 
 

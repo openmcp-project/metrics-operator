@@ -5,7 +5,7 @@ metadata:
 spec:
   name: helm-release-metric
   description: Helm Release Metric Helm Crossplane Provider
-  kind: Release
+  kind: releases
   group: helm.crossplane.io
   version: v1beta1
   checkInterval: 1m # in minutes
@@ -17,10 +17,13 @@ metadata:
 spec:
   name: pods-metric
   description: Pods
-  kind: Pod
+  kind: pods
   group: ""
   version: v1
   checkInterval: 1m # in minutes
+  projections:
+    - name: pod-namespace
+      fieldPath: "metadata.namespace"
 ---
 #apiVersion: metrics.cloud.sap/v1alpha1
 #kind: Metric

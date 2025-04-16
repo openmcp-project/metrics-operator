@@ -32,15 +32,20 @@ import (
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
-	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
+	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
 )
 
-// NewCompoundMetricReconciler creates a new CompoundMetricReconciler
-func NewCompoundMetricReconciler(mgr ctrl.Manager) *CompoundMetricReconciler {
-	return &CompoundMetricReconciler{
+const (
+	// RequeueAfterError is the time to requeue the metric after an error
+	RequeueAfterError = 2 * time.Minute
+)
+
+// NewMetricReconciler creates a new MetricReconciler
+func NewMetricReconciler(mgr ctrl.Manager) *MetricReconciler {
+	return &MetricReconciler{
 		log: mgr.GetLogger().WithName("controllers").WithName("Metric"),
 
 		inCli:      mgr.GetClient(),
@@ -50,8 +55,8 @@ func NewCompoundMetricReconciler(mgr ctrl.Manager) *CompoundMetricReconciler {
 	}
 }
 
-// CompoundMetricReconciler reconciles a CompoundMetric object
-type CompoundMetricReconciler struct {
+// MetricReconciler reconciles a Metric object
+type MetricReconciler struct {
 	log logr.Logger
 
 	inCli      client.Client
@@ -61,16 +66,16 @@ type CompoundMetricReconciler struct {
 }
 
 // GetClient returns the client
-func (r *CompoundMetricReconciler) getClient() client.Client {
+func (r *MetricReconciler) getClient() client.Client {
 	return r.inCli
 }
 
 // GetRestConfig returns the rest config
-func (r *CompoundMetricReconciler) getRestConfig() *rest.Config {
+func (r *MetricReconciler) getRestConfig() *rest.Config {
 	return r.RestConfig
 }
 
-func (r *CompoundMetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (ctrl.Result, error) {
+func (r *MetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (ctrl.Result, error) {
 
 	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
 	return ctrl.Result{
@@ -79,7 +84,7 @@ func (r *CompoundMetricReconciler) scheduleNextReconciliation(metric *v1alpha1.M
 	}, nil
 }
 
-func (r *CompoundMetricReconciler) shouldReconcile(metric *v1alpha1.Metric) bool {
+func (r *MetricReconciler) shouldReconcile(metric *v1alpha1.Metric) bool {
 	if metric.Status.Observation.LatestValue == "" || metric.Status.Observation.Timestamp.Time.IsZero() {
 		return true
 	}
@@ -87,30 +92,29 @@ func (r *CompoundMetricReconciler) shouldReconcile(metric *v1alpha1.Metric) bool
 	return elapsed >= metric.Spec.CheckInterval.Duration
 }
 
-func (r *CompoundMetricReconciler) handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
+func (r *MetricReconciler) handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
 	// we'll ignore not-found errors, since they can't be fixed by an immediate
 	// requeue (we'll need to wait for a new notification), and we can also get them
 	// on delete requests.
 	if apierrors.IsNotFound(err) {
-		log.Info("CompoundMetric not found")
+		log.Info("Metric not found")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, nil
 	}
-	log.Error(err, "unable to fetch CompoundMetric")
+	log.Error(err, "unable to fetch Metric")
 	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 }
 
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=compoundmetrics,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=compoundmetrics/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=compoundmetrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/finalizers,verbs=update
 
-// Reconcile handles the reconciliation of a CompountMetric object
-// A Compound represents a metric with multiple time series and dynamic dimensions
+// Reconcile handles the reconciliation of a Metric object
 //
 //nolint:gocyclo
-func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := r.log.WithValues("namespace", req.NamespacedName, "name", req.Name)
 
-	l.Info("Reconciling CompoundMetric")
+	l.Info("Reconciling Metric")
 
 	/*
 			1. Load the generic metric using the client
@@ -169,7 +173,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithCompound(metric, gaugeMetric) // Pass gaugeMetric
+	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithMetric(metric, gaugeMetric) // Pass gaugeMetric
 	if errOrch != nil {
 		l.Error(errOrch, "unable to create metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
@@ -252,7 +256,7 @@ func (r *CompoundMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *CompoundMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Metric{}).
 		Complete(r)

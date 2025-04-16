@@ -16,14 +16,34 @@ import (
 	"github.com/SAP/metrics-operator/internal/common"
 )
 
-// MetricHandler is used to monitor the metric
-type MetricHandler interface {
+const (
+	// KIND Constant for k8s resource fields
+	KIND string = "kind"
+
+	// GROUP Constant for k8s resource fields
+	GROUP string = "group"
+
+	// VERSION Constant for k8s resource fields
+	VERSION string = "version"
+
+	// CLUSTER Constant for k8s resource fields
+	CLUSTER string = "cluster"
+
+	// RESOURCE Constant for k8s resource fields
+	RESOURCE string = "resource"
+
+	// APIVERSION Constant for k8s resource fields
+	APIVERSION string = "apiVersion"
+)
+
+// GenericHandler is used to monitor the metric
+type GenericHandler interface {
 	Monitor(ctx context.Context) (MonitorResult, error)
 }
 
 // Orchestrator is used to create a new handler
 type Orchestrator struct {
-	Handler MetricHandler
+	Handler GenericHandler
 
 	credentials common.DataSinkCredentials
 
@@ -42,16 +62,6 @@ func NewOrchestrator(creds common.DataSinkCredentials, qConfig QueryConfig) *Orc
 	return &Orchestrator{credentials: creds, queryConfig: qConfig}
 }
 
-// WithGeneric creates a new Orchestrator with a Generic handler
-func (o *Orchestrator) WithGeneric(metric v1.Metric) (*Orchestrator, error) {
-	dtClient := client.NewClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)
-	metricMetadata := client.NewMetricMetadata(metric.Spec.Name, metric.Spec.Name, metric.Spec.Description)
-
-	var err error
-	o.Handler, err = NewGenericHandler(metric, metricMetadata, o.queryConfig, dtClient)
-	return o, err
-}
-
 // WithManaged creates a new Orchestrator with a ManagedMetric handler
 func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, error) {
 	dtClient := client.NewClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)
@@ -62,8 +72,8 @@ func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, err
 	return o, err
 }
 
-// WithCompound creates a new Orchestrator with a CompoundMetric handler
-func (o *Orchestrator) WithCompound(metric v1alpha1.Metric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
+// WithMetric creates a new Orchestrator with a CompoundMetric handler
+func (o *Orchestrator) WithMetric(metric v1alpha1.Metric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
 	// dtClient creation removed, as it's handled by the controller
 
 	var err error
