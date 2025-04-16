@@ -19,90 +19,124 @@ package controller
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/SAP/metrics-operator/api/v1alpha1"
+	"github.com/SAP/metrics-operator/api/v1beta1"
+	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
-
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	insight "github.com/SAP/metrics-operator/api/v1alpha1"
 )
 
-// NewManagedMetricReconciler creates a new ManagedMetricReconciler
-func NewManagedMetricReconciler(mgr ctrl.Manager) *ManagedMetricReconciler {
-	return &ManagedMetricReconciler{
-		inClient:     mgr.GetClient(),
-		inRestConfig: mgr.GetConfig(),
-		Scheme:       mgr.GetScheme(),
-		Recorder:     mgr.GetEventRecorderFor("managedmetrics-controller"),
+const (
+	// RequeueAfterError is the time to requeue the metric after an error
+	RequeueAfterError = 2 * time.Minute
+)
+
+// NewMetricReconciler creates a new MetricReconciler
+func NewMetricReconciler(mgr ctrl.Manager) *MetricReconciler {
+	return &MetricReconciler{
+		log: mgr.GetLogger().WithName("controllers").WithName("Metric"),
+
+		inCli:      mgr.GetClient(),
+		RestConfig: mgr.GetConfig(),
+		Scheme:     mgr.GetScheme(),
+		Recorder:   mgr.GetEventRecorderFor("Metric-controller"),
 	}
 }
 
-func (r *ManagedMetricReconciler) getClient() client.Client {
-	return r.inClient
+// MetricReconciler reconciles a Metric object
+type MetricReconciler struct {
+	log logr.Logger
+
+	inCli      client.Client
+	Scheme     *runtime.Scheme
+	RestConfig *rest.Config
+	Recorder   record.EventRecorder
 }
 
-func (r *ManagedMetricReconciler) getRestConfig() *rest.Config {
-	return r.inRestConfig
+// GetClient returns the client
+func (r *MetricReconciler) getClient() client.Client {
+	return r.inCli
 }
 
-// ManagedMetricReconciler reconciles a ManagedMetric object
-type ManagedMetricReconciler struct {
-	inClient     client.Client
-	inRestConfig *rest.Config
-	Scheme       *runtime.Scheme
-
-	Recorder record.EventRecorder
+// GetRestConfig returns the rest config
+func (r *MetricReconciler) getRestConfig() *rest.Config {
+	return r.RestConfig
 }
 
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/finalizers,verbs=update
+func (r *MetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (ctrl.Result, error) {
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
+	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
+	return ctrl.Result{
+		Requeue:      true,
+		RequeueAfter: metric.Spec.CheckInterval.Duration - elapsed,
+	}, nil
+}
+
+func (r *MetricReconciler) shouldReconcile(metric *v1alpha1.Metric) bool {
+	if metric.Status.Observation.LatestValue == "" || metric.Status.Observation.Timestamp.Time.IsZero() {
+		return true
+	}
+	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
+	return elapsed >= metric.Spec.CheckInterval.Duration
+}
+
+func (r *MetricReconciler) handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
+	// we'll ignore not-found errors, since they can't be fixed by an immediate
+	// requeue (we'll need to wait for a new notification), and we can also get them
+	// on delete requests.
+	if apierrors.IsNotFound(err) {
+		log.Info("Metric not found")
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, nil
+	}
+	log.Error(err, "unable to fetch Metric")
+	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+}
+
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/finalizers,verbs=update
+
+// Reconcile handles the reconciliation of a Metric object
 //
 //nolint:gocyclo
-func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var l = log.FromContext(ctx)
+func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	l := r.log.WithValues("namespace", req.NamespacedName, "name", req.Name)
+
+	l.Info("Reconciling Metric")
 
 	/*
-			1. Load the managed metric using the client
+			1. Load the generic metric using the client
 		 	All method should take the context to allow for cancellation (like CancellationToken)
 	*/
-	metric := insight.ManagedMetric{}
-	if errLoad := r.inClient.Get(ctx, req.NamespacedName, &metric); errLoad != nil {
-		// we'll ignore not-found errors, since they can't be fixed by an immediate
-		// requeue (we'll need to wait for a new notification), and we can also get them
-		// on delete requests.
-		if apierrors.IsNotFound(errLoad) {
-			l.Info("Managed Metric not found")
-			return ctrl.Result{RequeueAfter: RequeueAfterError}, nil
-		}
-		l.Error(errLoad, "unable to fetch Managed Metric")
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errLoad
+	metric := v1alpha1.Metric{}
+	if errLoad := r.getClient().Get(ctx, req.NamespacedName, &metric); errLoad != nil {
+		return r.handleGetError(errLoad, l)
+	}
+
+	// Check if enough time has passed since the last reconciliation
+	if !r.shouldReconcile(&metric) {
+		return r.scheduleNextReconciliation(&metric)
 	}
 
 	/*
 		1.1 Get the Secret that holds the Dynatrace credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(ctx, r.inClient)
+	secret, errSecret := common.GetCredentialsSecret(ctx, r.getClient())
 	if errSecret != nil {
-		l.Error(errSecret, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
-		r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
+		l.Error(errSecret, fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
+		r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errSecret
 	}
 
@@ -111,17 +145,37 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfig, err := createQueryConfig(ctx, metric.Spec.RemoteClusterAccessRef, r)
+	queryConfig, err := createQC(ctx, metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	if errCli != nil {
+		l.Error(errCli, fmt.Sprintf("metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		// TODO: Update status?
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+	}
+	defer func() {
+		if err := metricClient.Close(ctx); err != nil {
+			l.Error(err, "Failed to close metric client during metric reconciliation", "metric", metric.Name)
+		}
+	}() // Ensure exporter is shut down
+
+	metricClient.SetMeter("metric")
+
+	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
+	if errGauge != nil {
+		l.Error(errGauge, fmt.Sprintf("metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		// TODO: Update status?
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
+	}
 	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithManaged(metric)
+	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithMetric(metric, gaugeMetric) // Pass gaugeMetric
 	if errOrch != nil {
-		l.Error(errOrch, "unable to create managed metric orchestrator monitor")
+		l.Error(errOrch, "unable to create metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
 	}
@@ -129,33 +183,57 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	result, errMon := orchestrator.Handler.Monitor(ctx)
 
 	if errMon != nil {
-		l.Error(errMon, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		metric.Status.Ready = v1beta1.StatusFalse
+		l.Error(errMon, fmt.Sprintf("metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		// Update status before returning
+		_ = r.getClient().Status().Update(ctx, &metric) // Best effort status update on error
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
+	}
+
+	errExport := metricClient.ExportMetrics(ctx)
+	if errExport != nil {
+		metric.Status.Ready = v1beta1.StatusFalse
+		l.Error(errExport, fmt.Sprintf("metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+	} else {
+		metric.Status.Ready = v1beta1.StatusTrue
 	}
 
 	/*
 		3. Update the status of the metric with conditions and phase
 	*/
 	switch result.Phase {
-	case insight.PhaseActive:
+	case v1alpha1.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
 		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
-	case insight.PhaseFailed:
+	case v1alpha1.PhaseFailed:
 		l.Error(result.Error, result.Message, "reason", result.Reason)
 		metric.SetConditions(common.Error(result.Message))
 		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
-	case insight.PhasePending:
+	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	metric.Status.Ready = boolToString(result.Phase == insight.PhaseActive)
-	metric.Status.Observation = insight.ManagedObservation{Timestamp: result.Observation.GetTimestamp(), Resources: result.Observation.GetValue()}
+	cObs := result.Observation.(*v1alpha1.MetricObservation)
+
+	// Override Ready status if export failed
+	if errExport != nil {
+		metric.Status.Ready = "False"
+	}
+	// metric.Status.Observation = v1beta1.MetricObservation{Timestamp: result.Observation.GetTimestamp(), Dimensions: cObs.Dimensions, LatestValue: cObs.LatestValue}
+	metric.Status.Observation = v1alpha1.MetricObservation{
+		Timestamp:   result.Observation.GetTimestamp(),
+		LatestValue: cObs.LatestValue,
+		Dimensions:  cObs.Dimensions,
+	}
+
+	// Update LastReconcileTime
+	metric.Status.Observation.Timestamp.Time = metav1.Now().Time
 
 	// conditions are not persisted until the status is updated
-	errUp := r.inClient.Status().Update(ctx, &metric)
+	errUp := r.getClient().Status().Update(ctx, &metric)
 	if errUp != nil {
-		l.Error(errUp, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		l.Error(errUp, fmt.Sprintf("metric '%s' failed to update status, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errUp
 	}
 
@@ -163,13 +241,13 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
 	*/
 	var requeueTime time.Duration
-	if result.Error != nil {
+	if result.Error != nil || errExport != nil { // Requeue faster on monitor or export error
 		requeueTime = RequeueAfterError
 	} else {
 		requeueTime = metric.Spec.CheckInterval.Duration
 	}
 
-	l.Info(fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
+	l.Info(fmt.Sprintf("metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
 		Requeue:      true,
@@ -178,25 +256,17 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ManagedMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&insight.ManagedMetric{}).
+		For(&v1alpha1.Metric{}).
 		Complete(r)
 }
 
-func boolToString(b bool) string {
-	if b {
-		return "True"
-	}
-	return "False"
-
-}
-
-func createQueryConfig(ctx context.Context, rcaRef *insight.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
+func createQC(ctx context.Context, rcaRef *v1alpha1.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
 	var queryConfig orc.QueryConfig
 	// Kubernetes client to the external cluster if defined
 	if rcaRef != nil {
-		qc, err := config.CreateExternalQueryConfig(ctx, rcaRef, r.getClient())
+		qc, err := config.CreateExternalQC(ctx, rcaRef, r.getClient())
 		if err != nil {
 			return orc.QueryConfig{}, err
 		}
@@ -208,35 +278,3 @@ func createQueryConfig(ctx context.Context, rcaRef *insight.RemoteClusterAccessR
 	}
 	return queryConfig, nil
 }
-
-func getClusterInfo(config *rest.Config) (string, error) {
-	if config.Host == "" {
-		return "", fmt.Errorf("config.Host is empty")
-	}
-
-	// Parse the host URL
-	u, err := url.Parse(config.Host)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse host URL: %w", err)
-	}
-
-	// Extract the hostname
-	hostname := u.Hostname()
-
-	// debugging only
-	if hostname == "127.0.0.1" {
-		return "localhost", nil
-	}
-
-	// Remove any prefix (like "kubernetes" or "kubernetes.default.svc")
-	parts := strings.Split(hostname, ".")
-	clusterName := parts[0]
-
-	return clusterName, nil
-}
-
-// OrchestratorFactory is a function type for creating orchestrators
-type OrchestratorFactory func(creds common.DataSinkCredentials, qConfig orc.QueryConfig) *orc.Orchestrator
-
-// QueryConfigFactory is a function type for creating query configs
-type QueryConfigFactory func(ctx context.Context, rcaRef *insight.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error)
