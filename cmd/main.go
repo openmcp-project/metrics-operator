@@ -216,7 +216,7 @@ func setupReconcilersV1beta1(mgr ctrl.Manager) {
 
 func setupMetricController(mgr ctrl.Manager) {
 	if err := controller.NewMetricReconciler(mgr).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create reconciler", "controller", "compound metric")
+		setupLog.Error(err, "unable to create reconciler", "controller", "metric")
 		os.Exit(1)
 	}
 }

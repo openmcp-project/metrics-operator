@@ -236,8 +236,7 @@ dev-local-all:
 	$(MAKE) dev-namespace
 	$(MAKE) dev-secret
 	$(MAKE) dev-basic-metric
-	# $(MAKE) dev-managed-metric
-	# $(MAKE) dev-v1beta1-compmetric
+	$(MAKE) dev-managed-metric
 
 
 

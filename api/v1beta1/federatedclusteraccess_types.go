@@ -85,6 +85,7 @@ func init() {
 	SchemeBuilder.Register(&FederatedClusterAccess{}, &FederatedClusterAccessList{})
 }
 
+// MetricObservation stores the last observation details
 type MetricObservation struct {
 	// The timestamp of the observation
 	Timestamp metav1.Time `json:"timestamp,omitempty"`

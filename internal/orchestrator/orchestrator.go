@@ -7,11 +7,9 @@ import (
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	v1 "github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/client"
 
-	// "github.com/SAP/metrics-operator/internal/clientlite" // Removed
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 )
@@ -63,7 +61,7 @@ func NewOrchestrator(creds common.DataSinkCredentials, qConfig QueryConfig) *Orc
 }
 
 // WithManaged creates a new Orchestrator with a ManagedMetric handler
-func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, error) {
+func (o *Orchestrator) WithManaged(managed v1alpha1.ManagedMetric) (*Orchestrator, error) {
 	dtClient := client.NewClient(o.credentials.Host, o.credentials.Path, o.credentials.Token)
 	metricMetadata := client.NewMetricMetadata(managed.Spec.Name, managed.Spec.Name, managed.Spec.Description)
 
@@ -72,13 +70,13 @@ func (o *Orchestrator) WithManaged(managed v1.ManagedMetric) (*Orchestrator, err
 	return o, err
 }
 
-// WithMetric creates a new Orchestrator with a CompoundMetric handler
+// WithMetric creates a new Orchestrator with a Metric handler
 func (o *Orchestrator) WithMetric(metric v1alpha1.Metric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) { // Added gaugeMetric parameter
 	// dtClient creation removed, as it's handled by the controller
 
 	var err error
 	// Pass gaugeMetric instead of dtClient
-	o.Handler, err = NewCompoundHandler(metric, o.queryConfig, gaugeMetric)
+	o.Handler, err = NewMetricHandler(metric, o.queryConfig, gaugeMetric)
 	return o, err
 }
 

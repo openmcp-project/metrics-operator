@@ -176,8 +176,8 @@ func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.Unstruc
 	return list, nil
 }
 
-// NewCompoundHandler creates a new CompoundHandler
-func NewCompoundHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*MetricHandler, error) { // Changed dtClient to gaugeMetric
+// NewMetricHandler creates a new MetricHandler
+func NewMetricHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*MetricHandler, error) { // Changed dtClient to gaugeMetric
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, errCli

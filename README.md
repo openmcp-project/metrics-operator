@@ -47,15 +47,15 @@ Replace `<operator-namespace>`, `<artifactory-secret-name>`, and `<version>` wit
 
 ## Usage
 
-### Compound Metric
+### Metric
 
-Compound metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
+Metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
 This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation to access nested fields.
 The projections are then translated to dimensions in the metric.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
-kind: CompoundMetric
+apiVersion: metrics.cloud.sap/v1alpha
+kind: Metric
 metadata:
   name: comp-pod
 spec:
