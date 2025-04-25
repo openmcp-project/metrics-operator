@@ -32,11 +32,11 @@ import (
 
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
-	orc "github.com/SAP/metrics-operator/internal/orchestrator"
+	"github.com/SAP/metrics-operator/internal/orchestrator"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	insight "github.com/SAP/metrics-operator/api/v1alpha1"
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 )
 
 // NewManagedMetricReconciler creates a new ManagedMetricReconciler
@@ -83,7 +83,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			1. Load the managed metric using the client
 		 	All method should take the context to allow for cancellation (like CancellationToken)
 	*/
-	metric := insight.ManagedMetric{}
+	metric := v1alpha1.ManagedMetric{}
 	if errLoad := r.inClient.Get(ctx, req.NamespacedName, &metric); errLoad != nil {
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
 		// requeue (we'll need to wait for a new notification), and we can also get them
@@ -111,7 +111,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfig, err := createQueryConfig(ctx, metric.Spec.RemoteClusterAccessRef, r)
+	queryConfig, err := createQueryConfig(ctx, &metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
@@ -119,7 +119,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithManaged(metric)
+	orchestrator, errOrch := orchestrator.NewOrchestrator(credentials, queryConfig).WithManaged(metric)
 	if errOrch != nil {
 		l.Error(errOrch, "unable to create managed metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
@@ -137,20 +137,23 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		3. Update the status of the metric with conditions and phase
 	*/
 	switch result.Phase {
-	case insight.PhaseActive:
+	case v1alpha1.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
 		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
-	case insight.PhaseFailed:
+	case v1alpha1.PhaseFailed:
 		l.Error(result.Error, result.Message, "reason", result.Reason)
 		metric.SetConditions(common.Error(result.Message))
 		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
-	case insight.PhasePending:
+	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	metric.Status.Ready = boolToString(result.Phase == insight.PhaseActive)
-	metric.Status.Observation = insight.ManagedObservation{Timestamp: result.Observation.GetTimestamp(), Resources: result.Observation.GetValue()}
+	metric.Status.Ready = v1alpha1.StatusFalse
+	if result.Phase == v1alpha1.PhaseActive {
+		metric.Status.Ready = v1alpha1.StatusTrue
+	}
+	metric.Status.Observation = v1alpha1.ManagedObservation{Timestamp: result.Observation.GetTimestamp(), Resources: result.Observation.GetValue()}
 
 	// conditions are not persisted until the status is updated
 	errUp := r.inClient.Status().Update(ctx, &metric)
@@ -180,31 +183,23 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManagedMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&insight.ManagedMetric{}).
+		For(&v1alpha1.ManagedMetric{}).
 		Complete(r)
 }
 
-func boolToString(b bool) string {
-	if b {
-		return "True"
-	}
-	return "False"
-
-}
-
-func createQueryConfig(ctx context.Context, rcaRef *insight.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
-	var queryConfig orc.QueryConfig
+func createQueryConfig(ctx context.Context, rcaRef *v1alpha1.RemoteClusterAccessRef, r InsightReconciler) (orchestrator.QueryConfig, error) {
+	var queryConfig orchestrator.QueryConfig
 	// Kubernetes client to the external cluster if defined
 	if rcaRef != nil {
 		qc, err := config.CreateExternalQueryConfig(ctx, rcaRef, r.getClient())
 		if err != nil {
-			return orc.QueryConfig{}, err
+			return orchestrator.QueryConfig{}, err
 		}
 		queryConfig = *qc
 	} else {
 		// local cluster name (where operator is deployed)
 		clusterName, _ := getClusterInfo(r.getRestConfig())
-		queryConfig = orc.QueryConfig{Client: r.getClient(), RestConfig: *r.getRestConfig(), ClusterName: &clusterName}
+		queryConfig = orchestrator.QueryConfig{Client: r.getClient(), RestConfig: *r.getRestConfig(), ClusterName: &clusterName}
 	}
 	return queryConfig, nil
 }
@@ -236,7 +231,7 @@ func getClusterInfo(config *rest.Config) (string, error) {
 }
 
 // OrchestratorFactory is a function type for creating orchestrators
-type OrchestratorFactory func(creds common.DataSinkCredentials, qConfig orc.QueryConfig) *orc.Orchestrator
+type OrchestratorFactory func(creds common.DataSinkCredentials, qConfig orchestrator.QueryConfig) *orchestrator.Orchestrator
 
 // QueryConfigFactory is a function type for creating query configs
-type QueryConfigFactory func(ctx context.Context, rcaRef *insight.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error)
+type QueryConfigFactory func(ctx context.Context, rcaRef *v1alpha1.RemoteClusterAccessRef, r InsightReconciler) (orchestrator.QueryConfig, error)

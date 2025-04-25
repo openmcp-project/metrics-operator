@@ -44,7 +44,6 @@ import (
 	"github.com/SAP/metrics-operator/internal/controller"
 
 	metricsv1alpha1 "github.com/SAP/metrics-operator/api/v1alpha1"
-	metricsv1beta1 "github.com/SAP/metrics-operator/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -66,7 +65,6 @@ func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
 	utilruntime.Must(metricsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(metricsv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -89,7 +87,7 @@ func runInit(setupClient client.Client) {
 				&metricsv1alpha1.Metric{},
 				&metricsv1alpha1.ManagedMetric{},
 				&metricsv1alpha1.RemoteClusterAccess{},
-				&metricsv1beta1.FederatedMetric{},
+				&metricsv1alpha1.FederatedMetric{},
 			},
 			webhooksFlags.InstallOptions...,
 		)

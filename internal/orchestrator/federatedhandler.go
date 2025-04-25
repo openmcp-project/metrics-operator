@@ -12,17 +12,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 )
 
 // NewFederatedHandler creates a new FederatedHandler
-func NewFederatedHandler(metric v1beta1.FederatedMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*FederatedHandler, error) {
+func NewFederatedHandler(metric v1alpha1.FederatedMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*FederatedHandler, error) {
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, errCli
@@ -49,7 +47,7 @@ type FederatedHandler struct {
 	dCli        dynamic.Interface
 	discoClient discovery.DiscoveryInterface
 
-	metric v1beta1.FederatedMetric
+	metric v1alpha1.FederatedMetric
 
 	gauge       *clientoptl.Metric
 	clusterName *string
@@ -66,7 +64,7 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		result.Error = err
 		result.Phase = v1alpha1.PhaseFailed
 		result.Reason = "ResourceNotFound"
-		result.Message = fmt.Sprintf("could not find any matching resources for metric set with filter '%s'", h.metric.Spec.Target.String())
+		result.Message = fmt.Sprintf("could not find any matching resources for metric set with filter '%s'", h.metric.Spec.Target.GVK().String())
 		return result, nil
 	}
 
@@ -76,12 +74,12 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	groups := h.extractProjectionGroupsFrom(list)
 
-	var dimensions []v1beta1.Dimension
+	var dimensions []v1alpha1.Dimension
 
 	for _, group := range groups {
 		dp := clientoptl.NewDataPoint().
 			AddDimension(CLUSTER, *h.clusterName).
-			AddDimension(RESOURCE, h.metric.Spec.Target.Resource).
+			AddDimension(RESOURCE, h.metric.Spec.Target.Kind).
 			AddDimension(GROUP, h.metric.Spec.Target.Group).
 			AddDimension(VERSION, h.metric.Spec.Target.Version).
 			SetValue(int64(len(group)))
@@ -94,7 +92,7 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 					pField.value = "n/a"
 				}
 				dp.AddDimension(pField.name, pField.value)
-				dimensions = append(dimensions, v1beta1.Dimension{Name: pField.name, Value: pField.value})
+				dimensions = append(dimensions, v1alpha1.Dimension{Name: pField.name, Value: pField.value})
 			}
 		}
 		err = h.gauge.RecordMetrics(ctx, dp)
@@ -107,12 +105,12 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	result.Phase = v1alpha1.PhaseActive
 	result.Reason = v1alpha1.ReasonMonitoringActive
-	result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.Spec.Target.String())
+	result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.Spec.Target.GVK().String())
 
 	if dimensions != nil {
-		result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1beta1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(list.Items))}}}
+		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1alpha1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(list.Items))}}}
 	} else {
-		result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now()}
+		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now()}
 	}
 
 	return result, nil
@@ -128,7 +126,7 @@ func (h *FederatedHandler) extractProjectionGroupsFrom(list *unstructured.Unstru
 
 	for _, obj := range list.Items {
 
-		projection := lo.FirstOr(h.metric.Spec.Projections, v1beta1.Projection{})
+		projection := lo.FirstOr(h.metric.Spec.Projections, v1alpha1.Projection{})
 
 		if projection.Name != "" && projection.FieldPath != "" {
 			name := projection.Name
@@ -160,11 +158,11 @@ func (h *FederatedHandler) getResources(ctx context.Context) (*unstructured.Unst
 		options.FieldSelector = h.metric.Spec.FieldSelector
 	}
 
-	gvr := schema.GroupVersionResource{
-		Group:    h.metric.Spec.Target.Group,
-		Version:  h.metric.Spec.Target.Version,
-		Resource: h.metric.Spec.Target.Resource,
+	gvr, err := GetGVRfromGVK(h.metric.Spec.Target.GVK(), h.discoClient)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get target GVK: %w", err)
 	}
+
 	list, err := h.dCli.Resource(gvr).List(ctx, options)
 
 	if err != nil {

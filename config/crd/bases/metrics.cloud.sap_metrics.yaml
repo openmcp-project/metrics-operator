@@ -82,9 +82,8 @@ spec:
                   type: object
                 type: array
               remoteClusterAccessRef:
-                description: Reference to the RemoteClusterAccess type that either
-                  reference a kubeconfig or a service account and cluster secret for
-                  remote access
+                description: RemoteClusterAccessRef is to be used by other types to
+                  reference a RemoteClusterAccess type
                 properties:
                   name:
                     type: string

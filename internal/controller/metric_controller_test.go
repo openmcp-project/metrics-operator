@@ -107,7 +107,11 @@ func (r *TestMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	metric.Status.Ready = boolToString(result.Phase == v1alpha1.PhaseActive)
+	metric.Status.Ready = v1alpha1.StatusFalse
+	if result.Phase == v1alpha1.PhaseActive {
+		metric.Status.Ready = v1alpha1.StatusTrue
+	}
+
 	metric.Status.Observation = v1alpha1.MetricObservation{
 		Timestamp:   result.Observation.GetTimestamp(),
 		LatestValue: result.Observation.GetValue(),

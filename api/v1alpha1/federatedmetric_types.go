@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,7 +29,7 @@ type FederatedMetricSpec struct {
 	Description string `json:"description,omitempty"`
 
 	// +kubebuilder:validation:Required
-	Target GroupVersionResource `json:"target,omitempty"`
+	Target GroupVersionKind `json:"target,omitempty"`
 
 	// Define labels of your object to adapt filters of the query
 	// +optional
@@ -44,22 +44,7 @@ type FederatedMetricSpec struct {
 	// +kubebuilder:default:="12h"
 	CheckInterval metav1.Duration `json:"checkInterval,omitempty"`
 
-	FederateCAFacade `json:",inline"`
-}
-
-// Projection defines the projection of the metric
-type Projection struct {
-	// Define the name of the field that should be extracted
-	Name string `json:"name,omitempty"`
-
-	// Define the path to the field that should be extracted
-	FieldPath string `json:"fieldPath,omitempty"`
-}
-
-// Dimension defines the dimension of the metric
-type Dimension struct {
-	Name  string `json:"name,omitempty"`
-	Value string `json:"value,omitempty"`
+	FederatedClusterAccessRef FederateClusterAccessRef `json:"federateClusterAccessRef,omitempty"`
 }
 
 // FederatedObservation represents the latest available observation of an object's state

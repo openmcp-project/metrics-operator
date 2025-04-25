@@ -14,21 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
-	"strings"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// FederateCAFacade defines the desired state of FederatedClusterAccess
-type FederateCAFacade struct {
-	FederatedCARef FederateCARef `json:"federateCaRef,omitempty"`
-}
-
-// FederateCARef is a reference to a FederateCA
-type FederateCARef struct {
+// FederateClusterAccessRef is a reference to a FederateCA
+type FederateClusterAccessRef struct {
 	Name      string `json:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 }
@@ -36,24 +29,13 @@ type FederateCARef struct {
 // FederatedClusterAccessSpec defines the desired state of FederatedClusterAccess
 type FederatedClusterAccessSpec struct {
 	// Define the target resources that should be monitored
-	Target GroupVersionResource `json:"target,omitempty"`
+	Target GroupVersionKind `json:"target,omitempty"`
 
 	// Field that contains the kubeconfig to access the target cluster. Use dot notation to access nested fields.
 	KubeConfigPath string `json:"kubeConfigPath,omitempty"`
 
 	// TODO: add label and field selectors
 
-}
-
-// GroupVersionResource defines the target resource
-type GroupVersionResource struct {
-	Group    string `json:"group,omitempty"`
-	Version  string `json:"version,omitempty"`
-	Resource string `json:"resource,omitempty"`
-}
-
-func (gvr *GroupVersionResource) String() string {
-	return strings.Join([]string{gvr.Group, "/", gvr.Version, ", Resource=", gvr.Resource}, "")
 }
 
 // FederatedClusterAccessStatus defines the observed state of FederatedClusterAccess
@@ -83,25 +65,4 @@ type FederatedClusterAccessList struct {
 
 func init() {
 	SchemeBuilder.Register(&FederatedClusterAccess{}, &FederatedClusterAccessList{})
-}
-
-// MetricObservation stores the last observation details
-type MetricObservation struct {
-	// The timestamp of the observation
-	Timestamp metav1.Time `json:"timestamp,omitempty"`
-
-	// The latest value of the metric
-	LatestValue string `json:"latestValue,omitempty"`
-
-	Dimensions []Dimension `json:"dimensions,omitempty"`
-}
-
-// GetTimestamp returns the timestamp of the observation
-func (mo *MetricObservation) GetTimestamp() metav1.Time {
-	return mo.Timestamp
-}
-
-// GetValue returns the latest value of the metric
-func (mo *MetricObservation) GetValue() string {
-	return mo.LatestValue
 }

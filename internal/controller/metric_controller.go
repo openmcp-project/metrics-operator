@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
@@ -145,7 +144,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfig, err := createQC(ctx, metric.Spec.RemoteClusterAccessRef, r)
+	queryConfig, err := createQC(ctx, &metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
@@ -183,7 +182,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, errMon := orchestrator.Handler.Monitor(ctx)
 
 	if errMon != nil {
-		metric.Status.Ready = v1beta1.StatusFalse
+		metric.Status.Ready = v1alpha1.StatusFalse
 		l.Error(errMon, fmt.Sprintf("metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		// Update status before returning
 		_ = r.getClient().Status().Update(ctx, &metric) // Best effort status update on error
@@ -192,10 +191,10 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	errExport := metricClient.ExportMetrics(ctx)
 	if errExport != nil {
-		metric.Status.Ready = v1beta1.StatusFalse
+		metric.Status.Ready = v1alpha1.StatusFalse
 		l.Error(errExport, fmt.Sprintf("metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 	} else {
-		metric.Status.Ready = v1beta1.StatusTrue
+		metric.Status.Ready = v1alpha1.StatusTrue
 	}
 
 	/*
@@ -266,7 +265,7 @@ func createQC(ctx context.Context, rcaRef *v1alpha1.RemoteClusterAccessRef, r In
 	var queryConfig orc.QueryConfig
 	// Kubernetes client to the external cluster if defined
 	if rcaRef != nil {
-		qc, err := config.CreateExternalQC(ctx, rcaRef, r.getClient())
+		qc, err := config.CreateExternalQueryConfig(ctx, rcaRef, r.getClient())
 		if err != nil {
 			return orc.QueryConfig{}, err
 		}
