@@ -25,6 +25,18 @@ spec:
     - name: pod-namespace
       fieldPath: "metadata.namespace"
 ---
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: basic-total-pods
+spec:
+  name: pods-metric-total
+  description: Pods
+  kind: pods
+  group: ""
+  version: v1
+  checkInterval: 1m # in minutes
+
 #apiVersion: metrics.cloud.sap/v1alpha1
 #kind: Metric
 #metadata:
