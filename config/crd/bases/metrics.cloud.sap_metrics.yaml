@@ -61,14 +61,6 @@ spec:
                 description: Define fields of your object to adapt filters of the
                   query
                 type: string
-              group:
-                description: Define the group of your object that should be instrumented
-                  (without version at the end)
-                type: string
-              kind:
-                description: Decide which kind the metric should keep track of (needs
-                  to be plural version)
-                type: string
               labelSelector:
                 description: Define labels of your object to adapt filters of the
                   query
@@ -99,9 +91,22 @@ spec:
                   namespace:
                     type: string
                 type: object
-              version:
-                description: Define version of the object you want to intrsument
-                type: string
+              target:
+                description: GroupVersionKind defines the group, version and kind
+                  of the object that should be instrumented
+                properties:
+                  group:
+                    description: Define the group of your object that should be instrumented
+                    type: string
+                  kind:
+                    description: Define the kind of the object that should be instrumented
+                    type: string
+                  version:
+                    description: Define version of the object you want to be instrumented
+                    type: string
+                type: object
+            required:
+            - target
             type: object
           status:
             description: MetricStatus defines the observed state of ManagedMetric

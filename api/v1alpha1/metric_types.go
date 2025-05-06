@@ -58,12 +58,8 @@ type MetricSpec struct {
 	// Sets the description that will be used to identify the metric in Dynatrace(or other providers)
 	// +optional
 	Description string `json:"description,omitempty"`
-	// Decide which kind the metric should keep track of (needs to be plural version)
-	Kind string `json:"kind,omitempty"`
-	// Define the group of your object that should be instrumented (without version at the end)
-	Group string `json:"group,omitempty"`
-	// Define version of the object you want to intrsument
-	Version string `json:"version,omitempty"`
+	// +kubebuilder:validation:Required
+	Target GroupVersionKind `json:"target,omitempty"`
 	// Define labels of your object to adapt filters of the query
 	// +optional
 	LabelSelector string `json:"labelSelector,omitempty"`
@@ -133,13 +129,11 @@ func (r *Metric) SetConditions(conditions ...metav1.Condition) {
 		meta.SetStatusCondition(&r.Status.Conditions, c)
 	}
 }
-
-// GvkToString returns the GVK of the metric as a string
 func (r *Metric) GvkToString() string {
-	if r.Spec.Group == "" {
-		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Version, r.Spec.Kind)
+	if r.Spec.Target.Group == "" {
+		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Target.Version, r.Spec.Target.Kind)
 	}
-	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Group, r.Spec.Version, r.Spec.Kind)
+	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Target.Group, r.Spec.Target.Version, r.Spec.Target.Kind)
 }
 
 //+kubebuilder:object:root=true

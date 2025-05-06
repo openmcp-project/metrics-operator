@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/dynamic"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/internal/clientoptl" // Added
+	"github.com/SAP/metrics-operator/internal/clientoptl"
 )
 
 // MetricHandler is used to monitor a metric
@@ -133,14 +133,14 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 }
 
 func (h *MetricHandler) setDataPointBaseDimensions(dataPoint *clientoptl.DataPoint) {
-	if h.metric.Spec.Kind != "" {
-		dataPoint.AddDimension(RESOURCE, h.metric.Spec.Kind)
+	if h.metric.Spec.Target.Kind != "" {
+		dataPoint.AddDimension(RESOURCE, h.metric.Spec.Target.Kind)
 	}
-	if h.metric.Spec.Group != "" {
-		dataPoint.AddDimension(GROUP, h.metric.Spec.Group)
+	if h.metric.Spec.Target.Group != "" {
+		dataPoint.AddDimension(GROUP, h.metric.Spec.Target.Group)
 	}
-	if h.metric.Spec.Version != "" {
-		dataPoint.AddDimension(VERSION, h.metric.Spec.Version)
+	if h.metric.Spec.Target.Version != "" {
+		dataPoint.AddDimension(VERSION, h.metric.Spec.Target.Version)
 	}
 	if h.clusterName != nil && *h.clusterName != "" {
 		dataPoint.AddDimension(CLUSTER, *h.clusterName)
@@ -199,13 +199,12 @@ func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.Unstruc
 	if h.metric.Spec.FieldSelector != "" {
 		options.FieldSelector = h.metric.Spec.FieldSelector
 	}
-	gvr := schema.GroupVersionResource{
-		Group:    h.metric.Spec.Group,
-		Version:  h.metric.Spec.Version,
-		Resource: strings.ToLower(h.metric.Spec.Kind), // this must be plural and lower case
+
+	gvr, err := getGVRfromGVK(h.metric.Spec.Target.GVK(), h.discoClient)
+	if err != nil {
+		return nil, err
 	}
 	list, err := h.dCli.Resource(gvr).List(ctx, options)
-
 	if err != nil {
 		return nil, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", gvr.String(), err)
 	}
@@ -234,4 +233,24 @@ func NewMetricHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clien
 	}
 
 	return handler, nil
+}
+
+func getGVRfromGVK(gvk schema.GroupVersionKind, disco discovery.DiscoveryInterface) (schema.GroupVersionResource, error) {
+	// TODO: this could be optimized later (e.g. by caching the discovery client)
+	groupResources, err := disco.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+
+	for _, resource := range groupResources.APIResources {
+		if strings.EqualFold(resource.Kind, gvk.Kind) {
+			return schema.GroupVersionResource{
+				Group:    gvk.Group,
+				Version:  gvk.Version,
+				Resource: resource.Name,
+			}, nil
+		}
+	}
+
+	return schema.GroupVersionResource{}, nil
 }

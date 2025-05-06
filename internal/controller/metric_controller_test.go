@@ -215,11 +215,13 @@ func testReconcileSecretNotFound(t *testing.T) {
 			Namespace: MetricNamespace,
 		},
 		Spec: v1alpha1.MetricSpec{
-			Name:          "test-metric-no-secret",
-			Description:   "Test metric description",
-			Kind:          "Pod",
-			Group:         "",
-			Version:       "v1",
+			Name:        "test-metric-no-secret",
+			Description: "Test metric description",
+			Target: v1alpha1.GroupVersionKind{
+				Kind:    "Pod",
+				Group:   "",
+				Version: "v1",
+			},
 			CheckInterval: metav1.Duration{Duration: 5 * time.Minute},
 		},
 	}
@@ -302,11 +304,13 @@ func testReconcileMetricHappyPath(t *testing.T) {
 			Namespace: MetricNamespace,
 		},
 		Spec: v1alpha1.MetricSpec{
-			Name:          "test-metric",
-			Description:   "Test metric description",
-			Kind:          "Pod",
-			Group:         "",
-			Version:       "v1",
+			Name:        "test-metric",
+			Description: "Test metric description",
+			Target: v1alpha1.GroupVersionKind{
+				Kind:    "Pod",
+				Group:   "",
+				Version: "v1",
+			},
 			CheckInterval: metav1.Duration{Duration: 5 * time.Minute},
 		},
 	}
