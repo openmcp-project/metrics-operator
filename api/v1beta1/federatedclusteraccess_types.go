@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -41,6 +43,17 @@ type FederatedClusterAccessSpec struct {
 
 	// TODO: add label and field selectors
 
+}
+
+// GroupVersionResource defines the target resource
+type GroupVersionResource struct {
+	Group    string `json:"group,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Resource string `json:"resource,omitempty"`
+}
+
+func (gvr *GroupVersionResource) String() string {
+	return strings.Join([]string{gvr.Group, "/", gvr.Version, ", Resource=", gvr.Resource}, "")
 }
 
 // FederatedClusterAccessStatus defines the observed state of FederatedClusterAccess
@@ -70,4 +83,25 @@ type FederatedClusterAccessList struct {
 
 func init() {
 	SchemeBuilder.Register(&FederatedClusterAccess{}, &FederatedClusterAccessList{})
+}
+
+// MetricObservation stores the last observation details
+type MetricObservation struct {
+	// The timestamp of the observation
+	Timestamp metav1.Time `json:"timestamp,omitempty"`
+
+	// The latest value of the metric
+	LatestValue string `json:"latestValue,omitempty"`
+
+	Dimensions []Dimension `json:"dimensions,omitempty"`
+}
+
+// GetTimestamp returns the timestamp of the observation
+func (mo *MetricObservation) GetTimestamp() metav1.Time {
+	return mo.Timestamp
+}
+
+// GetValue returns the latest value of the metric
+func (mo *MetricObservation) GetValue() string {
+	return mo.LatestValue
 }

@@ -237,8 +237,6 @@ dev-local-all:
 	$(MAKE) dev-secret
 	$(MAKE) dev-basic-metric
 	$(MAKE) dev-managed-metric
-	$(MAKE) dev-v1beta1-singlemetric
-	$(MAKE) dev-v1beta1-compmetric
 
 
 
@@ -259,11 +257,6 @@ dev-basic-metric:
 .PHONY: dev-managed-metric
 dev-managed-metric:
 	kubectl apply -f examples/managed_metric.yaml
-
-
-.PHONY: dev-v1beta1-singlemetric
-dev-v1beta1-singlemetric:
-	kubectl apply -f examples/v1beta1/singlemetric.yaml
 
 .PHONY: dev-v1beta1-compmetric
 dev-v1beta1-compmetric:
@@ -311,7 +304,7 @@ helm-chart:
 .PHONY: helm-install-local
 helm-install-local: docker-build
 	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
-	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
+	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
 
 

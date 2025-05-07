@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	insight "github.com/SAP/metrics-operator/api/v1alpha1"
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/internal/common"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
 
@@ -83,7 +83,7 @@ type TestMetricReconciler struct {
 // Override the Reconcile method to skip the real implementation
 func (r *TestMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Get the metric
-	metric := insight.Metric{}
+	metric := v1alpha1.Metric{}
 	if err := r.getClient().Get(ctx, req.NamespacedName, &metric); err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
@@ -96,19 +96,19 @@ func (r *TestMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Update the status
 	switch result.Phase {
-	case insight.PhaseActive:
+	case v1alpha1.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
 		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
-	case insight.PhaseFailed:
+	case v1alpha1.PhaseFailed:
 		metric.SetConditions(common.Error(result.Message))
 		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
-	case insight.PhasePending:
+	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	metric.Status.Ready = boolToString(result.Phase == insight.PhaseActive)
-	metric.Status.Observation = insight.MetricObservation{
+	metric.Status.Ready = boolToString(result.Phase == v1alpha1.PhaseActive)
+	metric.Status.Observation = v1alpha1.MetricObservation{
 		Timestamp:   result.Observation.GetTimestamp(),
 		LatestValue: result.Observation.GetValue(),
 	}
@@ -152,7 +152,7 @@ func TestMetricController(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	err = insight.AddToScheme(scheme.Scheme)
+	err = v1alpha1.AddToScheme(scheme.Scheme)
 	require.NoError(t, err)
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -179,7 +179,7 @@ func testReconcileMetricNotFound(t *testing.T) {
 
 	// Create a test reconciler
 	reconciler := &MetricReconciler{
-		inClient:   k8sClient,
+		inCli:      k8sClient,
 		RestConfig: cfg,
 		Scheme:     scheme.Scheme,
 		Recorder:   recorder,
@@ -209,17 +209,19 @@ func testReconcileSecretNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a test Metric
-	metric := &insight.Metric{
+	metric := &v1alpha1.Metric{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      MetricName,
 			Namespace: MetricNamespace,
 		},
-		Spec: insight.MetricSpec{
-			Name:          "test-metric-no-secret",
-			Description:   "Test metric description",
-			Kind:          "Pod",
-			Group:         "",
-			Version:       "v1",
+		Spec: v1alpha1.MetricSpec{
+			Name:        "test-metric-no-secret",
+			Description: "Test metric description",
+			Target: v1alpha1.GroupVersionKind{
+				Kind:    "Pod",
+				Group:   "",
+				Version: "v1",
+			},
 			CheckInterval: metav1.Duration{Duration: 5 * time.Minute},
 		},
 	}
@@ -237,7 +239,7 @@ func testReconcileSecretNotFound(t *testing.T) {
 
 	// Create a test reconciler
 	reconciler := &MetricReconciler{
-		inClient:   k8sClient,
+		inCli:      k8sClient,
 		RestConfig: cfg,
 		Scheme:     scheme.Scheme,
 		Recorder:   recorder,
@@ -296,17 +298,19 @@ func testReconcileMetricHappyPath(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a test Metric
-	metric := &insight.Metric{
+	metric := &v1alpha1.Metric{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      MetricName,
 			Namespace: MetricNamespace,
 		},
-		Spec: insight.MetricSpec{
-			Name:          "test-metric",
-			Description:   "Test metric description",
-			Kind:          "Pod",
-			Group:         "",
-			Version:       "v1",
+		Spec: v1alpha1.MetricSpec{
+			Name:        "test-metric",
+			Description: "Test metric description",
+			Target: v1alpha1.GroupVersionKind{
+				Kind:    "Pod",
+				Group:   "",
+				Version: "v1",
+			},
 			CheckInterval: metav1.Duration{Duration: 5 * time.Minute},
 		},
 	}
@@ -321,7 +325,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 	}
 
 	fakeResult := orc.MonitorResult{
-		Phase:       insight.PhaseActive,
+		Phase:       v1alpha1.PhaseActive,
 		Reason:      "MonitoringActive",
 		Message:     "metric is monitoring resource '/v1, Kind=Pod'",
 		Observation: fakeObservation,
@@ -336,7 +340,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 	// Create a test reconciler with our fake handler
 	reconciler := &TestMetricReconciler{
 		MetricReconciler: MetricReconciler{
-			inClient:   k8sClient,
+			inCli:      k8sClient,
 			RestConfig: cfg,
 			Scheme:     scheme.Scheme,
 			Recorder:   recorder,
@@ -371,7 +375,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 	require.Equal(t, 5*time.Minute, result.RequeueAfter)
 
 	// Verify the Metric status was updated correctly
-	updatedMetric := &insight.Metric{}
+	updatedMetric := &v1alpha1.Metric{}
 	err = k8sClient.Get(ctx, types.NamespacedName{Name: MetricName, Namespace: MetricNamespace}, updatedMetric)
 	require.NoError(t, err)
 
@@ -383,7 +387,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 	require.GreaterOrEqual(t, len(updatedMetric.Status.Conditions), 1)
 	var availableCondition *metav1.Condition
 	for i := range updatedMetric.Status.Conditions {
-		if updatedMetric.Status.Conditions[i].Type == insight.TypeAvailable {
+		if updatedMetric.Status.Conditions[i].Type == v1alpha1.TypeAvailable {
 			availableCondition = &updatedMetric.Status.Conditions[i]
 			break
 		}

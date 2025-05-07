@@ -5,30 +5,12 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - metrics.cloud.sap
   resources:
   - clusteraccesses
-  - compoundmetrics
   - federatedmetrics
   - managedmetrics
   - metrics
-  - singlemetrics
   verbs:
   - create
   - delete
@@ -41,22 +23,18 @@ rules:
   - metrics.cloud.sap
   resources:
   - clusteraccesses/finalizers
-  - compoundmetrics/finalizers
   - federatedmetrics/finalizers
   - managedmetrics/finalizers
   - metrics/finalizers
-  - singlemetrics/finalizers
   verbs:
   - update
 - apiGroups:
   - metrics.cloud.sap
   resources:
   - clusteraccesses/status
-  - compoundmetrics/status
   - federatedmetrics/status
   - managedmetrics/status
   - metrics/status
-  - singlemetrics/status
   verbs:
   - get
   - patch

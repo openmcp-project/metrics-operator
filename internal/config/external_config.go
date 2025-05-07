@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	insight "github.com/SAP/metrics-operator/api/v1alpha1"
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/api/v1beta1"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
 )
@@ -39,12 +39,12 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(externalScheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(externalScheme))
-	utilruntime.Must(insight.AddToScheme(externalScheme))
+	utilruntime.Must(v1alpha1.AddToScheme(externalScheme))
 
 }
 
 // CreateExternalQC creates an external query config from a remote cluster access reference
-func CreateExternalQC(ctx context.Context, racRef *v1beta1.ClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
+func CreateExternalQC(ctx context.Context, racRef *v1alpha1.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
 
 	rcaName := racRef.Name
 	rcaNamespace := racRef.Namespace
@@ -70,12 +70,12 @@ func CreateExternalQC(ctx context.Context, racRef *v1beta1.ClusterAccessRef, inC
 }
 
 // CreateExternalQueryConfig creates an external query config from a remote cluster access reference
-func CreateExternalQueryConfig(ctx context.Context, racRef *insight.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
+func CreateExternalQueryConfig(ctx context.Context, racRef *v1alpha1.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
 
 	rcaName := racRef.Name
 	rcaNamespace := racRef.Namespace
 
-	rca := &insight.RemoteClusterAccess{}
+	rca := &v1alpha1.RemoteClusterAccess{}
 	err := inClient.Get(ctx, types.NamespacedName{Name: rcaName, Namespace: rcaNamespace}, rca)
 	if err != nil {
 		errRCA := fmt.Errorf("failed to retrieve Remote Cluster Acces Ref with name %s in namespace %s: %w", rcaName, rcaNamespace, err)
@@ -95,7 +95,7 @@ func CreateExternalQueryConfig(ctx context.Context, racRef *insight.RemoteCluste
 	return nil, fmt.Errorf("kubeconfigSecretRef and clusterAccessConfig are both nil")
 }
 
-func queryConfigFromClusterAccessConfig(ctx context.Context, cac *insight.ClusterAccessConfig, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
+func queryConfigFromClusterAccessConfig(ctx context.Context, cac *v1alpha1.ClusterAccessConfig, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
 	clsData, errData := getCusterDataFromSecret(ctx, cac, inClient)
 	if errData != nil {
 		return nil, errData
@@ -215,7 +215,7 @@ func qcFromKubeConfig(ctx context.Context, kcRef *v1beta1.KubeConfigSecretRef, i
 	return &orc.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName}, nil
 }
 
-func queryConfigFromKubeConfig(ctx context.Context, kcRef *insight.KubeConfigSecretRef, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
+func queryConfigFromKubeConfig(ctx context.Context, kcRef *v1alpha1.KubeConfigSecretRef, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
 	secretName := kcRef.Name
 	secretNamespace := kcRef.Namespace
 
@@ -271,7 +271,7 @@ func getTokenWithAPI(ctx context.Context, inClient client.Client, serviceAccount
 	return token, nil
 }
 
-func getCusterDataFromSecret(ctx context.Context, cac *insight.ClusterAccessConfig, inClient client.Client) (*clusterData, error) {
+func getCusterDataFromSecret(ctx context.Context, cac *v1alpha1.ClusterAccessConfig, inClient client.Client) (*clusterData, error) {
 	clusterSecretName := cac.ClusterSecretRef.Name
 	clusterSecretNamespace := cac.ClusterSecretRef.Namespace
 

@@ -4,8 +4,6 @@ resources:
 - insight_v1alpha1_managedmetric.yaml
 - insight_v1alpha1_clientconfig.yaml
 - insight_v1alpha1_remoteclusteraccess.yaml
-- insight_v1beta1_singlemetric.yaml
-- insight_v1beta1_compoundmetric.yaml
 - insight_v1beta1_federatedmetric.yaml
 - insight_v1beta1_clusteraccess.yaml
 - insight_v1beta1_federatedclusteraccess.yaml

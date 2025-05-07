@@ -61,14 +61,6 @@ spec:
                 description: Define fields of your object to adapt filters of the
                   query
                 type: string
-              group:
-                description: Define the group of your object that should be instrumented
-                  (without version at the end)
-                type: string
-              kind:
-                description: Decide which kind the metric should keep track of (needs
-                  to be plural version)
-                type: string
               labelSelector:
                 description: Define labels of your object to adapt filters of the
                   query
@@ -77,6 +69,18 @@ spec:
                 description: Sets the name that will be used to identify the metric
                   in Dynatrace(or other providers)
                 type: string
+              projections:
+                items:
+                  description: Projection defines the projection of the metric
+                  properties:
+                    fieldPath:
+                      description: Define the path to the field that should be extracted
+                      type: string
+                    name:
+                      description: Define the name of the field that should be extracted
+                      type: string
+                  type: object
+                type: array
               remoteClusterAccessRef:
                 description: Reference to the RemoteClusterAccess type that either
                   reference a kubeconfig or a service account and cluster secret for
@@ -87,9 +91,22 @@ spec:
                   namespace:
                     type: string
                 type: object
-              version:
-                description: Define version of the object you want to intrsument
-                type: string
+              target:
+                description: GroupVersionKind defines the group, version and kind
+                  of the object that should be instrumented
+                properties:
+                  group:
+                    description: Define the group of your object that should be instrumented
+                    type: string
+                  kind:
+                    description: Define the kind of the object that should be instrumented
+                    type: string
+                  version:
+                    description: Define version of the object you want to be instrumented
+                    type: string
+                type: object
+            required:
+            - target
             type: object
           status:
             description: MetricStatus defines the observed state of ManagedMetric
@@ -156,6 +173,16 @@ spec:
                 description: Observation represent the latest available observation
                   of an object's state
                 properties:
+                  dimensions:
+                    items:
+                      description: Dimension defines the dimension of the metric
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
+                      type: object
+                    type: array
                   latestValue:
                     description: The latest value of the metric
                     type: string

@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/SAP/metrics-operator/internal/common"
+	"github.com/SAP/metrics-operator/internal/config"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -180,3 +183,60 @@ func (r *ManagedMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&insight.ManagedMetric{}).
 		Complete(r)
 }
+
+func boolToString(b bool) string {
+	if b {
+		return "True"
+	}
+	return "False"
+
+}
+
+func createQueryConfig(ctx context.Context, rcaRef *insight.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error) {
+	var queryConfig orc.QueryConfig
+	// Kubernetes client to the external cluster if defined
+	if rcaRef != nil {
+		qc, err := config.CreateExternalQueryConfig(ctx, rcaRef, r.getClient())
+		if err != nil {
+			return orc.QueryConfig{}, err
+		}
+		queryConfig = *qc
+	} else {
+		// local cluster name (where operator is deployed)
+		clusterName, _ := getClusterInfo(r.getRestConfig())
+		queryConfig = orc.QueryConfig{Client: r.getClient(), RestConfig: *r.getRestConfig(), ClusterName: &clusterName}
+	}
+	return queryConfig, nil
+}
+
+func getClusterInfo(config *rest.Config) (string, error) {
+	if config.Host == "" {
+		return "", fmt.Errorf("config.Host is empty")
+	}
+
+	// Parse the host URL
+	u, err := url.Parse(config.Host)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse host URL: %w", err)
+	}
+
+	// Extract the hostname
+	hostname := u.Hostname()
+
+	// debugging only
+	if hostname == "127.0.0.1" {
+		return "localhost", nil
+	}
+
+	// Remove any prefix (like "kubernetes" or "kubernetes.default.svc")
+	parts := strings.Split(hostname, ".")
+	clusterName := parts[0]
+
+	return clusterName, nil
+}
+
+// OrchestratorFactory is a function type for creating orchestrators
+type OrchestratorFactory func(creds common.DataSinkCredentials, qConfig orc.QueryConfig) *orc.Orchestrator
+
+// QueryConfigFactory is a function type for creating query configs
+type QueryConfigFactory func(ctx context.Context, rcaRef *insight.RemoteClusterAccessRef, r InsightReconciler) (orc.QueryConfig, error)

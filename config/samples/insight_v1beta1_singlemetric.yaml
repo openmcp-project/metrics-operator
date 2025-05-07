@@ -1,9 +1,0 @@
-apiVersion: metrics.cloud.sap/v1beta1
-kind: SingleMetric
-metadata:
-  labels:
-    app.kubernetes.io/name: co-metrics-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: singlemetric-sample
-spec:
-  # TODO(user): Add fields here

@@ -47,6 +47,21 @@ type FederatedMetricSpec struct {
 	FederateCAFacade `json:",inline"`
 }
 
+// Projection defines the projection of the metric
+type Projection struct {
+	// Define the name of the field that should be extracted
+	Name string `json:"name,omitempty"`
+
+	// Define the path to the field that should be extracted
+	FieldPath string `json:"fieldPath,omitempty"`
+}
+
+// Dimension defines the dimension of the metric
+type Dimension struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
 // FederatedObservation represents the latest available observation of an object's state
 type FederatedObservation struct {
 	ActiveCount  int `json:"activeCount,omitempty"`

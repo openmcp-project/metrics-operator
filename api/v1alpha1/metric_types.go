@@ -36,8 +36,20 @@ const (
 	PhasePending PhaseType = "Pending"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// Projection defines the projection of the metric
+type Projection struct {
+	// Define the name of the field that should be extracted
+	Name string `json:"name,omitempty"`
+
+	// Define the path to the field that should be extracted
+	FieldPath string `json:"fieldPath,omitempty"`
+}
+
+// Dimension defines the dimension of the metric
+type Dimension struct {
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
+}
 
 // MetricSpec defines the desired state of Metric
 type MetricSpec struct {
@@ -46,12 +58,8 @@ type MetricSpec struct {
 	// Sets the description that will be used to identify the metric in Dynatrace(or other providers)
 	// +optional
 	Description string `json:"description,omitempty"`
-	// Decide which kind the metric should keep track of (needs to be plural version)
-	Kind string `json:"kind,omitempty"`
-	// Define the group of your object that should be instrumented (without version at the end)
-	Group string `json:"group,omitempty"`
-	// Define version of the object you want to intrsument
-	Version string `json:"version,omitempty"`
+	// +kubebuilder:validation:Required
+	Target GroupVersionKind `json:"target,omitempty"`
 	// Define labels of your object to adapt filters of the query
 	// +optional
 	LabelSelector string `json:"labelSelector,omitempty"`
@@ -63,6 +71,8 @@ type MetricSpec struct {
 	CheckInterval metav1.Duration `json:"checkInterval,omitempty"`
 
 	RemoteClusterAccessFacade `json:",inline"`
+
+	Projections []Projection `json:"projections,omitempty"`
 }
 
 // MetricObservation represents the latest available observation of an object's state
@@ -72,6 +82,8 @@ type MetricObservation struct {
 
 	// The latest value of the metric
 	LatestValue string `json:"latestValue,omitempty"`
+
+	Dimensions []Dimension `json:"dimensions,omitempty"`
 }
 
 // GetTimestamp returns the timestamp of the observation
@@ -117,13 +129,11 @@ func (r *Metric) SetConditions(conditions ...metav1.Condition) {
 		meta.SetStatusCondition(&r.Status.Conditions, c)
 	}
 }
-
-// GvkToString returns the GVK of the metric as a string
 func (r *Metric) GvkToString() string {
-	if r.Spec.Group == "" {
-		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Version, r.Spec.Kind)
+	if r.Spec.Target.Group == "" {
+		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Target.Version, r.Spec.Target.Kind)
 	}
-	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Group, r.Spec.Version, r.Spec.Kind)
+	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Target.Group, r.Spec.Target.Version, r.Spec.Target.Kind)
 }
 
 //+kubebuilder:object:root=true
