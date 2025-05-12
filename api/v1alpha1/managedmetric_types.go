@@ -46,7 +46,7 @@ type ManagedMetricSpec struct {
 	// +kubebuilder:default:="12h"
 	CheckInterval metav1.Duration `json:"checkInterval,omitempty"`
 
-	RemoteClusterAccessFacade `json:",inline"`
+	RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 }
 
 // ManagedObservation represents the latest available observation of an object's state

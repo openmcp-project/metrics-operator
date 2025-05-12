@@ -14,7 +14,7 @@ spec:
     singular: federatedmetric
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: FederatedMetric is the Schema for the federatedmetrics API
@@ -45,8 +45,8 @@ spec:
                 type: string
               description:
                 type: string
-              federateCaRef:
-                description: FederateCARef is a reference to a FederateCA
+              federateClusterAccessRef:
+                description: FederateClusterAccessRef is a reference to a FederateCA
                 properties:
                   name:
                     type: string
@@ -76,13 +76,17 @@ spec:
                   type: object
                 type: array
               target:
-                description: GroupVersionResource defines the target resource
+                description: GroupVersionKind defines the group, version and kind
+                  of the object that should be instrumented
                 properties:
                   group:
+                    description: Define the group of your object that should be instrumented
                     type: string
-                  resource:
+                  kind:
+                    description: Define the kind of the object that should be instrumented
                     type: string
                   version:
+                    description: Define version of the object you want to be instrumented
                     type: string
                 type: object
             required:

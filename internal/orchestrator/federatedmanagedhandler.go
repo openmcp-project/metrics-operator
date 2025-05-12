@@ -15,12 +15,11 @@ import (
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 )
 
 // NewFederatedManagedHandler creates a new FederatedManagedHandler
-func NewFederatedManagedHandler(metric v1beta1.FederatedManagedMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*FederatedManagedHandler, error) {
+func NewFederatedManagedHandler(metric v1alpha1.FederatedManagedMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*FederatedManagedHandler, error) {
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, errCli
@@ -49,7 +48,7 @@ type FederatedManagedHandler struct {
 	dCli        dynamic.Interface
 	discoClient discovery.DiscoveryInterface
 
-	metric v1beta1.FederatedManagedMetric
+	metric v1alpha1.FederatedManagedMetric
 
 	gauge       *clientoptl.Metric
 	clusterName *string
@@ -70,7 +69,7 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 		return result, nil //nolint:nilerr
 	}
 
-	var dimensions []v1beta1.Dimension
+	var dimensions []v1alpha1.Dimension
 
 	// this is not right, we need to do a group by on the resources based on gvk
 
@@ -92,7 +91,7 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 
 		for fieldName, state := range cr.Status {
 			dp.AddDimension(fieldName, strconv.FormatBool(state))
-			dimensions = append(dimensions, v1beta1.Dimension{Name: fieldName, Value: strconv.FormatBool(state)})
+			dimensions = append(dimensions, v1alpha1.Dimension{Name: fieldName, Value: strconv.FormatBool(state)})
 		}
 
 		err = h.gauge.RecordMetrics(ctx, dp)
@@ -107,9 +106,9 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 	result.Message = fmt.Sprintf("metric is monitoring federated managed resources '%s'", h.metric.Name)
 
 	if dimensions != nil {
-		result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1beta1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(resources))}}}
+		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1alpha1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(resources))}}}
 	} else {
-		result.Observation = &v1beta1.MetricObservation{Timestamp: metav1.Now()}
+		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now()}
 	}
 
 	return result, nil

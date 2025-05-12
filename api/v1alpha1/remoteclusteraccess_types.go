@@ -20,13 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RemoteClusterAccessFacade is a facade to reference a RemoteClusterAccess type
-type RemoteClusterAccessFacade struct {
-	// Reference to the RemoteClusterAccess type that either reference a kubeconfig or a service account and cluster secret for remote access
-	// +optional
-	RemoteClusterAccessRef *RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
-}
-
 // RemoteClusterAccessRef is to be used by other types to reference a RemoteClusterAccess type
 type RemoteClusterAccessRef struct {
 	Name      string `json:"name,omitempty"`

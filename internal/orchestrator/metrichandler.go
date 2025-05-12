@@ -185,8 +185,6 @@ func (h *MetricHandler) extractProjectionGroupsFrom(list *unstructured.Unstructu
 	return groups
 }
 
-// Removed createGvrBaseMetric as it's clientlite specific
-
 func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {
 	var options = metav1.ListOptions{}
 	// if not defined in the metric, the list options need to be empty to get resources based on GVR only
@@ -200,7 +198,7 @@ func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.Unstruc
 		options.FieldSelector = h.metric.Spec.FieldSelector
 	}
 
-	gvr, err := getGVRfromGVK(h.metric.Spec.Target.GVK(), h.discoClient)
+	gvr, err := GetGVRfromGVK(h.metric.Spec.Target.GVK(), h.discoClient)
 	if err != nil {
 		return nil, err
 	}
@@ -228,14 +226,14 @@ func NewMetricHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clien
 		metric:      metric,
 		dCli:        dynamicClient,
 		discoClient: disco,
-		gaugeMetric: gaugeMetric, // Changed dtClient to gaugeMetric
+		gaugeMetric: gaugeMetric,
 		clusterName: qc.ClusterName,
 	}
 
 	return handler, nil
 }
 
-func getGVRfromGVK(gvk schema.GroupVersionKind, disco discovery.DiscoveryInterface) (schema.GroupVersionResource, error) {
+func GetGVRfromGVK(gvk schema.GroupVersionKind, disco discovery.DiscoveryInterface) (schema.GroupVersionResource, error) {
 	// TODO: this could be optimized later (e.g. by caching the discovery client)
 	groupResources, err := disco.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
 	if err != nil {

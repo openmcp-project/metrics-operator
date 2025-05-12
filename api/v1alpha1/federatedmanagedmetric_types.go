@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -41,7 +41,7 @@ type FederatedManagedMetricSpec struct {
 	// +kubebuilder:default:="12h"
 	CheckInterval metav1.Duration `json:"checkInterval,omitempty"`
 
-	FederateCAFacade `json:",inline"`
+	FederatedClusterAccessRef FederateClusterAccessRef `json:"federateClusterAccessRef,omitempty"`
 }
 
 // FederatedManagedMetricStatus defines the observed state of FederatedManagedMetric

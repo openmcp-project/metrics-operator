@@ -26,7 +26,7 @@ import (
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/SAP/metrics-operator/api/v1beta1"
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
@@ -82,7 +82,7 @@ func handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
 	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 }
 
-func scheduleNextReconciliation(metric *v1beta1.FederatedMetric) (ctrl.Result, error) {
+func scheduleNextReconciliation(metric *v1alpha1.FederatedMetric) (ctrl.Result, error) {
 
 	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
 	return ctrl.Result{
@@ -91,7 +91,7 @@ func scheduleNextReconciliation(metric *v1beta1.FederatedMetric) (ctrl.Result, e
 	}, nil
 }
 
-func shouldReconcile(metric *v1beta1.FederatedMetric) bool {
+func shouldReconcile(metric *v1alpha1.FederatedMetric) bool {
 	if metric.Status.LastReconcileTime == nil {
 		return true
 	}
@@ -117,7 +117,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			1. Load the generic metric using the client
 		 	All method should take the context to allow for cancellation (like CancellationToken)
 	*/
-	metric := v1beta1.FederatedMetric{}
+	metric := v1alpha1.FederatedMetric{}
 	if errLoad := r.getClient().Get(ctx, req.NamespacedName, &metric); errLoad != nil {
 		return handleGetError(errLoad, l)
 	}
@@ -140,7 +140,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfigs, err := config.CreateExternalQueryConfigSet(ctx, metric.Spec.FederatedCARef, r.getClient(), r.getRestConfig())
+	queryConfigs, err := config.CreateExternalQueryConfigSet(ctx, metric.Spec.FederatedClusterAccessRef, r.getClient(), r.getRestConfig())
 	if err != nil {
 		l.Error(err, "unable to create query configs")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
@@ -212,7 +212,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}, nil
 }
 
-func (r *FederatedMetricReconciler) handleSecretError(l logr.Logger, errSecret error, metric v1beta1.FederatedMetric) (ctrl.Result, error) {
+func (r *FederatedMetricReconciler) handleSecretError(l logr.Logger, errSecret error, metric v1alpha1.FederatedMetric) (ctrl.Result, error) {
 	l.Error(errSecret, fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
 	r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
 	return ctrl.Result{RequeueAfter: RequeueAfterError}, errSecret
@@ -221,6 +221,6 @@ func (r *FederatedMetricReconciler) handleSecretError(l logr.Logger, errSecret e
 // SetupWithManager sets up the controller with the Manager.
 func (r *FederatedMetricReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1beta1.FederatedMetric{}).
+		For(&v1alpha1.FederatedMetric{}).
 		Complete(r)
 }

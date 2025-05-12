@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	insightv1beta1 "github.com/SAP/metrics-operator/api/v1beta1"
+	"github.com/SAP/metrics-operator/api/v1alpha1"
 )
 
 // ClusterAccessReconciler reconciles a ClusterAccess object
@@ -57,6 +57,6 @@ func (r *ClusterAccessReconciler) Reconcile(ctx context.Context, _ ctrl.Request)
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterAccessReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&insightv1beta1.ClusterAccess{}).
+		For(&v1alpha1.RemoteClusterAccess{}).
 		Complete(r)
 }

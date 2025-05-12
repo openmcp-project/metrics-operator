@@ -12,9 +12,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -22,14 +22,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/api/v1beta1"
-	orc "github.com/SAP/metrics-operator/internal/orchestrator"
+	"github.com/SAP/metrics-operator/internal/orchestrator"
 )
 
 const (
-	caDataKey   = "caData"
-	audienceKey = "audience"
-	hostKey     = "host"
+	caDataKey                  = "caData"
+	audienceKey                = "audience"
+	hostKey                    = "host"
+	defaultKubeconfigSecretKey = "kubeconfig"
 )
 
 var (
@@ -43,34 +43,8 @@ func init() {
 
 }
 
-// CreateExternalQC creates an external query config from a remote cluster access reference
-func CreateExternalQC(ctx context.Context, racRef *v1alpha1.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
-
-	rcaName := racRef.Name
-	rcaNamespace := racRef.Namespace
-
-	rca := &v1beta1.ClusterAccess{}
-	err := inClient.Get(ctx, types.NamespacedName{Name: rcaName, Namespace: rcaNamespace}, rca)
-	if err != nil {
-		errRCA := fmt.Errorf("failed to retrieve Remote Cluster Acces Ref with name %s in namespace %s: %w", rcaName, rcaNamespace, err)
-		return nil, errRCA
-	}
-
-	kcRef := rca.Spec.KubeConfigSecretRef
-	if kcRef != nil {
-		return qcFromKubeConfig(ctx, kcRef, inClient, externalScheme)
-	}
-
-	cac := rca.Spec.ClusterAccessConfig
-	if cac != nil {
-		return qcFromClusterAccessConfig(ctx, cac, inClient, externalScheme)
-	}
-
-	return nil, fmt.Errorf("kubeconfigSecretRef and clusterAccessConfig are both nil")
-}
-
 // CreateExternalQueryConfig creates an external query config from a remote cluster access reference
-func CreateExternalQueryConfig(ctx context.Context, racRef *v1alpha1.RemoteClusterAccessRef, inClient client.Client) (*orc.QueryConfig, error) {
+func CreateExternalQueryConfig(ctx context.Context, racRef *v1alpha1.RemoteClusterAccessRef, inClient client.Client) (*orchestrator.QueryConfig, error) {
 
 	rcaName := racRef.Name
 	rcaNamespace := racRef.Namespace
@@ -95,7 +69,7 @@ func CreateExternalQueryConfig(ctx context.Context, racRef *v1alpha1.RemoteClust
 	return nil, fmt.Errorf("kubeconfigSecretRef and clusterAccessConfig are both nil")
 }
 
-func queryConfigFromClusterAccessConfig(ctx context.Context, cac *v1alpha1.ClusterAccessConfig, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
+func queryConfigFromClusterAccessConfig(ctx context.Context, cac *v1alpha1.ClusterAccessConfig, inClient client.Client, externalScheme *runtime.Scheme) (*orchestrator.QueryConfig, error) {
 	clsData, errData := getCusterDataFromSecret(ctx, cac, inClient)
 	if errData != nil {
 		return nil, errData
@@ -132,50 +106,10 @@ func queryConfigFromClusterAccessConfig(ctx context.Context, cac *v1alpha1.Clust
 	}
 	hostName := parsedHost.Hostname()
 
-	return &orc.QueryConfig{Client: externalClient, RestConfig: *restConfig, ClusterName: &hostName}, nil
+	return &orchestrator.QueryConfig{Client: externalClient, RestConfig: *restConfig, ClusterName: &hostName}, nil
 }
 
-func qcFromClusterAccessConfig(ctx context.Context, cac *v1beta1.ClusterAccessConfig, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
-	clsData, errData := getCDataFromSecret(ctx, cac, inClient)
-	if errData != nil {
-		return nil, errData
-	}
-
-	saName := cac.ServiceAccountName
-	saNamespace := cac.ServiceAccountNamespace
-
-	token, errToken := getTokenWithAPI(ctx, inClient, saName, saNamespace, clsData.audience)
-	if errToken != nil {
-		return nil, errToken
-	}
-
-	// Create a restconfig from token, host, caData, and audience
-
-	restConfig := &rest.Config{
-		Host:        clsData.host,
-		BearerToken: token,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: []byte(clsData.caData),
-		},
-	}
-
-	// Create the client
-	externalClient, err := client.New(restConfig, client.Options{Scheme: externalScheme})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create external client: %w", err)
-
-	}
-
-	parsedHost, errParse := url.Parse(clsData.host)
-	if errParse != nil {
-		return nil, fmt.Errorf("failed to parse host URL: %w", errParse)
-	}
-	hostName := parsedHost.Hostname()
-
-	return &orc.QueryConfig{Client: externalClient, RestConfig: *restConfig, ClusterName: &hostName}, nil
-}
-
-func qcFromKubeConfig(ctx context.Context, kcRef *v1beta1.KubeConfigSecretRef, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
+func queryConfigFromKubeConfig(ctx context.Context, kcRef *v1alpha1.KubeConfigSecretRef, inClient client.Client, externalScheme *runtime.Scheme) (*orchestrator.QueryConfig, error) {
 	secretName := kcRef.Name
 	secretNamespace := kcRef.Namespace
 
@@ -212,47 +146,7 @@ func qcFromKubeConfig(ctx context.Context, kcRef *v1beta1.KubeConfigSecretRef, i
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
-	return &orc.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName}, nil
-}
-
-func queryConfigFromKubeConfig(ctx context.Context, kcRef *v1alpha1.KubeConfigSecretRef, inClient client.Client, externalScheme *runtime.Scheme) (*orc.QueryConfig, error) {
-	secretName := kcRef.Name
-	secretNamespace := kcRef.Namespace
-
-	// Retrieve the Secret
-	secret := &corev1.Secret{}
-	err := inClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: secretNamespace}, secret)
-	if err != nil {
-		errSecret := fmt.Errorf("failed to retrieve KubeConfig Secret Ref with name %s in namespace %s: %w", secretName, secretNamespace, err)
-		return nil, errSecret
-	}
-
-	key := kcRef.Key
-	kubeconfigData, ok := secret.Data[key]
-	if !ok {
-		return nil, fmt.Errorf("kubeconfig key %s not found in Secret", key)
-	}
-
-	// Create a config from the kubeconfig data
-	config, errRest := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
-	if errRest != nil {
-		return nil, fmt.Errorf("failed to create config from kubeconfig: %w", err)
-	}
-
-	kubeconfig, errKC := clientcmd.Load(kubeconfigData)
-	if errKC != nil {
-		return nil, fmt.Errorf("failed to load Config object from kubeconfigData: %w", errKC)
-	}
-
-	clusterName := kubeconfig.Contexts[kubeconfig.CurrentContext].Cluster
-
-	// Create the client
-	externalClient, err := client.New(config, client.Options{Scheme: externalScheme})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
-	}
-
-	return &orc.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName}, nil
+	return &orchestrator.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName}, nil
 }
 
 func getTokenWithAPI(ctx context.Context, inClient client.Client, serviceAccount, namespace, audience string) (string, error) {
@@ -306,41 +200,6 @@ func getCusterDataFromSecret(ctx context.Context, cac *v1alpha1.ClusterAccessCon
 	return &clsData, nil
 }
 
-func getCDataFromSecret(ctx context.Context, cac *v1beta1.ClusterAccessConfig, inClient client.Client) (*clusterData, error) {
-	clusterSecretName := cac.ClusterSecretRef.Name
-	clusterSecretNamespace := cac.ClusterSecretRef.Namespace
-
-	secret := &corev1.Secret{}
-	errSecret := inClient.Get(ctx, types.NamespacedName{Name: clusterSecretName, Namespace: clusterSecretNamespace}, secret)
-	if errSecret != nil {
-		errClusterSecret := fmt.Errorf("failed to retrieve Cluster Secret Ref with name %s in namespace %s: %w", clusterSecretName, clusterSecretNamespace, errSecret)
-		return nil, errClusterSecret
-	}
-
-	caData, ok := secret.Data[caDataKey]
-	if !ok {
-		return nil, fmt.Errorf("caData key %s not found in Secret '%s/%s'", caDataKey, clusterSecretNamespace, clusterSecretName)
-	}
-
-	audience, ok := secret.Data[audienceKey]
-	if !ok {
-		return nil, fmt.Errorf("audience key %s not found in Secret '%s/%s'", audienceKey, clusterSecretNamespace, clusterSecretName)
-	}
-
-	host, ok := secret.Data[hostKey]
-	if !ok {
-		return nil, fmt.Errorf("host key %s not found in Secret '%s/%s'", audienceKey, clusterSecretNamespace, clusterSecretName)
-	}
-
-	clsData := clusterData{
-		caData:   string(caData),
-		audience: string(audience),
-		host:     string(host),
-	}
-
-	return &clsData, nil
-}
-
 type clusterData struct {
 	caData   string
 	audience string
@@ -348,12 +207,12 @@ type clusterData struct {
 }
 
 // CreateExternalQueryConfigSet creates a set of external query configs from a federated cluster access reference
-func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1beta1.FederateCARef, inClient client.Client, restConfig *rest.Config) ([]orc.QueryConfig, error) {
+func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1alpha1.FederateClusterAccessRef, inClient client.Client, restConfig *rest.Config) ([]orchestrator.QueryConfig, error) {
 
 	rcaSetName := fcaRef.Name
 	rcaSetNamespace := fcaRef.Namespace
 
-	set := &v1beta1.FederatedClusterAccess{}
+	set := &v1alpha1.FederatedClusterAccess{}
 	errSet := inClient.Get(ctx, types.NamespacedName{Name: rcaSetName, Namespace: rcaSetNamespace}, set)
 	if errSet != nil {
 		errRCA := fmt.Errorf("failed to retrieve federated cluster access with name %s in namespace %s: %w", rcaSetName, rcaSetNamespace, errSet)
@@ -364,7 +223,14 @@ func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1beta1.FederateCA
 
 	var options = metav1.ListOptions{}
 
-	gvr := schema.GroupVersionResource{Group: set.Spec.Target.Group, Version: set.Spec.Target.Version, Resource: set.Spec.Target.Resource}
+	discoveryCli, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
+	}
+	gvr, err := orchestrator.GetGVRfromGVK(set.Spec.Target.GVK(), discoveryCli)
+	if err != nil {
+		return nil, err
+	}
 
 	dynamicClient, errCli := dynamic.NewForConfig(restConfig)
 	if errCli != nil {
@@ -372,17 +238,16 @@ func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1beta1.FederateCA
 	}
 
 	list, err := dynamicClient.Resource(gvr).List(ctx, options)
-
 	if err != nil {
-		return nil, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", set.Spec.Target.String(), err)
+		return nil, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", set.Spec.Target.GVK().String(), err)
 	}
 
 	return extractKubeConfigs(kcPath, list)
 
 }
 
-func extractKubeConfigs(kcPath string, list *unstructured.UnstructuredList) ([]orc.QueryConfig, error) {
-	queryConfigs := make([]orc.QueryConfig, 0, len(list.Items))
+func extractKubeConfigs(kcPath string, list *unstructured.UnstructuredList) ([]orchestrator.QueryConfig, error) {
+	queryConfigs := make([]orchestrator.QueryConfig, 0, len(list.Items))
 
 	// TODO: not all resources will have kubeconfig data, need to handle this case
 
@@ -421,7 +286,7 @@ func extractKubeConfigs(kcPath string, list *unstructured.UnstructuredList) ([]o
 			return nil, fmt.Errorf("failed to create external client query config: %w", err)
 		}
 
-		queryConfigs = append(queryConfigs, orc.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName})
+		queryConfigs = append(queryConfigs, orchestrator.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName})
 
 	}
 

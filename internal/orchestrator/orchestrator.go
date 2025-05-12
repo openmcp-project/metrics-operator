@@ -7,7 +7,6 @@ import (
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/api/v1beta1"
 	"github.com/SAP/metrics-operator/internal/client"
 
 	"github.com/SAP/metrics-operator/internal/clientoptl"
@@ -81,14 +80,14 @@ func (o *Orchestrator) WithMetric(metric v1alpha1.Metric, gaugeMetric *clientopt
 }
 
 // WithFederated creates a new Orchestrator with a FederatedMetric handler
-func (o *Orchestrator) WithFederated(metric v1beta1.FederatedMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) {
+func (o *Orchestrator) WithFederated(metric v1alpha1.FederatedMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) {
 	var err error
 	o.Handler, err = NewFederatedHandler(metric, o.queryConfig, gaugeMetric)
 	return o, err
 }
 
 // WithFederatedManaged creates a new Orchestrator with a FederatedManagedMetric handler
-func (o *Orchestrator) WithFederatedManaged(metric v1beta1.FederatedManagedMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) {
+func (o *Orchestrator) WithFederatedManaged(metric v1alpha1.FederatedManagedMetric, gaugeMetric *clientoptl.Metric) (*Orchestrator, error) {
 	var err error
 	o.Handler, err = NewFederatedManagedHandler(metric, o.queryConfig, gaugeMetric)
 	return o, err

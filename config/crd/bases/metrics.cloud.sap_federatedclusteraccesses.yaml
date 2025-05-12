@@ -14,7 +14,7 @@ spec:
     singular: federatedclusteraccess
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
         description: FederatedClusterAccess is the Schema for the federatedclusteraccesses
@@ -48,10 +48,13 @@ spec:
                 description: Define the target resources that should be monitored
                 properties:
                   group:
+                    description: Define the group of your object that should be instrumented
                     type: string
-                  resource:
+                  kind:
+                    description: Define the kind of the object that should be instrumented
                     type: string
                   version:
+                    description: Define version of the object you want to be instrumented
                     type: string
                 type: object
             type: object
