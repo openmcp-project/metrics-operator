@@ -22,6 +22,7 @@ type GroupVersionKind struct {
 	Version string `json:"version,omitempty"`
 }
 
+// GVK returns the schema.GroupVersionKind object of v1alpha1 GVK
 func (gvk *GroupVersionKind) GVK() schema.GroupVersionKind {
 	return schema.GroupVersionKind{
 		Group:   gvk.Group,

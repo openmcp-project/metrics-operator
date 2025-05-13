@@ -233,6 +233,7 @@ func NewMetricHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clien
 	return handler, nil
 }
 
+// GetGVRfromGVK converts GVK to GVR
 func GetGVRfromGVK(gvk schema.GroupVersionKind, disco discovery.DiscoveryInterface) (schema.GroupVersionResource, error) {
 	// TODO: this could be optimized later (e.g. by caching the discovery client)
 	groupResources, err := disco.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
