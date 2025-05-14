@@ -93,6 +93,8 @@ func (r *Metric) SetConditions(conditions ...metav1.Condition) {
 		meta.SetStatusCondition(&r.Status.Conditions, c)
 	}
 }
+
+// GvkToString returns the string representation of the metric targe GVK
 func (r *Metric) GvkToString() string {
 	if r.Spec.Target.Group == "" {
 		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Target.Version, r.Spec.Target.Kind)

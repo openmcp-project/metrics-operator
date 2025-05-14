@@ -1,0 +1,121 @@
+name: Versioned Release
+
+on:
+  push:
+    branches:
+      - main
+      
+permissions:
+  contents: write # we need this to be able to push tags
+
+jobs:
+  release_tag:
+    name: Release version
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.PUSH_KEY }}
+          fetch-tags: true
+          fetch-depth: 0
+
+      - name: Read and validate VERSION
+        id: version
+        run: |
+          VERSION=$(cat VERSION)
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-dev)?$ ]]; then
+            echo "Invalid version format in VERSION file: $VERSION"
+            exit 1
+          fi
+          echo "New version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_ENV
+
+      - name: Skip release if version is a dev version
+        if: contains(env.version, '-dev')
+        run: |
+          echo "Skipping development version release: ${{ env.version }}"
+          echo "SKIP=true" >> $GITHUB_ENV
+          exit 0
+    
+      - name: Check if VERSION is already tagged
+        id: check_tag
+        run: |
+          if git rev-parse "refs/tags/${{ env.version }}" >/dev/null 2>&1; then
+            echo "Tag ${{ env.version }} already exists. Skipping release."
+            echo "SKIP=true" >> $GITHUB_ENV
+            exit 0
+          fi
+          echo "Tag ${{ env.version }} doesn't exists. Proceeding with release."
+
+      - name: Create Git tag
+        if: ${{ env.SKIP != 'true' }}
+        run: |
+          AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
+          AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
+          echo "Tagging as $AUTHOR_NAME <$AUTHOR_EMAIL>"
+
+          echo "AUTHOR_NAME=$AUTHOR_NAME" >> $GITHUB_ENV
+          echo "AUTHOR_EMAIL=$AUTHOR_EMAIL" >> $GITHUB_ENV
+
+          git config user.name "$AUTHOR_NAME"
+          git config user.email "$AUTHOR_EMAIL"
+
+          git tag -a "${{ env.version }}" -m "Release ${{ env.version }}"
+          git push origin "${{ env.version }}"
+
+      - name: Build Changelog
+        id: github_release
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          mode: "PR"
+          configurationJson: |
+            {
+              "template": "#{{CHANGELOG}}",
+              "pr_template": "- #{{TITLE}}: ##{{NUMBER}}",
+              "categories": [
+                {
+                    "title": "## Feature",
+                    "labels": ["feat", "feature"]
+                },
+                {
+                    "title": "## Fix",
+                    "labels": ["fix", "bug"]
+                },
+                {
+                    "title": "## Other",
+                    "labels": []
+                }
+              ],
+              "label_extractor": [
+                {
+                  "pattern": "^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\\([\\w\\-\\.]+\\))?(!)?: ([\\w ])+([\\s\\S]*)",
+                  "on_property": "title",
+                  "target": "$1"
+                }
+              ]
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Create GitHub release
+        if: ${{ env.SKIP != 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.version }}
+          name: Release ${{ env.version }}
+          body: "Automated release for version ${{ env.version }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push dev VERSION
+        if: ${{ env.SKIP != 'true' }}
+        run: |
+          echo "${{ env.version }}-dev" > VERSION
+          git config user.name "${{ env.AUTHOR_NAME }}"
+          git config user.email "${{ env.AUTHOR_EMAIL }}"
+          git add VERSION
+          git commit -m "Update VERSION to ${{ env.version }}-dev"
+          git push origin main

@@ -1,0 +1,21 @@
+components:
+- name:  ${COMPONENT_NAME_PREFIX}/${COMPONENT_NAME}
+  version: ${VERSION}
+  provider:
+    name: ${PROVIDER}
+  resources:
+    - name: ${COMPONENT_NAME}-chart
+      type: helmChart
+      input:
+        type: helm
+        path: ./charts/${COMPONENT_NAME}
+        repository: charts/${COMPONENT_NAME}
+      
+    - name: ${COMPONENT_NAME}-image
+      type: ociImage
+      input:
+        type: dockermulti
+        repository: images/${COMPONENT_NAME}
+        variants:
+        - "${COMPONENT_REPO_PREFIX}:${VERSION}-linux-amd64"
+        - "${COMPONENT_REPO_PREFIX}:${VERSION}-linux-arm64"

@@ -4,9 +4,12 @@ name: make reviewable && make check-Diff
 
 on:
   workflow_call: {}
-  pull_request:
+  push:
+    tags:
+      - v*
     branches:
       - main
+  pull_request:
 env:
   GO_IMPORT_VERSION: 'v0.16.1'
 
@@ -35,7 +38,10 @@ jobs:
 
       - name: tidy
         run: go mod tidy
-        
+
+      - name: sync chart version
+        run: make helm-chart
+
       - name: make check-diff
         run: make check-diff
       
