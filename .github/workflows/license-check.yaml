@@ -2,13 +2,16 @@ name: Check Go Dependency Licenses
 
 on:
   workflow_call: {}
-  pull_request:
+  push:
+    tags:
+      - v*
     branches:
       - main
     paths:
       - go.mod
       - go.sum
-
+  pull_request:
+    
 permissions:
   contents: read
 

@@ -4,9 +4,12 @@ name: make reviewable && make check-Diff
 
 on:
   workflow_call: {}
-  pull_request:
+  push:
+    tags:
+      - v*
     branches:
       - main
+  pull_request:
 env:
   GO_IMPORT_VERSION: 'v0.16.1'
 

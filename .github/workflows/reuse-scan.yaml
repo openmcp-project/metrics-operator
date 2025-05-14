@@ -4,10 +4,11 @@ name: REUSE Compliance Check
 
 on:
   workflow_call: {}
-  pull_request:
+  push:
     branches:
       - main
-
+  pull_request:
+    
 
 jobs:
   lint-reuse:
