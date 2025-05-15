@@ -71,11 +71,11 @@ jobs:
       - name: Build the ${{ github.repository }}
         run: |
           make reviewable
-          make build
+          make build-docker-binary
 
       - name: Build Images
         run: |
-          IMG=ghcr.io/sap/metrics-operator:${{ env.version }} make docker-build
+          IMG=ghcr.io/sap/metrics-operator:${{ env.version }} make docker-buildx
 
       - name: setup OCM
         uses: open-component-model/ocm-setup-action@main

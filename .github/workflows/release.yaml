@@ -106,8 +106,8 @@ jobs:
         with:
           tag_name: ${{ env.version }}
           name: Release ${{ env.version }}
-          body: "Automated release for version ${{ env.version }}"
-          draft: false
+          body: ${{steps.github_release.outputs.changelog}}
+          draft: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
