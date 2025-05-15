@@ -3,13 +3,14 @@
 name: make reviewable && make check-Diff
 
 on:
+  pull_request:
   workflow_call: {}
   push:
     tags:
       - v*
     branches:
       - main
-  pull_request:
+
 env:
   GO_IMPORT_VERSION: 'v0.16.1'
 
@@ -46,7 +47,7 @@ jobs:
         run: make check-diff
       
       - name: run tests
-        run: make tests
+        run: make test
       
       - name: build
         run: make build

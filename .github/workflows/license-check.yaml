@@ -1,6 +1,7 @@
 name: Check Go Dependency Licenses
 
 on:
+  pull_request:
   workflow_call: {}
   push:
     tags:
@@ -10,7 +11,6 @@ on:
     paths:
       - go.mod
       - go.sum
-  pull_request:
     
 permissions:
   contents: read
