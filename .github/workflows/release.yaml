@@ -116,8 +116,9 @@ jobs:
         if: ${{ env.SKIP != 'true' }}
         run: |
           echo "${{ env.version }}-dev" > VERSION
+          make helm-chart
           git config user.name "${{ env.AUTHOR_NAME }}"
           git config user.email "${{ env.AUTHOR_EMAIL }}"
-          git add VERSION
+          git add VERSION charts/metrics-operator/Chart.yaml charts/metrics-operator/values.yaml
           git commit -m "Update VERSION to ${{ env.version }}-dev"
           git push origin main

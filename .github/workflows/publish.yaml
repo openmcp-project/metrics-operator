@@ -75,7 +75,7 @@ jobs:
 
       - name: Build Images
         run: |
-          IMAGE_REGISTRY=ghcr.io/sap/metrics-operator make docker-build
+          IMG=ghcr.io/sap/metrics-operator:${{ env.version }} make docker-build
 
       - name: setup OCM
         uses: open-component-model/ocm-setup-action@main

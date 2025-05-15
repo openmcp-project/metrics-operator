@@ -3,11 +3,11 @@
 name: REUSE Compliance Check
 
 on:
+  pull_request:
   workflow_call: {}
   push:
     branches:
       - main
-  pull_request:
     
 
 jobs:
