@@ -7,6 +7,7 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 ## Table of Contents
 
 - [Key Features](#key-features)
+- [Architecture Overview](#architecture-overview)
 - [Installation](#installation)
 - [Usage](#usage)
 - [RBAC Configuration](#rbac-configuration)
@@ -22,6 +23,101 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 - **Predictive Insights**: Aggregates data over time to identify emerging trends, supporting data-driven decision making for future system enhancements.
 - **Strategic Decision Support**: Offers data-backed insights to guide product evolution.
 - **Customizable Alerting System**: Allows defining alerts based on specific metric thresholds, enabling proactive response to potential issues or significant changes in system state.
+
+## Architecture Overview
+
+The Metrics Operator provides four main resource types for monitoring Kubernetes objects. Each type serves different use cases:
+
+### Metric Resource Flow
+
+```mermaid
+graph LR
+    M[Metric] -->|targets via GroupVersionKind| K8S[Kubernetes Objects<br/>Pods, Services, etc.]
+    M -.->|optional| RCA[RemoteClusterAccess]
+    RCA -->|accesses remote cluster| K8S
+    M -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class M metricType
+    class RCA accessType
+    class K8S targetType
+    class DS dataType
+```
+
+### ManagedMetric Resource Flow
+
+```mermaid
+graph LR
+    MM[ManagedMetric] -->|targets managed resources| MR[Managed Resources<br/>with 'crossplane' & 'managed' categories]
+    MM -.->|optional| RCA[RemoteClusterAccess]
+    RCA -->|accesses remote cluster| MR
+    MM -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class MM metricType
+    class RCA accessType
+    class MR targetType
+    class DS dataType
+```
+
+### FederatedMetric Resource Flow
+
+```mermaid
+graph LR
+    FM[FederatedMetric] -->|requires| FCA[FederatedClusterAccess]
+    FCA -->|discovers clusters via| CP[ControlPlane Resources]
+    FCA -->|provides access to| MC[Multiple Clusters]
+    FM -->|targets across clusters| K8S[Kubernetes Objects<br/>across federated clusters]
+    FM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class FM metricType
+    class FCA accessType
+    class CP,MC,K8S targetType
+    class DS dataType
+```
+
+### FederatedManagedMetric Resource Flow
+
+```mermaid
+graph LR
+    FMM[FederatedManagedMetric] -->|requires| FCA[FederatedClusterAccess]
+    FCA -->|discovers clusters via| CP[ControlPlane Resources]
+    FCA -->|provides access to| MC[Multiple Clusters]
+    FMM -->|targets managed resources<br/>across clusters| MR[Managed Resources<br/>with 'crossplane' & 'managed' categories]
+    FMM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class FMM metricType
+    class FCA accessType
+    class CP,MC,MR targetType
+    class DS dataType
+```
+
+### Resource Type Descriptions:
+
+- **Metric**: Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- **ManagedMetric**: Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- **FederatedMetric**: Monitors resources across multiple clusters, aggregating data from federated sources
+- **FederatedManagedMetric**: Monitors Crossplane managed resources across multiple clusters
+- **RemoteClusterAccess**: Provides access configuration for monitoring resources in remote clusters
+- **FederatedClusterAccess**: Discovers and provides access to multiple clusters for federated monitoring
 
 ## Installation
 
@@ -54,7 +150,7 @@ This can be useful for tracking additional dimensions of the resource, such as f
 The projections are then translated to dimensions in the metric.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
 metadata:
   name: comp-pod
@@ -62,13 +158,32 @@ spec:
   name: comp-metric-pods
   description: Pods
   target:
-    resource: pods
+    kind: Pod
     group: ""
     version: v1
-  frequency: 1 # in minutes
+  interval: "1m"
   projections:
     - name: pod-namespace
       fieldPath: "metadata.namespace"
+---
+```
+
+### Managed Metric
+
+Managed metrics are used to monitor crossplane managed resources. They automatically track resources that have the "crossplane" and "managed" categories in their CRDs.
+
+```yaml
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: managed-metric
+spec:
+  name: managed-metric
+  description: Status metric created by an Operator
+  kind: Release
+  group: helm.crossplane.io
+  version: v1beta1
+  interval: "1m"
 ---
 ```
 
@@ -76,7 +191,7 @@ spec:
 Federated metrics deal with resources that are spread across multiple clusters. To monitor these resources, you need to define a `FederatedMetric` resource.
 They offer capabilities to aggregate data as well as filtering down to a specific cluster or field using projections.
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-prov
@@ -84,14 +199,14 @@ spec:
   name: xfed-prov
   description: crossplane providers
   target:
-    group:  pkg.crossplane.io
-    resource: providers
+    kind: Provider
+    group: pkg.crossplane.io
     version: v1
-  frequency: 1 # in minutes
+  interval: "1m"
   projections:
     - name: package
       fieldPath: "spec.package"
-  federateCaRef:
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---
@@ -104,15 +219,15 @@ The pre-condition here is that if a resource comes from a crossplane provider, i
 
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: xfed-managed
 spec:
   name: xfed-managed
   description: crossplane managed resources
-  frequency: 1 # in minutes
-  federateCaRef:
+  interval: "1m"
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---
@@ -121,14 +236,15 @@ spec:
 ## Remote Cluster Access
 
 
-### Cluster Access
-The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `ClusterAccess` resource:
+### Remote Cluster Access
 
-This cluster access resource can be used by `CompoundMetric` resources to monitor resources in the remote cluster.
+The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `RemoteClusterAccess` resource:
+
+This remote cluster access resource can be used by `Metric` and `ManagedMetric` resources to monitor resources in the remote cluster.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
-kind: ClusterAccess
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
   namespace: <monitoring-namespace>
@@ -147,17 +263,17 @@ spec:
 To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ca-sample
   namespace: default
 spec:
   target:
+    kind: ControlPlane
     group: core.orchestrate.cloud.sap
-    resource: controlplanes #plural always, lowecase only
     version: v1beta1
-  kubeConfigPath: spec.target.kubeconfig #case sensitive
+  kubeConfigPath: spec.target.kubeconfig
 ```
 
 
