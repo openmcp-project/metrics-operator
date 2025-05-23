@@ -144,7 +144,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfig, err := createQC(ctx, &metric.Spec.RemoteClusterAccessRef, r)
+	queryConfig, err := createQC(ctx, metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}

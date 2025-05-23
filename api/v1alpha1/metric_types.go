@@ -55,7 +55,8 @@ type MetricSpec struct {
 	// +kubebuilder:default:="10m"
 	Interval metav1.Duration `json:"interval,omitempty"`
 
-	RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
+	// +optional
+	*RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 
 	Projections []Projection `json:"projections,omitempty"`
 }
