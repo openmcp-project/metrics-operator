@@ -18,7 +18,7 @@ import (
 // EventDrivenController manages the event-driven metric collection system.
 // It watches Metric CRs and coordinates the dynamic informer setup.
 type EventDrivenController struct {
-	client.Client
+	Client     client.Client
 	Log        logr.Logger
 	Scheme     *runtime.Scheme
 	RestConfig *rest.Config
@@ -102,7 +102,7 @@ func (edc *EventDrivenController) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Fetch the Metric CR
 	var metric v1alpha1.Metric
-	if err := edc.Get(ctx, req.NamespacedName, &metric); err != nil {
+	if err := edc.Client.Get(ctx, req.NamespacedName, &metric); err != nil {
 		if client.IgnoreNotFound(err) == nil {
 			// Metric was deleted, unregister it
 			log.Info("Metric deleted, unregistering from target registry")
@@ -147,7 +147,7 @@ func (edc *EventDrivenController) Reconcile(ctx context.Context, req ctrl.Reques
 	// This ensures the metric gets an observation even if no resource events occur immediately
 	log.Info("Triggering initial metric collection", "metric", req.NamespacedName)
 	edc.metricUpdateCoordinator.RequestMetricUpdate(
-		req.NamespacedName.String(),
+		req.Namespace+"/"+req.Name,
 		metric.Spec.Target.GVK(),
 		nil, // No specific triggering object for initial collection
 	)

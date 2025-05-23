@@ -62,7 +62,7 @@ func (r *TargetRegistry) Register(ctx context.Context, metric *v1alpha1.Metric) 
 		Kind:    metric.Spec.Target.Kind,
 	}
 
-	var selector labels.Selector = labels.Everything()
+	selector := labels.Everything()
 	if metric.Spec.LabelSelector != "" {
 		sel, err := labels.Parse(metric.Spec.LabelSelector)
 		if err != nil {

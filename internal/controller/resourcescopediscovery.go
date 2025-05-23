@@ -78,10 +78,10 @@ func (rsd *ResourceScopeDiscovery) discoverResourceScope(ctx context.Context, gv
 		rsd.logger.V(3).Info("Successfully discovered scope using preferred resources", "gvk", gvk, "clusterScoped", isClusterScoped)
 		rsd.logger.V(2).Info("Successfully discovered scope using preferred resources", "gvk", gvk, "clusterScoped", isClusterScoped)
 		return isClusterScoped, nil
-	} else {
-		rsd.logger.V(3).Info("Preferred resources discovery failed, trying group/version method", "gvk", gvk, "error", err)
-		rsd.logger.V(2).Info("Preferred resources discovery failed, trying group/version method", "gvk", gvk, "error", err)
 	}
+
+	rsd.logger.V(3).Info("Preferred resources discovery failed, trying group/version method", "gvk", gvk)
+	rsd.logger.V(2).Info("Preferred resources discovery failed, trying group/version method", "gvk", gvk)
 
 	// Fallback to the original group/version specific method
 	rsd.logger.V(3).Info("Trying group/version discovery for GVK", "gvk", gvk)
@@ -91,7 +91,7 @@ func (rsd *ResourceScopeDiscovery) discoverResourceScope(ctx context.Context, gv
 // discoverUsingPreferredResources uses ServerPreferredResources for more robust discovery.
 // This method gets all preferred resources across all API groups in one call, which is more
 // reliable than querying specific group/versions that might not be ready yet.
-func (rsd *ResourceScopeDiscovery) discoverUsingPreferredResources(ctx context.Context, gvk schema.GroupVersionKind) (bool, error) {
+func (rsd *ResourceScopeDiscovery) discoverUsingPreferredResources(_ context.Context, gvk schema.GroupVersionKind) (bool, error) {
 	// Get all preferred resources across all API groups
 	resourceLists, err := rsd.discoveryClient.ServerPreferredResources()
 	if err != nil {
@@ -118,7 +118,7 @@ func (rsd *ResourceScopeDiscovery) discoverUsingPreferredResources(ctx context.C
 }
 
 // discoverUsingGroupVersion uses the original ServerResourcesForGroupVersion method as fallback.
-func (rsd *ResourceScopeDiscovery) discoverUsingGroupVersion(ctx context.Context, gvk schema.GroupVersionKind) (bool, error) {
+func (rsd *ResourceScopeDiscovery) discoverUsingGroupVersion(_ context.Context, gvk schema.GroupVersionKind) (bool, error) {
 	// Get the API resources for the group/version
 	groupVersion := gvk.GroupVersion().String()
 	apiResourceList, err := rsd.discoveryClient.ServerResourcesForGroupVersion(groupVersion)

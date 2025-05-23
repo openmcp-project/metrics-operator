@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
@@ -33,9 +32,8 @@ type MetricUpdateCoordinator struct {
 	Scheme     *runtime.Scheme // Correct type for Kubernetes scheme
 
 	// Concurrency control fields
-	processingMutex sync.RWMutex
-	lastProcessed   map[string]time.Time
-	debounceWindow  time.Duration
+	lastProcessed  map[string]time.Time
+	debounceWindow time.Duration
 }
 
 // NewMetricUpdateCoordinator creates a new MetricUpdateCoordinator.
@@ -54,7 +52,7 @@ func NewMetricUpdateCoordinator(k8sClient client.Client, logger logr.Logger, con
 // RequestMetricUpdate is called by the ResourceEventHandler (or potentially a polling mechanism)
 // to process a metric. The eventObj and eventGVK are for context, might not be directly used
 // if the metric's own spec is the sole driver for fetching data.
-func (muc *MetricUpdateCoordinator) RequestMetricUpdate(metricNamespacedName string, eventGVK schema.GroupVersionKind, eventObj interface{}) {
+func (muc *MetricUpdateCoordinator) RequestMetricUpdate(metricNamespacedName string, eventGVK schema.GroupVersionKind, _ interface{}) {
 	ctx := context.Background() // Consider passing a more specific context
 	log := muc.Log.WithValues("metric", metricNamespacedName, "triggeringGVK", eventGVK.String())
 	log.Info("MetricUpdateCoordinator: Metric update requested")
@@ -95,178 +93,168 @@ func (muc *MetricUpdateCoordinator) RequestMetricUpdate(metricNamespacedName str
 	}
 }
 
-// shouldSkipDuplicateRequest checks if we should skip this request due to recent processing
-func (muc *MetricUpdateCoordinator) shouldSkipDuplicateRequest(metricNamespacedName string, log logr.Logger) bool {
-	muc.processingMutex.Lock()
-	defer muc.processingMutex.Unlock()
-
-	// Check if we recently processed this metric
-	if lastTime, exists := muc.lastProcessed[metricNamespacedName]; exists {
-		if time.Since(lastTime) < muc.debounceWindow {
-			log.V(1).Info("Skipping duplicate metric update request due to debounce window",
-				"metric", metricNamespacedName,
-				"lastProcessed", lastTime,
-				"debounceWindow", muc.debounceWindow)
-			return true
-		}
-	}
-
-	// Update the last processed time
-	muc.lastProcessed[metricNamespacedName] = time.Now()
-	return false
-}
-
 // processMetric contains the core logic to fetch, calculate, and export a single metric.
 // This is refactored from the original MetricReconciler.Reconcile.
 func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v1alpha1.Metric, log logr.Logger) error {
-	// 1. Get Credentials Secret
-	secret, errSecret := common.GetCredentialsSecret(ctx, muc.Client)
-	if errSecret != nil {
-		log.Error(errSecret, "Unable to fetch credentials secret", "secretName", common.SecretName, "secretNamespace", common.SecretNameSpace)
+	// Setup phase
+	credentials, err := muc.setupCredentials(ctx, metric, log)
+	if err != nil {
+		return err
+	}
+
+	queryConfig, err := muc.setupQueryConfig(ctx, metric, log)
+	if err != nil {
+		return err
+	}
+
+	metricClient, err := muc.setupMetricClient(ctx, credentials, metric, log)
+	if err != nil {
+		return err
+	}
+	defer muc.closeMetricClient(ctx, metricClient, log, metric.Name)
+
+	gaugeMetric, err := muc.createGaugeMetric(metricClient, metric, log)
+	if err != nil {
+		return err
+	}
+
+	orchestrator, err := muc.createOrchestrator(credentials, queryConfig, metric, gaugeMetric, log)
+	if err != nil {
+		return err
+	}
+
+	// Execution phase
+	result, errMon := orchestrator.Handler.Monitor(ctx)
+	errExport := muc.exportMetrics(ctx, metricClient, log)
+
+	// Status update phase
+	finalError := muc.updateMetricStatus(ctx, metric, result, errMon, errExport, log)
+	return finalError
+}
+
+// setupCredentials handles credential retrieval and error handling
+func (muc *MetricUpdateCoordinator) setupCredentials(ctx context.Context, metric *v1alpha1.Metric, log logr.Logger) (common.DataSinkCredentials, error) {
+	secret, err := common.GetCredentialsSecret(ctx, muc.Client)
+	if err != nil {
+		log.Error(err, "Unable to fetch credentials secret", "secretName", common.SecretName, "secretNamespace", common.SecretNameSpace)
 		muc.Recorder.Event(metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch secret '%s' in namespace '%s'", common.SecretName, common.SecretNameSpace))
-		// Update status to reflect this error
 		metric.Status.Ready = v1alpha1.StatusFalse
-		metric.SetConditions(common.Error(fmt.Sprintf("Credentials secret %s/%s not found: %s", common.SecretNameSpace, common.SecretName, errSecret.Error())))
-		if err := muc.updateMetricStatusWithRetry(ctx, metric, 3, log); err != nil {
-			log.Error(err, "Failed to update metric status after secret error")
+		metric.SetConditions(common.Error(fmt.Sprintf("Credentials secret %s/%s not found: %s", common.SecretNameSpace, common.SecretName, err.Error())))
+		if updateErr := muc.updateMetricStatusWithRetry(ctx, metric, 3, log); updateErr != nil {
+			log.Error(updateErr, "Failed to update metric status after secret error")
 		}
-		return errSecret
+		return common.DataSinkCredentials{}, err
 	}
-	credentials := common.GetCredentialData(secret)
+	return common.GetCredentialData(secret), nil
+}
 
-	// 2. Create QueryConfig
-	// We need a way to get the InsightReconciler interface or its methods for createQC.
-	// For now, let's assume we can construct it or pass necessary parts.
-	// The original createQC takes (ctx, rcaRef, InsightReconciler).
-	// InsightReconciler provides getClient() and getRestConfig(). muc has these.
-	queryConfig, errQCFunc := muc.createCoordinatorQueryConfig(ctx, metric.Spec.RemoteClusterAccessRef)
-	if errQCFunc != nil {
-		log.Error(errQCFunc, "Failed to create query config")
+// setupQueryConfig creates the query configuration
+func (muc *MetricUpdateCoordinator) setupQueryConfig(ctx context.Context, metric *v1alpha1.Metric, log logr.Logger) (orc.QueryConfig, error) {
+	queryConfig, err := muc.createCoordinatorQueryConfig(ctx, metric.Spec.RemoteClusterAccessRef)
+	if err != nil {
+		log.Error(err, "Failed to create query config")
 		metric.Status.Ready = v1alpha1.StatusFalse
-		metric.SetConditions(common.Error("Failed to create query config: " + errQCFunc.Error()))
-		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
-		return errQCFunc
+		metric.SetConditions(common.Error("Failed to create query config: " + err.Error()))
+		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log)
+		return orc.QueryConfig{}, err
 	}
+	return queryConfig, nil
+}
 
-	// 3. Create OTel Metric Client
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
-	if errCli != nil {
-		log.Error(errCli, "Failed to create OTel client")
+// setupMetricClient creates the OTel metric client
+func (muc *MetricUpdateCoordinator) setupMetricClient(ctx context.Context, credentials common.DataSinkCredentials, metric *v1alpha1.Metric, log logr.Logger) (*clientoptl.MetricClient, error) {
+	metricClient, err := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	if err != nil {
+		log.Error(err, "Failed to create OTel client")
 		metric.Status.Ready = v1alpha1.StatusFalse
-		metric.SetConditions(common.Error("Failed to create OTel client: " + errCli.Error()))
-		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
-		return errCli
+		metric.SetConditions(common.Error("Failed to create OTel client: " + err.Error()))
+		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log)
+		return nil, err
 	}
-	defer func() {
-		if err := metricClient.Close(ctx); err != nil {
-			log.Error(err, "Failed to close metric client", "metric", metric.Name)
-		}
-	}()
-	metricClient.SetMeter("metric") // Or a more dynamic meter name
+	metricClient.SetMeter("metric")
+	return metricClient, nil
+}
 
-	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name) // metric.Name or metric.Spec.Name? Metric CRD uses Spec.Name for Dynatrace.
-	if errGauge != nil {
-		log.Error(errGauge, "Failed to create OTel gauge")
+// closeMetricClient safely closes the metric client
+func (muc *MetricUpdateCoordinator) closeMetricClient(ctx context.Context, metricClient *clientoptl.MetricClient, log logr.Logger, metricName string) {
+	if err := metricClient.Close(ctx); err != nil {
+		log.Error(err, "Failed to close metric client", "metric", metricName)
+	}
+}
+
+// createGaugeMetric creates the gauge metric
+func (muc *MetricUpdateCoordinator) createGaugeMetric(metricClient *clientoptl.MetricClient, metric *v1alpha1.Metric, log logr.Logger) (*clientoptl.Metric, error) {
+	gaugeMetric, err := metricClient.NewMetric(metric.Name)
+	if err != nil {
+		log.Error(err, "Failed to create OTel gauge")
 		metric.Status.Ready = v1alpha1.StatusFalse
-		metric.SetConditions(common.Error("Failed to create OTel gauge: " + errGauge.Error()))
-		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
-		return errGauge
+		metric.SetConditions(common.Error("Failed to create OTel gauge: " + err.Error()))
+		_ = muc.updateMetricStatusWithRetry(context.Background(), metric, 3, log)
+		return nil, err
 	}
+	return gaugeMetric, nil
+}
 
-	// 4. Create Orchestrator
-	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithMetric(*metric, gaugeMetric)
-	if errOrch != nil {
-		log.Error(errOrch, "Unable to create metric orchestrator")
+// createOrchestrator creates the metric orchestrator
+func (muc *MetricUpdateCoordinator) createOrchestrator(credentials common.DataSinkCredentials, queryConfig orc.QueryConfig, metric *v1alpha1.Metric, gaugeMetric *clientoptl.Metric, log logr.Logger) (*orc.Orchestrator, error) {
+	orchestrator, err := orc.NewOrchestrator(credentials, queryConfig).WithMetric(*metric, gaugeMetric)
+	if err != nil {
+		log.Error(err, "Unable to create metric orchestrator")
 		muc.Recorder.Event(metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
 		metric.Status.Ready = v1alpha1.StatusFalse
-		metric.SetConditions(common.Error("Failed to create orchestrator: " + errOrch.Error()))
-		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
-		return errOrch
+		metric.SetConditions(common.Error("Failed to create orchestrator: " + err.Error()))
+		_ = muc.updateMetricStatusWithRetry(context.Background(), metric, 3, log)
+		return nil, err
 	}
+	return orchestrator, nil
+}
 
-	// 5. Monitor
-	result, errMon := orchestrator.Handler.Monitor(ctx)
-	var finalError error = errMon // Keep track of monitor error for final status
+// exportMetrics handles metric export
+func (muc *MetricUpdateCoordinator) exportMetrics(ctx context.Context, metricClient *clientoptl.MetricClient, log logr.Logger) error {
+	err := metricClient.ExportMetrics(ctx)
+	if err != nil {
+		log.Error(err, "Failed to export metrics")
+	}
+	return err
+}
+
+// updateMetricStatus handles the complex status update logic
+func (muc *MetricUpdateCoordinator) updateMetricStatus(ctx context.Context, metric *v1alpha1.Metric, result orc.MonitorResult, errMon, errExport error, log logr.Logger) error {
+	finalError := errMon
+
+	// Handle monitoring errors
 	if errMon != nil {
 		log.Error(errMon, "Orchestrator monitoring failed")
 		metric.Status.Ready = v1alpha1.StatusFalse
-		// If errMon is not nil, 'result' is a zero-value struct.
-		// The primary error is errMon.
 		metric.SetConditions(common.Error("Monitoring failed: " + errMon.Error()))
 	}
 
-	// 6. Export Metrics
-	errExport := metricClient.ExportMetrics(ctx)
+	// Handle export errors
 	if errExport != nil {
 		log.Error(errExport, "Failed to export metrics")
-		metric.Status.Ready = v1alpha1.StatusFalse // Explicitly set to false on export error
+		metric.Status.Ready = v1alpha1.StatusFalse
 		if finalError == nil {
 			finalError = errExport
 		}
-		// If monitoring was successful (errMon == nil) but export failed, update condition.
-		// If monitoring also failed, errMon's condition is already set.
-		if errMon == nil { // Only set export error condition if monitor was ok
+		if errMon == nil {
 			metric.SetConditions(common.Error("Metric export failed: " + errExport.Error()))
 		}
-	} else if errMon == nil { // Only set to true if monitor AND export were successful
+	} else if errMon == nil {
 		metric.Status.Ready = v1alpha1.StatusTrue
 	}
 
-	// 7. Update Status (based on monitor result and export status)
-	// Only use 'result' fields if errMon is nil, indicating Monitor() itself completed without error.
+	// Process monitor results
 	if errMon == nil {
-		switch result.Phase {
-		case v1alpha1.PhaseActive:
-			if metric.Status.Ready == v1alpha1.StatusTrue { // Monitor active and export succeeded
-				metric.SetConditions(common.Available(result.Message))
-				muc.Recorder.Event(metric, "Normal", "MetricAvailable", result.Message)
-			} else if errExport != nil {
-				// Condition for export failure already set if monitor was OK.
-			} else {
-				// Monitor active, but export status unclear and Ready is false. This is an odd state.
-				metric.SetConditions(common.Error("Metric available (monitor) but overall status not ready and no export error"))
-			}
-		case v1alpha1.PhaseFailed:
-			log.Error(result.Error, "Metric processing resulted in failed phase (from monitor result)", "reason", result.Reason, "message", result.Message)
-			metric.SetConditions(common.Error(result.Message)) // Monitor result's error message
-			muc.Recorder.Event(metric, "Warning", "MetricFailed", result.Message)
-		case v1alpha1.PhasePending:
-			metric.SetConditions(common.Creating()) // Assuming "Creating" is a pending state
-			muc.Recorder.Event(metric, "Normal", "MetricPending", result.Message)
-		}
-
-		if cObs, ok := result.Observation.(*v1alpha1.MetricObservation); ok {
-			metric.Status.Observation = v1alpha1.MetricObservation{
-				Timestamp:   result.Observation.GetTimestamp(),
-				LatestValue: cObs.LatestValue,
-				Dimensions:  cObs.Dimensions,
-			}
-		} else if result.Observation != nil { // Observation is present but not castable
-			log.Error(fmt.Errorf("unexpected observation type: %T", result.Observation), "Failed to cast observation from monitor result")
-			// metric.Status.Observation.Timestamp = metav1.Now() // Timestamp will be set below
-		}
-		// If result.Observation is nil, timestamp will be set below.
-	} else { // errMon != nil, so monitor itself failed.
-		// metric.Status.Ready should already be false.
-		// Condition for errMon is already set.
-		// We just ensure a fallback status if nothing else was set.
-		if metric.Status.Ready == "" {
-			metric.Status.Ready = v1alpha1.StatusFalse
-		}
-		if len(metric.Status.Conditions) == 0 && finalError != nil { // Check finalError before using
-			metric.SetConditions(common.Error(finalError.Error()))
-		} else if len(metric.Status.Conditions) == 0 {
-			metric.SetConditions(common.Error("Metric processing failed due to monitoring error"))
-		}
+		muc.processMonitorResult(metric, result)
+	} else {
+		muc.handleMonitorFailure(metric, finalError)
 	}
 
-	// Ensure observation timestamp is updated, regardless of event or polling
-	// This timestamp should reflect when this processing attempt concluded.
+	// Update observation timestamp
 	metric.Status.Observation.Timestamp = metav1.Now()
 
-	// Use retry logic for status update
-	errUp := muc.updateMetricStatusWithRetry(ctx, metric, 5, log)
-	if errUp != nil {
+	// Update status with retry
+	if errUp := muc.updateMetricStatusWithRetry(ctx, metric, 5, log); errUp != nil {
 		log.Error(errUp, "Failed to update metric status after retries")
 		if finalError == nil {
 			finalError = errUp
@@ -276,12 +264,75 @@ func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v
 	return finalError
 }
 
+// processMonitorResult handles successful monitor results
+func (muc *MetricUpdateCoordinator) processMonitorResult(metric *v1alpha1.Metric, result orc.MonitorResult) {
+	switch result.Phase {
+	case v1alpha1.PhaseActive:
+		muc.handleActivePhase(metric, result)
+	case v1alpha1.PhaseFailed:
+		muc.handleFailedPhase(metric, result)
+	case v1alpha1.PhasePending:
+		muc.handlePendingPhase(metric, result)
+	}
+
+	muc.updateObservation(metric, result)
+}
+
+// handleActivePhase processes active phase results
+func (muc *MetricUpdateCoordinator) handleActivePhase(metric *v1alpha1.Metric, result orc.MonitorResult) {
+	if metric.Status.Ready == v1alpha1.StatusTrue {
+		metric.SetConditions(common.Available(result.Message))
+		muc.Recorder.Event(metric, "Normal", "MetricAvailable", result.Message)
+	} else {
+		// Monitor active, but export status unclear and Ready is false
+		metric.SetConditions(common.Error("Metric available (monitor) but overall status not ready and no export error"))
+	}
+}
+
+// handleFailedPhase processes failed phase results
+func (muc *MetricUpdateCoordinator) handleFailedPhase(metric *v1alpha1.Metric, result orc.MonitorResult) {
+	muc.Log.Error(result.Error, "Metric processing resulted in failed phase (from monitor result)", "reason", result.Reason, "message", result.Message)
+	metric.SetConditions(common.Error(result.Message))
+	muc.Recorder.Event(metric, "Warning", "MetricFailed", result.Message)
+}
+
+// handlePendingPhase processes pending phase results
+func (muc *MetricUpdateCoordinator) handlePendingPhase(metric *v1alpha1.Metric, result orc.MonitorResult) {
+	metric.SetConditions(common.Creating())
+	muc.Recorder.Event(metric, "Normal", "MetricPending", result.Message)
+}
+
+// updateObservation updates the metric observation from monitor results
+func (muc *MetricUpdateCoordinator) updateObservation(metric *v1alpha1.Metric, result orc.MonitorResult) {
+	if cObs, ok := result.Observation.(*v1alpha1.MetricObservation); ok {
+		metric.Status.Observation = v1alpha1.MetricObservation{
+			Timestamp:   result.Observation.GetTimestamp(),
+			LatestValue: cObs.LatestValue,
+			Dimensions:  cObs.Dimensions,
+		}
+	} else if result.Observation != nil {
+		muc.Log.Error(fmt.Errorf("unexpected observation type: %T", result.Observation), "Failed to cast observation from monitor result")
+	}
+}
+
+// handleMonitorFailure handles cases where monitoring itself failed
+func (muc *MetricUpdateCoordinator) handleMonitorFailure(metric *v1alpha1.Metric, finalError error) {
+	if metric.Status.Ready == "" {
+		metric.Status.Ready = v1alpha1.StatusFalse
+	}
+	if len(metric.Status.Conditions) == 0 && finalError != nil {
+		metric.SetConditions(common.Error(finalError.Error()))
+	} else if len(metric.Status.Conditions) == 0 {
+		metric.SetConditions(common.Error("Metric processing failed due to monitoring error"))
+	}
+}
+
 // updateMetricStatusWithRetry implements retry logic with exponential backoff for status updates
 func (muc *MetricUpdateCoordinator) updateMetricStatusWithRetry(ctx context.Context, metric *v1alpha1.Metric, maxRetries int, log logr.Logger) error {
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		// For the first attempt, use the metric as-is
 		// For subsequent attempts, fetch fresh copy to get latest resource version
-		var targetMetric *v1alpha1.Metric = metric
+		targetMetric := metric
 		if attempt > 0 {
 			var freshMetric v1alpha1.Metric
 			if err := muc.Get(ctx, client.ObjectKeyFromObject(metric), &freshMetric); err != nil {
@@ -359,24 +410,6 @@ func (muc *MetricUpdateCoordinator) getClient() client.Client {
 // Helper to get rest config (satisfies parts of InsightReconciler interface implicitly for createQC logic)
 func (muc *MetricUpdateCoordinator) getRestConfig() *rest.Config {
 	return muc.RestConfig
-}
-
-// getClusterInfo is a simplified local version or needs to be adapted.
-// The original one is in metric_controller and not exported.
-// For now, this is a placeholder if createCoordinatorQueryConfig needs it.
-// It's better if QueryConfig for local doesn't strictly require a cluster name
-// or can derive it if absolutely necessary.
-// For the purpose of QueryConfig, if it's local, the client and restconfig are primary.
-// The orchestrator's use of ClusterName for local queries should be reviewed.
-// As a placeholder:
-func getClusterInfoCoordinator(rc *rest.Config) (string, error) {
-	// This is a simplified placeholder. A real implementation might involve
-	// querying the API server or using a well-known config.
-	// For now, returning a default or erroring if critical.
-	// The original `getClusterInfo` in `metric_controller.go` is not exported.
-	// Let's assume for local QueryConfig, the name isn't strictly critical for orchestrator
-	// or can be defaulted.
-	return "local-cluster-via-coordinator", nil
 }
 
 // Ensure MetricUpdateCoordinator implements MetricUpdateCoordinatorInterface

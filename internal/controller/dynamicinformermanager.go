@@ -40,7 +40,7 @@ func targetKey(target TargetResourceIdentifier) string {
 }
 
 // NewDynamicInformerManager creates a new DynamicInformerManager.
-func NewDynamicInformerManager(dynClient dynamic.Interface, defaultResync time.Duration, logger logr.Logger, eventHandler ResourceEventHandlerInterface, gvrDiscovery *GVRDiscoveryService) *DynamicInformerManager {
+func NewDynamicInformerManager(dynClient dynamic.Interface, _ time.Duration, logger logr.Logger, eventHandler ResourceEventHandlerInterface, gvrDiscovery *GVRDiscoveryService) *DynamicInformerManager {
 	// We'll create namespace-specific factories as needed, so no global factory here
 	return &DynamicInformerManager{
 		dynClient:          dynClient,
@@ -59,120 +59,119 @@ func (dim *DynamicInformerManager) EnsureInformers(ctx context.Context, targets 
 	dim.mu.Lock()
 	defer dim.mu.Unlock()
 
-	// Stop informers for targets that are no longer needed
-	for existingTargetKey, stopper := range dim.activeStoppers {
-		// Find the corresponding target from the current targets list
-		targetStillNeeded := false
-		for _, target := range targets {
-			if targetKey(target) == existingTargetKey {
-				targetStillNeeded = true
-				break
-			}
-		}
+	dim.stopUnneededInformers(targets)
+	dim.startNewInformers(ctx, targets)
+}
 
-		if !targetStillNeeded {
+// stopUnneededInformers stops informers for targets that are no longer needed
+func (dim *DynamicInformerManager) stopUnneededInformers(targets []TargetResourceIdentifier) {
+	for existingTargetKey, stopper := range dim.activeStoppers {
+		if !dim.isTargetStillNeeded(existingTargetKey, targets) {
 			dim.log.Info("Stopping informer for target", "targetKey", existingTargetKey)
-			close(stopper) // Signal the informer's goroutine to stop
+			close(stopper)
 			delete(dim.activeInformers, existingTargetKey)
 			delete(dim.activeStoppers, existingTargetKey)
 		}
 	}
+}
 
-	// Start informers for new targets
+// isTargetStillNeeded checks if a target is still in the desired targets list
+func (dim *DynamicInformerManager) isTargetStillNeeded(existingTargetKey string, targets []TargetResourceIdentifier) bool {
 	for _, target := range targets {
-		targetKeyStr := targetKey(target)
-
-		// Check if this target already has an active informer
-		if _, found := dim.activeInformers[targetKeyStr]; !found {
-			dim.log.Info("Starting informer for target",
-				"gvk", target.GVK,
-				"namespace", target.Namespace,
-				"selector", target.Selector.String(),
-				"targetKey", targetKeyStr)
-
-			// Use GVR discovery service to get the correct resource name
-			gvr, err := dim.gvrDiscovery.GetGVR(ctx, target.GVK)
-			if err != nil {
-				dim.log.Error(err, "Failed to discover GVR for target", "gvk", target.GVK)
-				// Skip this target and continue with others
-				continue
-			}
-
-			// Create a namespace-specific factory for this target
-			var factory dynamicinformer.DynamicSharedInformerFactory
-			if target.Namespace != "" {
-				// For namespaced resources, create a namespace-specific factory
-				factory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(
-					dim.dynClient,
-					10*time.Minute, // Default resync period
-					target.Namespace,
-					nil,
-				)
-			} else {
-				// For cluster-scoped resources, use all-namespace factory
-				factory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(
-					dim.dynClient,
-					10*time.Minute,
-					"",
-					nil,
-				)
-			}
-
-			// Get the GenericInformer from the namespace-specific factory
-			genericInformer := factory.ForResource(gvr)
-
-			// Get the underlying SharedIndexInformer to add event handlers
-			sharedInformer := genericInformer.Informer()
-
-			// Add event handlers
-			sharedInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					dim.log.Info("DynamicInformer Event: Add", "gvk", target.GVK.String(), "namespace", target.Namespace)
-					if dim.resourceEvtHandler != nil {
-						dim.resourceEvtHandler.OnAdd(obj, target.GVK)
-					}
-				},
-				UpdateFunc: func(oldObj, newObj interface{}) {
-					dim.log.Info("DynamicInformer Event: Update", "gvk", target.GVK.String(), "namespace", target.Namespace)
-					if dim.resourceEvtHandler != nil {
-						dim.resourceEvtHandler.OnUpdate(oldObj, newObj, target.GVK)
-					}
-				},
-				DeleteFunc: func(obj interface{}) {
-					dim.log.Info("DynamicInformer Event: Delete", "gvk", target.GVK.String(), "namespace", target.Namespace)
-					if dim.resourceEvtHandler != nil {
-						dim.resourceEvtHandler.OnDelete(obj, target.GVK)
-					}
-				},
-			})
-
-			// Start the factory immediately
-			factory.Start(ctx.Done())
-
-			stopper := make(chan struct{})
-			dim.activeInformers[targetKeyStr] = genericInformer // Store the GenericInformer
-			dim.activeStoppers[targetKeyStr] = stopper
-
-			// Start the informer. The factory manages the shared underlying machinery.
-			// The factory itself needs to be started, typically once.
-			// For dynamic informers, starting the factory might not be enough,
-			// individual informers might need a go routine.
-			// Let's assume the factory handles this for now.
-			// The SharedInformerFactory.Start(stopper) method starts all informers.
-			// We will call factory.Start() once, globally.
-			// For individual dynamic informers, they should start when event handlers are added
-			// and the factory is running.
+		if targetKey(target) == existingTargetKey {
+			return true
 		}
 	}
-	// The factory itself should be started once, usually in the main operator setup.
-	// dim.informerFactory.Start(ctx.Done()) // This would start all informers in the factory.
-	// This needs careful consideration: when and how to start the factory vs individual informers.
-	// For now, we assume the factory is started elsewhere, and adding handlers to
-	// an informer obtained from it makes it active.
+	return false
+}
+
+// startNewInformers starts informers for new targets
+func (dim *DynamicInformerManager) startNewInformers(ctx context.Context, targets []TargetResourceIdentifier) {
+	for _, target := range targets {
+		targetKeyStr := targetKey(target)
+		if _, found := dim.activeInformers[targetKeyStr]; !found {
+			if err := dim.createAndStartInformer(ctx, target, targetKeyStr); err != nil {
+				dim.log.Error(err, "Failed to create informer for target", "gvk", target.GVK)
+			}
+		}
+	}
+}
+
+// createAndStartInformer creates and starts a new informer for the given target
+func (dim *DynamicInformerManager) createAndStartInformer(ctx context.Context, target TargetResourceIdentifier, targetKeyStr string) error {
+	dim.log.Info("Starting informer for target",
+		"gvk", target.GVK,
+		"namespace", target.Namespace,
+		"selector", target.Selector.String(),
+		"targetKey", targetKeyStr)
+
+	gvr, err := dim.gvrDiscovery.GetGVR(ctx, target.GVK)
+	if err != nil {
+		return err
+	}
+
+	factory := dim.createInformerFactory(target)
+	genericInformer := factory.ForResource(gvr)
+	sharedInformer := genericInformer.Informer()
+
+	if err := dim.addEventHandlers(sharedInformer, target); err != nil {
+		return err
+	}
+
+	factory.Start(ctx.Done())
+
+	stopper := make(chan struct{})
+	dim.activeInformers[targetKeyStr] = genericInformer
+	dim.activeStoppers[targetKeyStr] = stopper
+
+	return nil
+}
+
+// createInformerFactory creates a namespace-specific or cluster-scoped informer factory
+func (dim *DynamicInformerManager) createInformerFactory(target TargetResourceIdentifier) dynamicinformer.DynamicSharedInformerFactory {
+	if target.Namespace != "" {
+		return dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+			dim.dynClient,
+			10*time.Minute,
+			target.Namespace,
+			nil,
+		)
+	}
+	return dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+		dim.dynClient,
+		10*time.Minute,
+		"",
+		nil,
+	)
+}
+
+// addEventHandlers adds event handlers to the shared informer
+func (dim *DynamicInformerManager) addEventHandlers(sharedInformer cache.SharedIndexInformer, target TargetResourceIdentifier) error {
+	_, err := sharedInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			dim.log.Info("DynamicInformer Event: Add", "gvk", target.GVK.String(), "namespace", target.Namespace)
+			if dim.resourceEvtHandler != nil {
+				dim.resourceEvtHandler.OnAdd(obj, target.GVK)
+			}
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			dim.log.Info("DynamicInformer Event: Update", "gvk", target.GVK.String(), "namespace", target.Namespace)
+			if dim.resourceEvtHandler != nil {
+				dim.resourceEvtHandler.OnUpdate(oldObj, newObj, target.GVK)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			dim.log.Info("DynamicInformer Event: Delete", "gvk", target.GVK.String(), "namespace", target.Namespace)
+			if dim.resourceEvtHandler != nil {
+				dim.resourceEvtHandler.OnDelete(obj, target.GVK)
+			}
+		},
+	})
+	return err
 }
 
 // Start initiates the informer factory. This should be called once.
-func (dim *DynamicInformerManager) Start(ctx context.Context) {
+func (dim *DynamicInformerManager) Start(_ context.Context) {
 	dim.log.Info("Starting DynamicInformerManager - namespace-specific factories will be started as needed")
 	// With the new approach, factories are started individually when informers are created
 	// No global factory to start here

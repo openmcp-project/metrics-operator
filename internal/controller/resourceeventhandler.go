@@ -116,25 +116,22 @@ func (reh *ResourceEventHandler) handleEvent(obj interface{}, gvk schema.GroupVe
 		// resources in the same namespace as the Metric CR.
 		// For cluster-scoped resources like Nodes, objNamespace will be empty.
 
-		// Check if this is a cluster-scoped resource (objNamespace is empty)
-		if objNamespace == "" {
-			// For cluster-scoped resources, we don't need namespace matching
-			// The metric can be in any namespace and watch cluster-scoped resources
-		} else {
+		// Check if this is a namespaced resource that needs namespace matching
+		if objNamespace != "" && registeredTarget.Namespace != objNamespace {
 			// For namespaced resources, the metric should watch resources in its own namespace
 			// registeredTarget.Namespace is the namespace of the Metric CR
 			// objNamespace is the namespace of the resource event
 			// They should match for the metric to be interested in this event
-			if registeredTarget.Namespace != objNamespace {
-				reh.logger.V(2).Info("Skipping event due to namespace mismatch",
-					"registeredTargetNamespace", registeredTarget.Namespace,
-					"objNamespace", objNamespace,
-					"gvk", gvk.String(),
-					"objName", accessor.GetName(),
-				)
-				continue
-			}
+			reh.logger.V(2).Info("Skipping event due to namespace mismatch",
+				"registeredTargetNamespace", registeredTarget.Namespace,
+				"objNamespace", objNamespace,
+				"gvk", gvk.String(),
+				"objName", accessor.GetName(),
+			)
+			continue
 		}
+		// For cluster-scoped resources (objNamespace is empty), we don't need namespace matching
+		// The metric can be in any namespace and watch cluster-scoped resources
 
 		if !registeredTarget.Selector.Matches(objLabels) {
 			continue

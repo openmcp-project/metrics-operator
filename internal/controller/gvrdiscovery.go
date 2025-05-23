@@ -70,7 +70,7 @@ func (gds *GVRDiscoveryService) setCache(gvk schema.GroupVersionKind, gvr schema
 
 // discoverGVR queries the Kubernetes API to find the resource name for a given kind.
 // This is based on the existing GetGVRfromGVK function in metrichandler.go but with improved error handling.
-func (gds *GVRDiscoveryService) discoverGVR(ctx context.Context, gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
+func (gds *GVRDiscoveryService) discoverGVR(_ context.Context, gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
 	// Get the API resources for the group/version
 	groupVersion := gvk.GroupVersion().String()
 	apiResourceList, err := gds.discoveryClient.ServerResourcesForGroupVersion(groupVersion)
