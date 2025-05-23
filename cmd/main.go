@@ -169,7 +169,8 @@ func main() {
 	}
 
 	// TODO: to deprecate v1beta1 resources
-	setupMetricController(mgr)
+	// setupMetricController(mgr) // Commented out - replaced with EventDrivenController
+	setupEventDrivenController(mgr) // New event-driven controller for Metric CRs
 	setupManagedMetricController(mgr)
 
 	setupReconcilersV1beta1(mgr)
@@ -217,6 +218,27 @@ func setupMetricController(mgr ctrl.Manager) {
 		setupLog.Error(err, "unable to create reconciler", "controller", "metric")
 		os.Exit(1)
 	}
+}
+
+func setupEventDrivenController(mgr ctrl.Manager) {
+	// Create and setup the new event-driven controller
+	eventDrivenController := controller.NewEventDrivenController(mgr)
+	if err := eventDrivenController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create event-driven controller", "controller", "EventDriven")
+		os.Exit(1)
+	}
+
+	// Start the event-driven system after the manager starts
+	go func() {
+		// Wait for the manager to be ready and leader election to complete
+		<-mgr.Elected()
+		// Use a context that will be cancelled when the manager stops
+		// Don't call SetupSignalHandler again as it's already called in main
+		ctx := context.Background()
+		if err := eventDrivenController.Start(ctx); err != nil {
+			setupLog.Error(err, "failed to start event-driven controller")
+		}
+	}()
 }
 
 func setupManagedMetricController(mgr ctrl.Manager) {

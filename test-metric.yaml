@@ -1,0 +1,17 @@
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: test-pods
+  namespace: default
+spec:
+  name: "test-pod-count"
+  description: "Count of pods in default namespace"
+  target:
+    group: ""
+    version: "v1"
+    kind: "Pod"
+  labelSelector: ""
+  interval: "30s"
+  projections:
+  - name: "count"
+    fieldPath: "metadata.name"
