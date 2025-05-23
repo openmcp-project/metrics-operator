@@ -24,12 +24,14 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
 	"github.com/SAP/metrics-operator/internal/orchestrator"
@@ -55,6 +57,22 @@ func (r *ManagedMetricReconciler) getClient() client.Client {
 
 func (r *ManagedMetricReconciler) getRestConfig() *rest.Config {
 	return r.inRestConfig
+}
+
+func (r *ManagedMetricReconciler) scheduleNextReconciliation(metric *v1alpha1.ManagedMetric) (ctrl.Result, error) {
+	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
+	return ctrl.Result{
+		Requeue:      true,
+		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
+	}, nil
+}
+
+func (r *ManagedMetricReconciler) shouldReconcile(metric *v1alpha1.ManagedMetric) bool {
+	if metric.Status.Observation.Timestamp.Time.IsZero() {
+		return true
+	}
+	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
+	return elapsed >= metric.Spec.Interval.Duration
 }
 
 // ManagedMetricReconciler reconciles a ManagedMetric object
@@ -96,6 +114,11 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errLoad
 	}
 
+	// Check if enough time has passed since the last reconciliation
+	if !r.shouldReconcile(&metric) {
+		return r.scheduleNextReconciliation(&metric)
+	}
+
 	/*
 		1.1 Get the Secret that holds the Dynatrace credentials
 	*/
@@ -117,9 +140,33 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	/*
+		1.3 Create OTel metric client and gauge metric
+	*/
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	if errCli != nil {
+		l.Error(errCli, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+	}
+
+	defer func() {
+		if err := metricClient.Close(ctx); err != nil {
+			l.Error(err, "Failed to close metric client during managed metric reconciliation", "metric", metric.Name)
+		}
+	}()
+
+	// Set meter name for managed metrics
+	metricClient.SetMeter("managed")
+
+	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
+	if errGauge != nil {
+		l.Error(errGauge, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
+	}
+
+	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orchestrator.NewOrchestrator(credentials, queryConfig).WithManaged(metric)
+	orchestrator, errOrch := orchestrator.NewOrchestrator(credentials, queryConfig).WithManaged(metric, gaugeMetric)
 	if errOrch != nil {
 		l.Error(errOrch, "unable to create managed metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
@@ -131,6 +178,17 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if errMon != nil {
 		l.Error(errMon, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
+	}
+
+	/*
+		2.1 Export metrics to data sink
+	*/
+	errExport := metricClient.ExportMetrics(ctx)
+	if errExport != nil {
+		metric.Status.Ready = v1alpha1.StatusFalse
+		l.Error(errExport, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+	} else {
+		metric.Status.Ready = v1alpha1.StatusTrue
 	}
 
 	/*
@@ -149,11 +207,16 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
 	}
 
-	metric.Status.Ready = v1alpha1.StatusFalse
-	if result.Phase == v1alpha1.PhaseActive {
-		metric.Status.Ready = v1alpha1.StatusTrue
+	// Override Ready status if export failed
+	if errExport != nil {
+		metric.Status.Ready = v1alpha1.StatusFalse
 	}
-	metric.Status.Observation = v1alpha1.ManagedObservation{Timestamp: result.Observation.GetTimestamp(), Resources: result.Observation.GetValue()}
+
+	// Update the observation timestamp to track when this reconciliation happened
+	metric.Status.Observation = v1alpha1.ManagedObservation{
+		Timestamp: metav1.Now(),
+		Resources: result.Observation.GetValue(),
+	}
 
 	// conditions are not persisted until the status is updated
 	errUp := r.inClient.Status().Update(ctx, &metric)
@@ -166,13 +229,13 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
 	*/
 	var requeueTime time.Duration
-	if result.Error != nil {
+	if result.Error != nil || errExport != nil {
 		requeueTime = RequeueAfterError
 	} else {
 		requeueTime = metric.Spec.Interval.Duration
 	}
 
-	l.Info(fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
+	l.Info(fmt.Sprintf("managed metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
 		Requeue:      true,

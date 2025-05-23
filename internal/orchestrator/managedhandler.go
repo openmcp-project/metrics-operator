@@ -15,7 +15,7 @@ import (
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/internal/client"
+	"github.com/SAP/metrics-operator/internal/clientoptl"
 )
 
 // ManagedHandler is used to monitor the metric
@@ -23,15 +23,14 @@ type ManagedHandler struct {
 	client rcli.Client
 	dCli   dynamic.Interface
 
-	metric     v1alpha1.ManagedMetric
-	metricMeta client.MetricMetadata
+	metric      v1alpha1.ManagedMetric
+	gaugeMetric *clientoptl.Metric
 
-	dtClient    client.DynatraceClient
 	clusterName *string
 }
 
 // NewManagedHandler creates a new ManagedHandler
-func NewManagedHandler(metric v1alpha1.ManagedMetric, metricMeta client.MetricMetadata, qc QueryConfig, dtClient client.DynatraceClient) (*ManagedHandler, error) {
+func NewManagedHandler(metric v1alpha1.ManagedMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*ManagedHandler, error) {
 	dynamicClient, errCli := dynamic.NewForConfig(&qc.RestConfig)
 	if errCli != nil {
 		return nil, fmt.Errorf("could not create dynamic client: %w", errCli)
@@ -41,8 +40,7 @@ func NewManagedHandler(metric v1alpha1.ManagedMetric, metricMeta client.MetricMe
 		client:      qc.Client,
 		dCli:        dynamicClient,
 		metric:      metric,
-		metricMeta:  metricMeta,
-		dtClient:    dtClient,
+		gaugeMetric: gaugeMetric,
 		clusterName: qc.ClusterName,
 	}
 
@@ -50,8 +48,6 @@ func NewManagedHandler(metric v1alpha1.ManagedMetric, metricMeta client.MetricMe
 }
 
 func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string, error) {
-	// add the Datapoint for the metric
-	h.metricMeta.AddDatapoint(1)
 	resources, err := h.getResourcesStatus(ctx)
 	if err != nil {
 		return "", err
@@ -59,22 +55,31 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 
 	// data point split by dimensions
 	for _, cr := range resources {
-		h.metricMeta.ClearDimensions()
-		_ = h.metricMeta.AddDimension("kind", cr.MangedResource.Kind)
-		_ = h.metricMeta.AddDimension("apiversion", cr.MangedResource.APIVersion)
+		// Create a new data point for each resource
+		dataPoint := clientoptl.NewDataPoint()
+		dataPoint.AddDimension("kind", cr.MangedResource.Kind)
+		dataPoint.AddDimension("apiversion", cr.MangedResource.APIVersion)
 
-		// TODO: add mcp name as well later
-		// b.dynaMetric.AddDimension("name", ...)
-
-		for typ, state := range cr.Status {
-			dimErr := h.metricMeta.AddDimension(strings.ToLower(typ), strconv.FormatBool(state))
-			if dimErr != nil {
-				return "", dimErr
-			}
+		// Add cluster dimension if available
+		if h.clusterName != nil {
+			dataPoint.AddDimension(CLUSTER, *h.clusterName)
 		}
 
-		// Send Metric
-		_, err = h.dtClient.SendMetric(ctx, h.metricMeta)
+		// Add GVK dimensions
+		dataPoint.AddDimension(KIND, h.metric.Spec.Kind)
+		dataPoint.AddDimension(GROUP, h.metric.Spec.Group)
+		dataPoint.AddDimension(VERSION, h.metric.Spec.Version)
+
+		// Add status conditions as dimensions
+		for typ, state := range cr.Status {
+			dataPoint.AddDimension(strings.ToLower(typ), strconv.FormatBool(state))
+		}
+
+		// Set the value to 1 for each resource
+		dataPoint.SetValue(1)
+
+		// Record the metric
+		err = h.gaugeMetric.RecordMetrics(ctx, dataPoint)
 		if err != nil {
 			return "", err
 		}
@@ -88,27 +93,6 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 
 // Monitor executes the monitoring of the metric
 func (h *ManagedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
-
-	kindDimErr := h.metricMeta.AddDimension(KIND, h.metric.Spec.Kind)
-	if kindDimErr != nil {
-		return MonitorResult{}, fmt.Errorf("could not initialize '"+KIND+"' dimensions: %w", kindDimErr)
-	}
-	groupDimErr := h.metricMeta.AddDimension(GROUP, h.metric.Spec.Group)
-	if groupDimErr != nil {
-		return MonitorResult{}, fmt.Errorf("could not initialize '"+GROUP+"' dimensions: %w", groupDimErr)
-	}
-	versionDimErr := h.metricMeta.AddDimension(VERSION, h.metric.Spec.Version)
-	if versionDimErr != nil {
-		return MonitorResult{}, fmt.Errorf("could not initialize '"+VERSION+"' dimensions: %w", versionDimErr)
-	}
-
-	if h.clusterName != nil {
-		clusterDimErr := h.metricMeta.AddDimension(CLUSTER, *h.clusterName)
-		if clusterDimErr != nil {
-			return MonitorResult{}, fmt.Errorf("could not initialize '"+CLUSTER+"' dimensions: %w", clusterDimErr)
-		}
-	}
-
 	result := MonitorResult{}
 	resources, err := h.sendStatusBasedMetricValue(ctx)
 

@@ -148,13 +148,19 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
 
+	defer func() {
+		if err := metricClient.Close(ctx); err != nil {
+			l.Error(err, "Failed to close metric client during federated managed metric reconciliation", "metric", metric.Name)
+		}
+	}()
+
 	// should this be the group fo the gvr?
 	metricClient.SetMeter("managed")
 
 	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
 	if errGauge != nil {
-		l.Error(errCli, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+		l.Error(errGauge, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
 
 	for _, queryConfig := range queryConfigs {
@@ -169,7 +175,7 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		_, errMon := orchestrator.Handler.Monitor(ctx)
 
 		if errMon != nil {
-			l.Error(errMon, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+			l.Error(errMon, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
 		}
 
@@ -197,9 +203,14 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	/*
 		4. Re-queue the metric after the frequency or 2 minutes if an error occurred
 	*/
-	var requeueTime = metric.Spec.Interval.Duration
+	var requeueTime time.Duration
+	if errExport != nil {
+		requeueTime = RequeueAfterError
+	} else {
+		requeueTime = metric.Spec.Interval.Duration
+	}
 
-	l.Info(fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
+	l.Info(fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
 		Requeue:      true,

@@ -3,9 +3,7 @@ module github.com/SAP/metrics-operator
 go 1.23.0
 
 require (
-	github.com/dynatrace-ace/dynatrace-go-api-client/api/v2/environment/dynatrace v0.0.0-20210816162345-de2eacc8ac9a
 	github.com/go-logr/logr v1.4.2
-	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/openmcp-project/controller-utils v0.4.2
@@ -42,6 +40,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
