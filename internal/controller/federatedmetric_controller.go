@@ -153,13 +153,19 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
 
+	defer func() {
+		if err := metricClient.Close(ctx); err != nil {
+			l.Error(err, "Failed to close metric client during federated metric reconciliation", "metric", metric.Name)
+		}
+	}()
+
 	// should this be the group fo the gvr?
 	metricClient.SetMeter("federated")
 
 	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
 	if errGauge != nil {
-		l.Error(errCli, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+		l.Error(errGauge, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
 
 	for _, queryConfig := range queryConfigs {
@@ -202,9 +208,14 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	/*
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
 	*/
-	var requeueTime = metric.Spec.Interval.Duration
+	var requeueTime time.Duration
+	if errExport != nil {
+		requeueTime = RequeueAfterError
+	} else {
+		requeueTime = metric.Spec.Interval.Duration
+	}
 
-	l.Info(fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
+	l.Info(fmt.Sprintf("federated metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
 		Requeue:      true,
