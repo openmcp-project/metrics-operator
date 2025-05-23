@@ -621,12 +621,8 @@ func (in *MetricObservation) DeepCopy() *MetricObservation {
 func (in *MetricSpec) DeepCopyInto(out *MetricSpec) {
 	*out = *in
 	out.Target = in.Target
-	out.Interval = in.Interval
-	if in.RemoteClusterAccessRef != nil {
-		in, out := &in.RemoteClusterAccessRef, &out.RemoteClusterAccessRef
-		*out = new(RemoteClusterAccessRef)
-		**out = **in
-	}
+	out.CheckInterval = in.CheckInterval
+	out.RemoteClusterAccessRef = in.RemoteClusterAccessRef
 	if in.Projections != nil {
 		in, out := &in.Projections, &out.Projections
 		*out = make([]Projection, len(*in))
