@@ -54,7 +54,7 @@ This can be useful for tracking additional dimensions of the resource, such as f
 The projections are then translated to dimensions in the metric.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
 metadata:
   name: comp-pod
@@ -62,13 +62,32 @@ spec:
   name: comp-metric-pods
   description: Pods
   target:
-    resource: pods
+    kind: Pod
     group: ""
     version: v1
-  frequency: 1 # in minutes
+  interval: "1m"
   projections:
     - name: pod-namespace
       fieldPath: "metadata.namespace"
+---
+```
+
+### Managed Metric
+
+Managed metrics are used to monitor crossplane managed resources. They automatically track resources that have the "crossplane" and "managed" categories in their CRDs.
+
+```yaml
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: ManagedMetric
+metadata:
+  name: managed-metric
+spec:
+  name: managed-metric
+  description: Status metric created by an Operator
+  kind: Release
+  group: helm.crossplane.io
+  version: v1beta1
+  interval: "1m"
 ---
 ```
 
@@ -76,7 +95,7 @@ spec:
 Federated metrics deal with resources that are spread across multiple clusters. To monitor these resources, you need to define a `FederatedMetric` resource.
 They offer capabilities to aggregate data as well as filtering down to a specific cluster or field using projections.
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-prov
@@ -84,14 +103,14 @@ spec:
   name: xfed-prov
   description: crossplane providers
   target:
-    group:  pkg.crossplane.io
-    resource: providers
+    kind: Provider
+    group: pkg.crossplane.io
     version: v1
-  frequency: 1 # in minutes
+  interval: "1m"
   projections:
     - name: package
       fieldPath: "spec.package"
-  federateCaRef:
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---
@@ -104,15 +123,15 @@ The pre-condition here is that if a resource comes from a crossplane provider, i
 
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: xfed-managed
 spec:
   name: xfed-managed
   description: crossplane managed resources
-  frequency: 1 # in minutes
-  federateCaRef:
+  interval: "1m"
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---
@@ -121,14 +140,15 @@ spec:
 ## Remote Cluster Access
 
 
-### Cluster Access
-The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `ClusterAccess` resource:
+### Remote Cluster Access
 
-This cluster access resource can be used by `CompoundMetric` resources to monitor resources in the remote cluster.
+The Metrics Operator can monitor both the cluster it's deployed in and remote clusters. To monitor a remote cluster, define a `RemoteClusterAccess` resource:
+
+This remote cluster access resource can be used by `Metric` and `ManagedMetric` resources to monitor resources in the remote cluster.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
-kind: ClusterAccess
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
   namespace: <monitoring-namespace>
@@ -147,17 +167,17 @@ spec:
 To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ca-sample
   namespace: default
 spec:
   target:
+    kind: ControlPlane
     group: core.orchestrate.cloud.sap
-    resource: controlplanes #plural always, lowecase only
     version: v1beta1
-  kubeConfigPath: spec.target.kubeconfig #case sensitive
+  kubeConfigPath: spec.target.kubeconfig
 ```
 
 
