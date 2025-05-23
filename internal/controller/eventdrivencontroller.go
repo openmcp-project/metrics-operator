@@ -7,6 +7,7 @@ import (
 	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -42,8 +43,21 @@ func NewEventDrivenController(mgr ctrl.Manager) *EventDrivenController {
 		panic("Failed to create dynamic client: " + err.Error())
 	}
 
+	// Create discovery client for resource scope discovery
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
+	if err != nil {
+		// This is a critical error during setup
+		panic("Failed to create discovery client: " + err.Error())
+	}
+
+	// Create resource scope discovery service
+	scopeDiscovery := NewResourceScopeDiscovery(discoveryClient, mgr.GetLogger().WithName("ResourceScopeDiscovery"))
+
+	// Create GVR discovery service
+	gvrDiscovery := NewGVRDiscoveryService(discoveryClient, mgr.GetLogger().WithName("GVRDiscoveryService"))
+
 	// Initialize core components
-	targetRegistry := NewTargetRegistry()
+	targetRegistry := NewTargetRegistry(scopeDiscovery)
 
 	metricUpdateCoordinator := NewMetricUpdateCoordinator(
 		mgr.GetClient(),
@@ -64,6 +78,7 @@ func NewEventDrivenController(mgr ctrl.Manager) *EventDrivenController {
 		10*time.Minute, // Default resync period
 		mgr.GetLogger().WithName("DynamicInformerManager"),
 		resourceEventHandler,
+		gvrDiscovery,
 	)
 
 	return &EventDrivenController{
@@ -107,16 +122,23 @@ func (edc *EventDrivenController) Reconcile(ctx context.Context, req ctrl.Reques
 	// For now, assume all metrics are event-driven capable
 
 	// Register or update the metric's target interest
-	if err := edc.targetRegistry.Register(&metric); err != nil {
+	if err := edc.targetRegistry.Register(ctx, &metric); err != nil {
 		log.Error(err, "Failed to register metric in target registry")
 		edc.Recorder.Event(&metric, "Warning", "RegistrationFailed", "Failed to register metric for event-driven updates")
 		return ctrl.Result{RequeueAfter: 2 * time.Minute}, err
 	}
 
-	log.Info("Metric registered in target registry", "targetGVK", metric.Spec.Target)
+	log.Info("Metric registered in target registry",
+		"targetGVK", metric.Spec.Target,
+		"metricNamespace", metric.Namespace,
+		"metricName", metric.Name)
 
 	// Update dynamic informers based on the new target set
 	uniqueTargets := edc.targetRegistry.GetUniqueTargets()
+	log.Info("Retrieved unique targets from registry",
+		"uniqueTargetsCount", len(uniqueTargets),
+		"targets", uniqueTargets)
+
 	edc.dynamicInformerManager.EnsureInformers(ctx, uniqueTargets)
 
 	log.Info("Dynamic informers updated", "uniqueTargetsCount", len(uniqueTargets))

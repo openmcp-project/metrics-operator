@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"context"
+	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,25 +37,24 @@ type TargetRegistry struct {
 	// For simplicity, we might start with GVK to set of metric keys.
 	// A more complex key might be needed for efficient event routing.
 	// For now, GetUniqueTargets will iterate `interests`.
+
+	// scopeDiscovery provides dynamic discovery of resource scope (cluster-scoped vs namespaced)
+	scopeDiscovery *ResourceScopeDiscovery
 }
 
 // NewTargetRegistry creates a new TargetRegistry.
-func NewTargetRegistry() *TargetRegistry {
+func NewTargetRegistry(scopeDiscovery *ResourceScopeDiscovery) *TargetRegistry {
 	return &TargetRegistry{
-		interests: make(map[types.NamespacedName]MetricInterest),
+		interests:      make(map[types.NamespacedName]MetricInterest),
+		scopeDiscovery: scopeDiscovery,
 	}
 }
 
 // Register records a Metric's interest in a target resource.
 // It extracts target information from the Metric spec.
-func (r *TargetRegistry) Register(metric *v1alpha1.Metric) error {
+func (r *TargetRegistry) Register(ctx context.Context, metric *v1alpha1.Metric) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	// metric.Spec.Target is a GroupVersionKind struct, not a pointer.
-	// It's required by CRD validation, so not checking for nil.
-	// If Kind is empty, it's an invalid spec for event-driven, but registration can proceed.
-	// The DynamicInformerManager should handle invalid GVKs.
 
 	gvk := schema.GroupVersionKind{
 		Group:   metric.Spec.Target.Group,
@@ -65,27 +66,38 @@ func (r *TargetRegistry) Register(metric *v1alpha1.Metric) error {
 	if metric.Spec.LabelSelector != "" {
 		sel, err := labels.Parse(metric.Spec.LabelSelector)
 		if err != nil {
-			// Consider logging this error and potentially returning it or using labels.Everything()
-			// For now, let's return the error to make it explicit.
 			return err
 		}
 		selector = sel
 	}
-	// TODO: Handle FieldSelector if needed by informers (metric.Spec.FieldSelector)
 
 	metricKey := types.NamespacedName{Name: metric.Name, Namespace: metric.Namespace}
+
+	targetNamespace := metric.Namespace // Default for namespaced resources
+	isClusterScoped := false
+	if r.scopeDiscovery != nil {
+		var err error
+		isClusterScoped, err = r.scopeDiscovery.IsClusterScoped(ctx, gvk)
+		if err != nil {
+			fmt.Printf("[TargetRegistry] Error discovering scope for GVK %s: %v. Will retry discovery later.\n", gvk.String(), err)
+			// For now, we'll proceed with the default (namespaced) but this will be retried
+			// when the informer manager attempts to create the informer
+		}
+		if isClusterScoped {
+			targetNamespace = ""
+		}
+	}
+	fmt.Printf("[TargetRegistry] Registering metric %s for GVK %s: isClusterScoped=%v, targetNamespace='%s'\n",
+		metricKey.String(), gvk.String(), isClusterScoped, targetNamespace)
+
 	r.interests[metricKey] = MetricInterest{
 		MetricKey: metricKey,
 		Target: TargetResourceIdentifier{
-			GVK: gvk,
-			// Use the Metric CR's namespace as the target namespace.
-			// The DynamicInformerManager can decide to watch all namespaces
-			// if the GVK is cluster-scoped or if metric.Namespace is empty (for a ClusterMetric CR if it existed).
-			Namespace: metric.Namespace,
+			GVK:       gvk,
+			Namespace: targetNamespace,
 			Selector:  selector,
 		},
 	}
-	// TODO: Update reverse lookup maps if implemented (e.g., targetToMetrics)
 	return nil
 }
 

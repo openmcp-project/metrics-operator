@@ -1,0 +1,17 @@
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: test-namespaces
+  namespace: default
+spec:
+  name: "namespace-count"
+  description: "Count of cluster namespaces"
+  target:
+    group: ""
+    version: "v1"
+    kind: "Namespace"
+  labelSelector: ""
+  interval: "30s"
+  projections:
+  - name: "count"
+    fieldPath: "metadata.name"

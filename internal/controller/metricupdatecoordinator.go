@@ -3,6 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"math"
+	"sync"
+	"time"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/internal/clientoptl"
@@ -28,16 +31,23 @@ type MetricUpdateCoordinator struct {
 	RestConfig *rest.Config
 	Recorder   record.EventRecorder
 	Scheme     *runtime.Scheme // Correct type for Kubernetes scheme
+
+	// Concurrency control fields
+	processingMutex sync.RWMutex
+	lastProcessed   map[string]time.Time
+	debounceWindow  time.Duration
 }
 
 // NewMetricUpdateCoordinator creates a new MetricUpdateCoordinator.
 func NewMetricUpdateCoordinator(k8sClient client.Client, logger logr.Logger, config *rest.Config, recorder record.EventRecorder, scheme *runtime.Scheme) *MetricUpdateCoordinator {
 	return &MetricUpdateCoordinator{
-		Client:     k8sClient,
-		Log:        logger.WithName("MetricUpdateCoordinator"),
-		RestConfig: config,
-		Recorder:   recorder,
-		Scheme:     scheme,
+		Client:         k8sClient,
+		Log:            logger.WithName("MetricUpdateCoordinator"),
+		RestConfig:     config,
+		Recorder:       recorder,
+		Scheme:         scheme,
+		lastProcessed:  make(map[string]time.Time),
+		debounceWindow: 500 * time.Millisecond, // Reduced debounce window for better responsiveness
 	}
 }
 
@@ -49,8 +59,11 @@ func (muc *MetricUpdateCoordinator) RequestMetricUpdate(metricNamespacedName str
 	log := muc.Log.WithValues("metric", metricNamespacedName, "triggeringGVK", eventGVK.String())
 	log.Info("MetricUpdateCoordinator: Metric update requested")
 
-	// TODO: Potentially use a workqueue here to decouple and manage processing.
-	// For now, process synchronously.
+	// Check for duplicate requests and apply debouncing
+	// TEMPORARILY DISABLED FOR DEBUGGING DELETE EVENTS
+	// if muc.shouldSkipDuplicateRequest(metricNamespacedName, log) {
+	//	return
+	// }
 
 	// The metricNamespacedName should be "namespace/name"
 	namespace, name, err := cache.SplitMetaNamespaceKey(metricNamespacedName)
@@ -82,6 +95,27 @@ func (muc *MetricUpdateCoordinator) RequestMetricUpdate(metricNamespacedName str
 	}
 }
 
+// shouldSkipDuplicateRequest checks if we should skip this request due to recent processing
+func (muc *MetricUpdateCoordinator) shouldSkipDuplicateRequest(metricNamespacedName string, log logr.Logger) bool {
+	muc.processingMutex.Lock()
+	defer muc.processingMutex.Unlock()
+
+	// Check if we recently processed this metric
+	if lastTime, exists := muc.lastProcessed[metricNamespacedName]; exists {
+		if time.Since(lastTime) < muc.debounceWindow {
+			log.V(1).Info("Skipping duplicate metric update request due to debounce window",
+				"metric", metricNamespacedName,
+				"lastProcessed", lastTime,
+				"debounceWindow", muc.debounceWindow)
+			return true
+		}
+	}
+
+	// Update the last processed time
+	muc.lastProcessed[metricNamespacedName] = time.Now()
+	return false
+}
+
 // processMetric contains the core logic to fetch, calculate, and export a single metric.
 // This is refactored from the original MetricReconciler.Reconcile.
 func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v1alpha1.Metric, log logr.Logger) error {
@@ -93,7 +127,7 @@ func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v
 		// Update status to reflect this error
 		metric.Status.Ready = v1alpha1.StatusFalse
 		metric.SetConditions(common.Error(fmt.Sprintf("Credentials secret %s/%s not found: %s", common.SecretNameSpace, common.SecretName, errSecret.Error())))
-		if err := muc.Status().Update(ctx, metric); err != nil {
+		if err := muc.updateMetricStatusWithRetry(ctx, metric, 3, log); err != nil {
 			log.Error(err, "Failed to update metric status after secret error")
 		}
 		return errSecret
@@ -110,7 +144,7 @@ func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v
 		log.Error(errQCFunc, "Failed to create query config")
 		metric.Status.Ready = v1alpha1.StatusFalse
 		metric.SetConditions(common.Error("Failed to create query config: " + errQCFunc.Error()))
-		_ = muc.Status().Update(ctx, metric) // Best effort
+		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
 		return errQCFunc
 	}
 
@@ -120,7 +154,7 @@ func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v
 		log.Error(errCli, "Failed to create OTel client")
 		metric.Status.Ready = v1alpha1.StatusFalse
 		metric.SetConditions(common.Error("Failed to create OTel client: " + errCli.Error()))
-		_ = muc.Status().Update(ctx, metric) // Best effort
+		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
 		return errCli
 	}
 	defer func() {
@@ -135,7 +169,7 @@ func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v
 		log.Error(errGauge, "Failed to create OTel gauge")
 		metric.Status.Ready = v1alpha1.StatusFalse
 		metric.SetConditions(common.Error("Failed to create OTel gauge: " + errGauge.Error()))
-		_ = muc.Status().Update(ctx, metric) // Best effort
+		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
 		return errGauge
 	}
 
@@ -146,7 +180,7 @@ func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v
 		muc.Recorder.Event(metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
 		metric.Status.Ready = v1alpha1.StatusFalse
 		metric.SetConditions(common.Error("Failed to create orchestrator: " + errOrch.Error()))
-		_ = muc.Status().Update(ctx, metric) // Best effort
+		_ = muc.updateMetricStatusWithRetry(ctx, metric, 3, log) // Best effort
 		return errOrch
 	}
 
@@ -230,15 +264,64 @@ func (muc *MetricUpdateCoordinator) processMetric(ctx context.Context, metric *v
 	// This timestamp should reflect when this processing attempt concluded.
 	metric.Status.Observation.Timestamp = metav1.Now()
 
-	errUp := muc.Status().Update(ctx, metric)
+	// Use retry logic for status update
+	errUp := muc.updateMetricStatusWithRetry(ctx, metric, 5, log)
 	if errUp != nil {
-		log.Error(errUp, "Failed to update metric status")
+		log.Error(errUp, "Failed to update metric status after retries")
 		if finalError == nil {
 			finalError = errUp
 		}
 	}
 
 	return finalError
+}
+
+// updateMetricStatusWithRetry implements retry logic with exponential backoff for status updates
+func (muc *MetricUpdateCoordinator) updateMetricStatusWithRetry(ctx context.Context, metric *v1alpha1.Metric, maxRetries int, log logr.Logger) error {
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// For the first attempt, use the metric as-is
+		// For subsequent attempts, fetch fresh copy to get latest resource version
+		var targetMetric *v1alpha1.Metric = metric
+		if attempt > 0 {
+			var freshMetric v1alpha1.Metric
+			if err := muc.Get(ctx, client.ObjectKeyFromObject(metric), &freshMetric); err != nil {
+				log.Error(err, "Failed to get fresh metric for retry", "attempt", attempt+1)
+				return err
+			}
+
+			// Copy the status updates to the fresh metric
+			freshMetric.Status = metric.Status
+			targetMetric = &freshMetric
+		}
+
+		// Attempt the status update
+		if err := muc.Status().Update(ctx, targetMetric); err != nil {
+			if apierrors.IsConflict(err) && attempt < maxRetries-1 {
+				// Calculate exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+				backoffMs := int64(100 * math.Pow(2, float64(attempt)))
+				backoff := time.Duration(backoffMs) * time.Millisecond
+
+				log.V(1).Info("Status update conflict, retrying with backoff",
+					"attempt", attempt+1,
+					"maxRetries", maxRetries,
+					"backoff", backoff,
+					"error", err.Error())
+
+				time.Sleep(backoff)
+				continue
+			}
+			// Non-conflict error or max retries reached
+			return fmt.Errorf("failed to update metric status after %d attempts: %w", attempt+1, err)
+		}
+
+		// Success
+		if attempt > 0 {
+			log.Info("Status update succeeded after retry", "attempt", attempt+1)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("failed to update status after %d retries", maxRetries)
 }
 
 // createCoordinatorQueryConfig is a helper to create QueryConfig, similar to createQC in metric_controller.

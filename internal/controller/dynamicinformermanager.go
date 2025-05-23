@@ -22,6 +22,7 @@ type DynamicInformerManager struct {
 	activeInformers    map[string]informers.GenericInformer
 	activeStoppers     map[string]chan struct{}      // To stop individual informers
 	resourceEvtHandler ResourceEventHandlerInterface // Interface for handling events
+	gvrDiscovery       *GVRDiscoveryService          // Dynamic GVK to GVR discovery
 	log                logr.Logger
 }
 
@@ -39,7 +40,7 @@ func targetKey(target TargetResourceIdentifier) string {
 }
 
 // NewDynamicInformerManager creates a new DynamicInformerManager.
-func NewDynamicInformerManager(dynClient dynamic.Interface, defaultResync time.Duration, logger logr.Logger, eventHandler ResourceEventHandlerInterface) *DynamicInformerManager {
+func NewDynamicInformerManager(dynClient dynamic.Interface, defaultResync time.Duration, logger logr.Logger, eventHandler ResourceEventHandlerInterface, gvrDiscovery *GVRDiscoveryService) *DynamicInformerManager {
 	// We'll create namespace-specific factories as needed, so no global factory here
 	return &DynamicInformerManager{
 		dynClient:          dynClient,
@@ -47,6 +48,7 @@ func NewDynamicInformerManager(dynClient dynamic.Interface, defaultResync time.D
 		activeInformers:    make(map[string]informers.GenericInformer),
 		activeStoppers:     make(map[string]chan struct{}),
 		resourceEvtHandler: eventHandler,
+		gvrDiscovery:       gvrDiscovery,
 		log:                logger.WithName("DynamicInformerManager"),
 	}
 }
@@ -82,17 +84,19 @@ func (dim *DynamicInformerManager) EnsureInformers(ctx context.Context, targets 
 
 		// Check if this target already has an active informer
 		if _, found := dim.activeInformers[targetKeyStr]; !found {
-			dim.log.Info("Starting informer for target", "gvk", target.GVK, "namespace", target.Namespace, "selector", target.Selector.String())
+			dim.log.Info("Starting informer for target",
+				"gvk", target.GVK,
+				"namespace", target.Namespace,
+				"selector", target.Selector.String(),
+				"targetKey", targetKeyStr)
 
-			// Note: The factory itself is not namespace/selector specific at creation.
-			// We create specific informers from it.
-			// For namespaced resources, target.Namespace should be set.
-			// For cluster-scoped, target.Namespace should be empty.
-			// The informer factory's NewFilteredDynamicInformer respects this.
-			gvr := target.GVK.GroupVersion().WithResource(dim.resourceForKind(target.GVK.Kind)) // Basic pluralization
-
-			// TODO: A robust GVK to GVR mapping is needed. For now, simple pluralization.
-			// This might require discovery client if kind to resource mapping is not direct.
+			// Use GVR discovery service to get the correct resource name
+			gvr, err := dim.gvrDiscovery.GetGVR(ctx, target.GVK)
+			if err != nil {
+				dim.log.Error(err, "Failed to discover GVR for target", "gvk", target.GVK)
+				// Skip this target and continue with others
+				continue
+			}
 
 			// Create a namespace-specific factory for this target
 			var factory dynamicinformer.DynamicSharedInformerFactory
@@ -185,111 +189,6 @@ func (dim *DynamicInformerManager) Stop() {
 		delete(dim.activeStoppers, target)
 	}
 	// Note: The factory itself is stopped by the context passed to Start.
-}
-
-// resourceForKind is a simplistic way to guess the resource name from Kind.
-// A proper solution would use the API discovery client (e.g., restmapper).
-func (dim *DynamicInformerManager) resourceForKind(kind string) string {
-	// This is a placeholder and will not work for all kinds.
-	// Example: "Pod" -> "pods", "Service" -> "services"
-	// CRDs: "MyCustomResource" -> "mycustomresources"
-	// Needs to be lowercase and plural.
-	// For now, let's assume a simple lowercase and 's' suffix.
-	// This will need to be replaced with a robust GVR discovery mechanism.
-	if len(kind) == 0 {
-		return ""
-	}
-	return pluralize(lowercase(kind)) // Placeholder functions
-}
-
-func lowercase(s string) string {
-	if len(s) == 0 {
-		return ""
-	}
-	// Convert first character to lowercase if it's uppercase
-	first := s[0]
-	if first >= 'A' && first <= 'Z' {
-		first = first + 32
-	}
-	return string(first) + s[1:]
-}
-
-func pluralize(s string) string {
-	if len(s) == 0 {
-		return ""
-	}
-
-	// Handle common Kubernetes resource pluralization patterns
-	switch s {
-	case "node":
-		return "nodes"
-	case "pod":
-		return "pods"
-	case "service":
-		return "services"
-	case "deployment":
-		return "deployments"
-	case "configmap":
-		return "configmaps"
-	case "secret":
-		return "secrets"
-	case "namespace":
-		return "namespaces"
-	case "ingress":
-		return "ingresses"
-	case "networkpolicy":
-		return "networkpolicies"
-	case "persistentvolume":
-		return "persistentvolumes"
-	case "persistentvolumeclaim":
-		return "persistentvolumeclaims"
-	case "storageclass":
-		return "storageclasses"
-	case "daemonset":
-		return "daemonsets"
-	case "replicaset":
-		return "replicasets"
-	case "statefulset":
-		return "statefulsets"
-	case "job":
-		return "jobs"
-	case "cronjob":
-		return "cronjobs"
-	case "horizontalpodautoscaler":
-		return "horizontalpodautoscalers"
-	case "verticalpodautoscaler":
-		return "verticalpodautoscalers"
-	case "poddisruptionbudget":
-		return "poddisruptionbudgets"
-	case "role":
-		return "roles"
-	case "rolebinding":
-		return "rolebindings"
-	case "clusterrole":
-		return "clusterroles"
-	case "clusterrolebinding":
-		return "clusterrolebindings"
-	case "serviceaccount":
-		return "serviceaccounts"
-	case "endpoint":
-		return "endpoints"
-	case "event":
-		return "events"
-	case "limitrange":
-		return "limitranges"
-	case "resourcequota":
-		return "resourcequotas"
-	default:
-		// Fallback to basic pluralization rules
-		if len(s) > 1 && s[len(s)-1] == 'y' && s[len(s)-2] != 'a' && s[len(s)-2] != 'e' && s[len(s)-2] != 'i' && s[len(s)-2] != 'o' && s[len(s)-2] != 'u' {
-			return s[:len(s)-1] + "ies"
-		}
-		if s[len(s)-1] == 's' || s[len(s)-1] == 'x' || s[len(s)-1] == 'z' ||
-			(len(s) > 1 && s[len(s)-2:] == "ch") || (len(s) > 1 && s[len(s)-2:] == "sh") {
-			return s + "es"
-		}
-		return s + "s"
-	}
 }
 
 // WaitForCacheSync waits for all caches of managed informers to sync.

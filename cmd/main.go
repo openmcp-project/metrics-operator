@@ -37,6 +37,7 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	"github.com/go-logr/logr"
 	"github.com/openmcp-project/controller-utils/pkg/api"
 	"github.com/openmcp-project/controller-utils/pkg/init/crds"
 	"github.com/openmcp-project/controller-utils/pkg/init/webhooks"
@@ -228,17 +229,37 @@ func setupEventDrivenController(mgr ctrl.Manager) {
 		os.Exit(1)
 	}
 
-	// Start the event-driven system after the manager starts
-	go func() {
-		// Wait for the manager to be ready and leader election to complete
-		<-mgr.Elected()
-		// Use a context that will be cancelled when the manager stops
-		// Don't call SetupSignalHandler again as it's already called in main
-		ctx := context.Background()
-		if err := eventDrivenController.Start(ctx); err != nil {
-			setupLog.Error(err, "failed to start event-driven controller")
-		}
-	}()
+	// Add a runnable to start the event-driven system when the manager starts
+	err := mgr.Add(&eventDrivenRunnable{
+		controller: eventDrivenController,
+		logger:     setupLog,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to add event-driven runnable to manager")
+		os.Exit(1)
+	}
+}
+
+// eventDrivenRunnable implements manager.Runnable to properly integrate with the controller manager lifecycle
+type eventDrivenRunnable struct {
+	controller *controller.EventDrivenController
+	logger     logr.Logger
+}
+
+func (r *eventDrivenRunnable) Start(ctx context.Context) error {
+	r.logger.Info("Starting event-driven runnable")
+
+	// Start the event-driven system with the proper context
+	if err := r.controller.Start(ctx); err != nil {
+		r.logger.Error(err, "failed to start event-driven controller")
+		return err
+	}
+
+	// Keep running until context is cancelled
+	<-ctx.Done()
+	r.logger.Info("Event-driven runnable stopping")
+	r.controller.Stop()
+	return nil
 }
 
 func setupManagedMetricController(mgr ctrl.Manager) {
