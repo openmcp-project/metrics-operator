@@ -1,12 +1,12 @@
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: xfed-managed
 spec:
   name: xfed-managed
   description: crossplane managed resources
-  checkInterval: "1m" # in minutes
-  federateCaRef:
+  interval: "1m" # in minutes
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---

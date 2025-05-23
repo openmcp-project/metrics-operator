@@ -49,10 +49,6 @@ spec:
           spec:
             description: MetricSpec defines the desired state of Metric
             properties:
-              checkInterval:
-                default: 12h
-                description: Define in what interval the query should be recorded
-                type: string
               description:
                 description: Sets the description that will be used to identify the
                   metric in Dynatrace(or other providers)
@@ -60,6 +56,10 @@ spec:
               fieldSelector:
                 description: Define fields of your object to adapt filters of the
                   query
+                type: string
+              interval:
+                default: 10m
+                description: Define in what interval the query should be recorded
                 type: string
               labelSelector:
                 description: Define labels of your object to adapt filters of the

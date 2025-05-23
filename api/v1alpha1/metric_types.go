@@ -52,8 +52,8 @@ type MetricSpec struct {
 	// +optional
 	FieldSelector string `json:"fieldSelector,omitempty"`
 	// Define in what interval the query should be recorded
-	// +kubebuilder:default:="12h"
-	CheckInterval metav1.Duration `json:"checkInterval,omitempty"`
+	// +kubebuilder:default:="10m"
+	Interval metav1.Duration `json:"interval,omitempty"`
 
 	RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 

@@ -49,10 +49,6 @@ spec:
           spec:
             description: ManagedMetricSpec defines the desired state of ManagedMetric
             properties:
-              checkInterval:
-                default: 12h
-                description: Define in what interval the query should be recorded
-                type: string
               description:
                 description: Sets the description that will be used to identify the
                   metric in Dynatrace(or other providers)
@@ -64,6 +60,10 @@ spec:
               group:
                 description: Define the group of your object that should be instrumented
                   (without version at the end)
+                type: string
+              interval:
+                default: 10m
+                description: Define in what interval the query should be recorded
                 type: string
               kind:
                 description: Decide which kind the metric should keep track of (needs

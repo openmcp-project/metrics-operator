@@ -1,4 +1,4 @@
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-instances
@@ -7,10 +7,10 @@ spec:
   description: service instances
   target:
     group:  services.cloud.sap.com
-    resource: serviceinstances
+    kind: ServiceInstance
     version: v1
-  checkInterval: "1m" # in minutes
-  federateCaRef:
+  interval: "1m" # in minutes
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---

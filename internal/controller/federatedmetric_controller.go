@@ -87,7 +87,7 @@ func scheduleNextReconciliation(metric *v1alpha1.FederatedMetric) (ctrl.Result, 
 	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: metric.Spec.CheckInterval.Duration - elapsed,
+		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
 	}, nil
 }
 
@@ -96,7 +96,7 @@ func shouldReconcile(metric *v1alpha1.FederatedMetric) bool {
 		return true
 	}
 	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
-	return elapsed >= metric.Spec.CheckInterval.Duration
+	return elapsed >= metric.Spec.Interval.Duration
 }
 
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics,verbs=get;list;watch;create;update;patch;delete
@@ -202,7 +202,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	/*
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
 	*/
-	var requeueTime = metric.Spec.CheckInterval.Duration
+	var requeueTime = metric.Spec.Interval.Duration
 
 	l.Info(fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
 

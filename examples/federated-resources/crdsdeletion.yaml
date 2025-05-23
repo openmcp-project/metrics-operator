@@ -1,4 +1,4 @@
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-crds-del
@@ -7,16 +7,16 @@ spec:
   description: subaccounts
   target:
     group:  apiextensions.k8s.io
-    resource: customresourcedefinitions
+    kind: customresourcedefinition
     version: v1
   fieldSelector: "metadata.deletionTimestamp"
-  checkInterval: "1m" # in minutes
+  interval: "1m" # in minutes
   projections:
     - name: deletion
       fieldPath: "metadata.deletionTimestamp"
     - name: crd.name
       fieldPath: "metadata.name"
-  federateCaRef:
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---

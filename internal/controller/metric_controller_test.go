@@ -125,7 +125,7 @@ func (r *TestMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	// Requeue
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: metric.Spec.CheckInterval.Duration,
+		RequeueAfter: metric.Spec.Interval.Duration,
 	}, nil
 }
 
@@ -226,7 +226,7 @@ func testReconcileSecretNotFound(t *testing.T) {
 				Group:   "",
 				Version: "v1",
 			},
-			CheckInterval: metav1.Duration{Duration: 5 * time.Minute},
+			Interval: metav1.Duration{Duration: 5 * time.Minute},
 		},
 	}
 	err := k8sClient.Create(ctx, metric)
@@ -315,7 +315,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 				Group:   "",
 				Version: "v1",
 			},
-			CheckInterval: metav1.Duration{Duration: 5 * time.Minute},
+			Interval: metav1.Duration{Duration: 5 * time.Minute},
 		},
 	}
 	err = k8sClient.Create(ctx, metric)

@@ -9,7 +9,7 @@ spec:
     kind: release
     group: helm.crossplane.io
     version: v1beta1
-  checkInterval: 1m # in minutes
+  interval: 1m # in minutes
 ---
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
@@ -22,7 +22,7 @@ spec:
     kind: pod
     group: ""
     version: v1
-  checkInterval: 1m # in minutes
+  interval: 1m # in minutes
   projections:
     - name: pod-namespace
       fieldPath: "metadata.namespace"
@@ -38,7 +38,7 @@ spec:
     kind: pod
     group: ""
     version: v1
-  checkInterval: 1m # in minutes
+  interval: 1m # in minutes
 
 #apiVersion: metrics.cloud.sap/v1alpha1
 #kind: Metric

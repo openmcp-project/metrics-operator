@@ -41,8 +41,8 @@ type FederatedMetricSpec struct {
 	Projections []Projection `json:"projections,omitempty"`
 
 	// Define in what interval the query should be recorded
-	// +kubebuilder:default:="12h"
-	CheckInterval metav1.Duration `json:"checkInterval,omitempty"`
+	// +kubebuilder:default:="10m"
+	Interval metav1.Duration `json:"interval,omitempty"`
 
 	FederatedClusterAccessRef FederateClusterAccessRef `json:"federateClusterAccessRef,omitempty"`
 }

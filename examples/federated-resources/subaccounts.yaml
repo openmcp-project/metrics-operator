@@ -1,4 +1,4 @@
-apiVersion: metrics.cloud.sap/v1beta1
+apiVersion: metrics.cloud.sap/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-subaccounts
@@ -7,13 +7,13 @@ spec:
   description: subaccounts
   target:
     group:  account.btp.orchestrate.cloud.sap
-    resource: subaccounts
+    kind: Subaccount
     version: v1alpha1
-  checkInterval: "1m" # in minutes
+  interval: "1m" # in minutes
   projections:
     - name: region
       fieldPath: "spec.forProvider.region"
-  federateCaRef:
+  federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
 ---
