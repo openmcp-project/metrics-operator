@@ -7,6 +7,7 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 ## Table of Contents
 
 - [Key Features](#key-features)
+- [Architecture Overview](#architecture-overview)
 - [Installation](#installation)
 - [Usage](#usage)
 - [RBAC Configuration](#rbac-configuration)
@@ -22,6 +23,101 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 - **Predictive Insights**: Aggregates data over time to identify emerging trends, supporting data-driven decision making for future system enhancements.
 - **Strategic Decision Support**: Offers data-backed insights to guide product evolution.
 - **Customizable Alerting System**: Allows defining alerts based on specific metric thresholds, enabling proactive response to potential issues or significant changes in system state.
+
+## Architecture Overview
+
+The Metrics Operator provides four main resource types for monitoring Kubernetes objects. Each type serves different use cases:
+
+### Metric Resource Flow
+
+```mermaid
+graph LR
+    M[Metric] -->|targets via GroupVersionKind| K8S[Kubernetes Objects<br/>Pods, Services, etc.]
+    M -.->|optional| RCA[RemoteClusterAccess]
+    RCA -->|accesses remote cluster| K8S
+    M -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class M metricType
+    class RCA accessType
+    class K8S targetType
+    class DS dataType
+```
+
+### ManagedMetric Resource Flow
+
+```mermaid
+graph LR
+    MM[ManagedMetric] -->|targets managed resources| MR[Managed Resources<br/>with 'crossplane' & 'managed' categories]
+    MM -.->|optional| RCA[RemoteClusterAccess]
+    RCA -->|accesses remote cluster| MR
+    MM -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class MM metricType
+    class RCA accessType
+    class MR targetType
+    class DS dataType
+```
+
+### FederatedMetric Resource Flow
+
+```mermaid
+graph LR
+    FM[FederatedMetric] -->|requires| FCA[FederatedClusterAccess]
+    FCA -->|discovers clusters via| CP[ControlPlane Resources]
+    FCA -->|provides access to| MC[Multiple Clusters]
+    FM -->|targets across clusters| K8S[Kubernetes Objects<br/>across federated clusters]
+    FM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class FM metricType
+    class FCA accessType
+    class CP,MC,K8S targetType
+    class DS dataType
+```
+
+### FederatedManagedMetric Resource Flow
+
+```mermaid
+graph LR
+    FMM[FederatedManagedMetric] -->|requires| FCA[FederatedClusterAccess]
+    FCA -->|discovers clusters via| CP[ControlPlane Resources]
+    FCA -->|provides access to| MC[Multiple Clusters]
+    FMM -->|targets managed resources<br/>across clusters| MR[Managed Resources<br/>with 'crossplane' & 'managed' categories]
+    FMM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
+    
+    classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    
+    class FMM metricType
+    class FCA accessType
+    class CP,MC,MR targetType
+    class DS dataType
+```
+
+### Resource Type Descriptions:
+
+- **Metric**: Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- **ManagedMetric**: Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- **FederatedMetric**: Monitors resources across multiple clusters, aggregating data from federated sources
+- **FederatedManagedMetric**: Monitors Crossplane managed resources across multiple clusters
+- **RemoteClusterAccess**: Provides access configuration for monitoring resources in remote clusters
+- **FederatedClusterAccess**: Discovers and provides access to multiple clusters for federated monitoring
 
 ## Installation
 
