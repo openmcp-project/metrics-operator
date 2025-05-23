@@ -40,10 +40,6 @@ spec:
           spec:
             description: FederatedManagedMetricSpec defines the desired state of FederatedManagedMetric
             properties:
-              checkInterval:
-                default: 12h
-                description: Define in what interval the query should be recorded
-                type: string
               description:
                 type: string
               federateClusterAccessRef:
@@ -57,6 +53,10 @@ spec:
               fieldSelector:
                 description: Define fields of your object to adapt filters of the
                   query
+                type: string
+              interval:
+                default: 10m
+                description: Define in what interval the query should be recorded
                 type: string
               labelSelector:
                 description: Define labels of your object to adapt filters of the

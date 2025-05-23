@@ -83,7 +83,7 @@ func (r *FederatedManagedMetricReconciler) scheduleNextReconciliation(metric *v1
 	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: metric.Spec.CheckInterval.Duration - elapsed,
+		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
 	}, nil
 }
 
@@ -92,7 +92,7 @@ func (r *FederatedManagedMetricReconciler) shouldReconcile(metric *v1alpha1.Fede
 		return true
 	}
 	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
-	return elapsed >= metric.Spec.CheckInterval.Duration
+	return elapsed >= metric.Spec.Interval.Duration
 }
 
 // Reconcile reads that state of the cluster for a FederatedManagedMetric object
@@ -197,7 +197,7 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	/*
 		4. Re-queue the metric after the frequency or 2 minutes if an error occurred
 	*/
-	var requeueTime = metric.Spec.CheckInterval.Duration
+	var requeueTime = metric.Spec.Interval.Duration
 
 	l.Info(fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
 

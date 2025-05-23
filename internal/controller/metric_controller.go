@@ -79,7 +79,7 @@ func (r *MetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (
 	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: metric.Spec.CheckInterval.Duration - elapsed,
+		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
 	}, nil
 }
 
@@ -88,7 +88,7 @@ func (r *MetricReconciler) shouldReconcile(metric *v1alpha1.Metric) bool {
 		return true
 	}
 	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
-	return elapsed >= metric.Spec.CheckInterval.Duration
+	return elapsed >= metric.Spec.Interval.Duration
 }
 
 func (r *MetricReconciler) handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
@@ -243,7 +243,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if result.Error != nil || errExport != nil { // Requeue faster on monitor or export error
 		requeueTime = RequeueAfterError
 	} else {
-		requeueTime = metric.Spec.CheckInterval.Duration
+		requeueTime = metric.Spec.Interval.Duration
 	}
 
 	l.Info(fmt.Sprintf("metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))

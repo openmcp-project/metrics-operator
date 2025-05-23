@@ -5,8 +5,9 @@ metadata:
 spec:
   name: dev-core-landscaperdeployment
   description: Number of LandscapperDeplyoments in the LS-DEV-CORE cluster
-  kind: LandscaperDeployment
-  group: landscaper-service.gardener.cloud
-  version: v1alpha1
-  checkInterval: "1m" # in minutes
+  target:
+    kind: LandscaperDeployment
+    group: landscaper-service.gardener.cloud
+    version: v1alpha1
+  interval: "1m" # in minutes
 ---

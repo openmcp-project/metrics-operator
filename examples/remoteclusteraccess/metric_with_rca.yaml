@@ -5,10 +5,11 @@ metadata:
 spec:
   name: crate-mcp-metric
   description: Number of ManagedControlPlanes in the Crate cluster
-  kind: ManagedControlPlane
-  group: cola.cloud.sap
-  version: v1alpha1
-  checkInterval: "1m" # in minutes
+  target:
+    kind: ManagedControlPlane
+    group: cola.cloud.sap
+    version: v1alpha1
+  interval: "1m" # in minutes
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring
@@ -20,10 +21,11 @@ metadata:
 spec:
   name: crate-co-metric
   description: Number of CloudOrchestrators in the Crate cluster
-  kind: CloudOrchestrator
-  group: cola.cloud.sap
-  version: v1alpha1
-  checkInterval: "1m" # in minutes
+  target:
+    kind: CloudOrchestrator
+    group: cola.cloud.sap
+    version: v1alpha1
+  interval: "1m" # in minutes
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring
@@ -35,10 +37,11 @@ metadata:
 spec:
   name: crate-dataplane-metric
   description: Number of DataPlanes in the Crate cluster
-  kind: DataPlane
-  group: cola.cloud.sap
-  version: v1alpha1
-  checkInterval: "1m" # in minutes
+  target:
+    kind: DataPlane
+    group: cola.cloud.sap
+    version: v1alpha1
+  interval: "1m" # in minutes
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring

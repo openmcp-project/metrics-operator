@@ -169,7 +169,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if result.Error != nil {
 		requeueTime = RequeueAfterError
 	} else {
-		requeueTime = metric.Spec.CheckInterval.Duration
+		requeueTime = metric.Spec.Interval.Duration
 	}
 
 	l.Info(fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, requeueTime))
