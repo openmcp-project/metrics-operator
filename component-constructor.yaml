@@ -17,5 +17,4 @@ components:
         type: dockermulti
         repository: images/${COMPONENT_NAME}
         variants:
-        - "${COMPONENT_REPO_PREFIX}:${VERSION}-linux-amd64"
-        - "${COMPONENT_REPO_PREFIX}:${VERSION}-linux-arm64"
+        - "${COMPONENT_REPO_PREFIX}:${VERSION}"
