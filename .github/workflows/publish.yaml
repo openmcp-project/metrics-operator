@@ -42,6 +42,16 @@ jobs:
           echo "SKIP=true" >> $GITHUB_ENV
           exit 0
 
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v4
+        with:
+          daemon-config: |
+            {
+              "features": {
+                "containerd-snapshotter": true
+              }
+            }
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -73,9 +83,9 @@ jobs:
           make reviewable
           make build-docker-binary
 
-      - name: Build Images
+      - name: Build and push Images
         run: |
-          IMG=ghcr.io/sap/metrics-operator:${{ env.version }} make docker-buildx
+          IMG=ghcr.io/sap/images/metrics-operator:${{ env.version }} make docker-buildx docker-push
 
       - name: setup OCM
         uses: open-component-model/ocm-setup-action@main
