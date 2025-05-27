@@ -87,6 +87,10 @@ jobs:
         run: |
           IMG=ghcr.io/openmcp-project/metrics-operator:${{ env.version }} make docker-buildx docker-push
 
+      - name: Package and push helm chart
+        run: |
+          make helm-package helm-push
+
       - name: setup OCM
         uses: open-component-model/ocm-setup-action@main
 

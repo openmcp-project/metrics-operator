@@ -61,8 +61,7 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOTESTSUM ?= $(LOCALBIN)/gotestsum
 GOLANGCILINT ?= $(LOCALBIN)/golangci-lint
-
-
+HELM ?= $(LOCALBIN)/helm
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.1
@@ -261,14 +260,36 @@ dev-apply-metric-dynatrace-prod: ## Apply metric using Dynatrace production exam
 
 #----------------------------------------------------------------------------------------------
 ##@ Helm
+
+HELM_VERSION ?= v3.18.0
+OCI_REGISTRY ?= ghcr.io/sap/charts
+
+$(HELM): $(LOCALBIN)
+	@if test -x $(LOCALBIN)/helm && ! $(LOCALBIN)/helm version --short | grep -q $(HELM_VERSION); then \
+		echo "$(LOCALBIN)/helm version is not expected $(HELM_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/helm; \
+	fi
+	test -s $(LOCALBIN)/helm || (curl -sSL https://get.helm.sh/helm-$(HELM_VERSION)-$(shell uname | tr '[:upper:]' '[:lower:]')-amd64.tar.gz | tar xz -C /tmp && \
+	mv /tmp/$(shell uname | tr '[:upper:]' '[:lower:]')-amd64/helm $(LOCALBIN)/helm && \
+	chmod +x $(LOCALBIN)/helm && \
+	rm -rf /tmp/$(shell uname | tr '[:upper:]' '[:lower:]')-amd64)
+
+.PHONY: helm-package
+helm-package: $(HELM) helm-chart
+	$(LOCALBIN)/helm package charts/$(PROJECT_FULL_NAME)/ -d ./ --version $(shell cat VERSION) 
+
+.PHONY: helm-push
+helm-push: $(HELM)
+	$(LOCALBIN)/helm push $(PROJECT_FULL_NAME)-$(shell cat VERSION).tgz oci://$(OCI_REGISTRY)
+
 .PHONY: helm-chart
 helm-chart: ## Generate Helm chart files from templates.
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/Chart.yaml.tpl > charts/$(PROJECT_FULL_NAME)/Chart.yaml
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/values.yaml.tpl > charts/$(PROJECT_FULL_NAME)/values.yaml
 
 .PHONY: helm-install-local
-helm-install-local: ## Install the Helm chart locally using the Docker image
-	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
+helm-install-local: $(HELM) ## Install the Helm chart locally using the Docker image
+	$(LOCALBIN)/helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
 #----------------------------------------------------------------------------------------------
