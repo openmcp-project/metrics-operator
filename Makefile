@@ -100,22 +100,14 @@ docker-push: ## Push docker image with the manager.
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
 # - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
+# - be using containerd image store with docker. More Info: https://docs.docker.com/engine/storage/containerd/
 # - have enable BuildKit, More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image for your registry (i.e. if you do not inform a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To properly provided solutions that supports more than one platform you should use this option.
-PLATFORMS ?= linux/arm64 linux/amd64
+PLATFORMS ?= linux/arm64,linux/amd64
+
 .PHONY: docker-buildx
-docker-buildx: #test ## Build and tag docker image for each platform locally using --load
-	sed '1 s/^FROM/FROM --platform=$${BUILDPLATFORM}/' Dockerfile > Dockerfile.cross
-	$(CONTAINER_TOOL) buildx create --name project-v3-builder || true
-	$(CONTAINER_TOOL) buildx use project-v3-builder
-	@for platform in $(PLATFORMS); do \
-		tag="$(IMG)-$$(echo $$platform | tr / -)"; \
-		echo "Building $$tag for $$platform"; \
-		$(CONTAINER_TOOL) buildx build --platform=$$platform --tag $$tag --load -f Dockerfile.cross .; \
-	done
-	$(CONTAINER_TOOL) buildx rm project-v3-builder
-	rm Dockerfile.cross
+docker-buildx: test 
+	$(CONTAINER_TOOL) buildx build --platform=$(PLATFORMS) --tag $(IMG) --load -f Dockerfile .
+	
 
 ##@ Deployment
 
@@ -155,8 +147,7 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOTESTSUM ?= $(LOCALBIN)/gotestsum
 GOLANGCILINT ?= $(LOCALBIN)/golangci-lint
-
-
+HELM ?= $(LOCALBIN)/helm
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.1
@@ -298,6 +289,26 @@ lint-fix:
 
 ### ------------------------------------ HELM ------------------------------------ ###
 
+HELM_VERSION ?= v3.18.0
+OCI_REGISTRY ?= ghcr.io/sap/charts
+
+$(HELM): $(LOCALBIN)
+	@if test -x $(LOCALBIN)/helm && ! $(LOCALBIN)/helm version --short | grep -q $(HELM_VERSION); then \
+		echo "$(LOCALBIN)/helm version is not expected $(HELM_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/helm; \
+	fi
+	test -s $(LOCALBIN)/helm || (curl -sSL https://get.helm.sh/helm-$(HELM_VERSION)-$(shell uname | tr '[:upper:]' '[:lower:]')-amd64.tar.gz | tar xz -C /tmp && \
+	mv /tmp/$(shell uname | tr '[:upper:]' '[:lower:]')-amd64/helm $(LOCALBIN)/helm && \
+	chmod +x $(LOCALBIN)/helm && \
+	rm -rf /tmp/$(shell uname | tr '[:upper:]' '[:lower:]')-amd64)
+
+.PHONY: helm-package
+helm-package: $(HELM) helm-chart
+	$(LOCALBIN)/helm package charts/$(PROJECT_FULL_NAME)/ -d ./ --version $(shell cat VERSION) 
+
+.PHONY: helm-push
+helm-push: $(HELM)
+	$(LOCALBIN)/helm push $(PROJECT_FULL_NAME)-$(shell cat VERSION).tgz oci://$(OCI_REGISTRY)
 
 .PHONY: helm-chart
 helm-chart:
