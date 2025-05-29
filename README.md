@@ -124,22 +124,20 @@ graph LR
 ### Prerequisites
 
 1. Create a namespace for the Metrics Operator.
-2. Create a secret containing the credentials for the artifactory (read-only) in the operator's namespace.
-3. Create a secret containing the data sink credentials in the operator's namespace.
+2. Create a secret containing the data sink credentials in the operator's namespace.
 
 ### Deployment
 
 Deploy the Metrics Operator using the Helm chart:
 
 ```bash
-helm upgrade --install co-metrics-operator deploy-releases-hyperspace-helm/co-metrics-operator \
+helm upgrade --install metrics-operator ghcr.io/sap/github.com/sap/metrics-operator/charts/metrics-operator \
   --namespace <operator-namespace> \
   --create-namespace \
-  --set imagePullSecrets[0].name=<artifactory-secret-name> \
   --version=<version>
 ```
 
-Replace `<operator-namespace>`, `<artifactory-secret-name>`, and `<version>` with appropriate values.
+Replace `<operator-namespace>` and `<version>` with appropriate values.
 
 ## Usage
 
