@@ -7,7 +7,6 @@ rules:
 - apiGroups:
   - metrics.cloud.sap
   resources:
-  - clusteraccesses
   - federatedmetrics
   - managedmetrics
   - metrics
@@ -22,7 +21,6 @@ rules:
 - apiGroups:
   - metrics.cloud.sap
   resources:
-  - clusteraccesses/finalizers
   - federatedmetrics/finalizers
   - managedmetrics/finalizers
   - metrics/finalizers
@@ -31,7 +29,6 @@ rules:
 - apiGroups:
   - metrics.cloud.sap
   resources:
-  - clusteraccesses/status
   - federatedmetrics/status
   - managedmetrics/status
   - metrics/status
