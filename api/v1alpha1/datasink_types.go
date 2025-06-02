@@ -25,12 +25,6 @@ import (
 type Connection struct {
 	// Endpoint specifies the target endpoint URL
 	Endpoint string `json:"endpoint"`
-	// Protocol specifies the communication protocol
-	// +kubebuilder:validation:Enum=http;grpc
-	Protocol string `json:"protocol"`
-	// InsecureSkipVerify controls whether to skip TLS certificate verification
-	// +optional
-	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
 }
 
 // APIKeyAuthentication defines API key authentication configuration
@@ -66,7 +60,6 @@ type DataSinkStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="ENDPOINT",type="string",JSONPath=".spec.connection.endpoint"
-// +kubebuilder:printcolumn:name="PROTOCOL",type="string",JSONPath=".spec.connection.protocol"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 type DataSink struct {
 	metav1.TypeMeta   `json:",inline"`

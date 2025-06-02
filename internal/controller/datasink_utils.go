@@ -87,9 +87,8 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 		return common.DataSinkCredentials{}, err
 	}
 
-	// Extract endpoint and protocol from DataSink
+	// Extract endpoint from DataSink
 	endpoint := dataSink.Spec.Connection.Endpoint
-	protocol := dataSink.Spec.Connection.Protocol
 
 	// Handle authentication
 	var token string
@@ -136,7 +135,7 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 		Token: token,
 	}
 
-	l.Info(fmt.Sprintf("Using DataSink '%s' with protocol '%s' and endpoint '%s'", dataSinkName, protocol, endpoint))
+	l.Info(fmt.Sprintf("Using DataSink '%s' with endpoint '%s'", dataSinkName, endpoint))
 
 	return credentials, nil
 }

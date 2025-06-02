@@ -7,8 +7,6 @@ metadata:
 spec:
   connection:
     endpoint: "https://your-tenant.live.dynatrace.com/api/v2/metrics/ingest/otlp/v1/metrics"
-    protocol: "http"
-    insecureSkipVerify: false
   authentication:
     apiKey:
       secretKeyRef:

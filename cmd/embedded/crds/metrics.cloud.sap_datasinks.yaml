@@ -18,9 +18,6 @@ spec:
     - jsonPath: .spec.connection.endpoint
       name: ENDPOINT
       type: string
-    - jsonPath: .spec.connection.protocol
-      name: PROTOCOL
-      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -91,19 +88,8 @@ spec:
                   endpoint:
                     description: Endpoint specifies the target endpoint URL
                     type: string
-                  insecureSkipVerify:
-                    description: InsecureSkipVerify controls whether to skip TLS certificate
-                      verification
-                    type: boolean
-                  protocol:
-                    description: Protocol specifies the communication protocol
-                    enum:
-                    - http
-                    - grpc
-                    type: string
                 required:
                 - endpoint
-                - protocol
                 type: object
             required:
             - connection
