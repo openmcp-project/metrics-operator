@@ -122,38 +122,3 @@ func TestGetToken_Cache_Expired(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, tk, rt)
 }
-
-// func TestTokenManager(t *testing.T) {
-//
-//	config, errrc := clientcmd.BuildConfigFromFlags("", "/Users/I073426/Desktop/metric-demo/dev-core.yaml")
-//	if errrc != nil {
-//		fmt.Println(errrc)
-//	}
-//
-//	clientset, _ := kubernetes.NewForConfig(config)
-//
-//	tokenManager, err := GetTokenManager(clientset)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	token, err := tokenManager.GetToken("cola-system", "mcp-operator", "crate")
-//	if err != nil {
-//		// Handle error
-//	}
-//
-//	tokenManager2, err := GetTokenManager(clientset)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	token2, err := tokenManager2.GetToken("cola-system", "mcp-operator", "crate")
-//	if err != nil {
-//		// Handle error
-//	}
-//
-//	require.Equal(t, token, token2)
-//
-//	fmt.Println(token)
-//
-//}
