@@ -35,6 +35,7 @@ import (
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
 	"github.com/SAP/metrics-operator/internal/orchestrator"
+	"github.com/go-logr/logr"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -84,9 +85,17 @@ type ManagedMetricReconciler struct {
 	Recorder record.EventRecorder
 }
 
+// getDataSinkCredentials fetches DataSink configuration and credentials
+func (r *ManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, managedMetric *v1alpha1.ManagedMetric, l logr.Logger) (common.DataSinkCredentials, error) {
+	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
+	return retriever.GetDataSinkCredentials(ctx, managedMetric.Spec.DataSinkRef, managedMetric, l)
+}
+
 //+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/finalizers,verbs=update
+//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -120,16 +129,12 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	/*
-		1.1 Get the Secret that holds the Dynatrace credentials
+		1.1 Get DataSink configuration and credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(ctx, r.inClient)
-	if errSecret != nil {
-		l.Error(errSecret, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
-		r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s' that stores the credentials to Data Sink", common.SecretName, common.SecretNameSpace))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errSecret
+	credentials, err := r.getDataSinkCredentials(ctx, &metric, l)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
-
-	credentials := common.GetCredentialData(secret)
 
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
@@ -142,7 +147,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.3 Create OTel metric client and gauge metric
 	*/
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
 	if errCli != nil {
 		l.Error(errCli, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli

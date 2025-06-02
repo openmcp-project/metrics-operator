@@ -12,6 +12,7 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 - [Usage](#usage)
 - [RBAC Configuration](#rbac-configuration)
 - [Remote Cluster Access](#remote-cluster-access)
+- [DataSink Configuration](#datasink-configuration)
 - [Data Sink Integration](#data-sink-integration)
 
 ## Key Features
@@ -124,7 +125,7 @@ graph LR
 ### Prerequisites
 
 1. Create a namespace for the Metrics Operator.
-2. Create a secret containing the data sink credentials in the operator's namespace.
+2. Create a DataSink resource and associated authentication secret for your metrics destination.
 
 ### Deployment
 
@@ -138,6 +139,8 @@ helm upgrade --install metrics-operator ghcr.io/sap/github.com/sap/metrics-opera
 ```
 
 Replace `<operator-namespace>` and `<version>` with appropriate values.
+
+After deployment, create your DataSink configuration as described in the [DataSink Configuration](#datasink-configuration) section.
 
 ## Usage
 
@@ -320,13 +323,113 @@ kubectl apply -f rbac-config.yaml
 Remember to update this RBAC configuration whenever you add new resource types to monitor.
 
 
+## DataSink Configuration
+
+The Metrics Operator uses DataSink custom resources to define where and how metrics data should be sent. This provides a flexible and secure way to configure data destinations.
+
+### Creating a DataSink
+
+Define a DataSink resource to specify the connection details and authentication for your metrics destination:
+
+```yaml
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: DataSink
+metadata:
+  name: default
+  namespace: metrics-operator-system
+spec:
+  connection:
+    endpoint: "https://your-tenant.live.dynatrace.com/api/v2/metrics/ingest"
+    protocol: "http"
+    insecureSkipVerify: false
+  authentication:
+    apiKey:
+      secretKeyRef:
+        name: dynatrace-credentials
+        key: api-token
+```
+
+### DataSink Specification
+
+The `DataSinkSpec` contains the following fields:
+
+#### Connection
+- **endpoint**: The target endpoint URL where metrics will be sent
+- **protocol**: Communication protocol (`http` or `grpc`)
+- **insecureSkipVerify**: (Optional) Skip TLS certificate verification
+
+#### Authentication
+- **apiKey**: API key authentication configuration
+  - **secretKeyRef**: Reference to a Kubernetes Secret containing the API key
+    - **name**: Name of the Secret
+    - **key**: Key within the Secret containing the API token
+
+### Using DataSink in Metrics
+
+All metric types support the `dataSinkRef` field to specify which DataSink to use:
+
+```yaml
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: pod-count
+spec:
+  name: "pods.count"
+  target:
+    kind: Pod
+    group: ""
+    version: v1
+  dataSinkRef:
+    name: default  # References the DataSink named "default"
+```
+
+### Default Behavior
+
+If no `dataSinkRef` is specified in a metric resource, the operator will automatically use a DataSink named "default" in the operator's namespace. This provides backward compatibility and simplifies configuration for single data sink deployments.
+
+### Supported Metric Types
+
+The `dataSinkRef` field is available in all metric resource types:
+
+- [`Metric`](#metric): Basic metrics for Kubernetes resources
+- [`ManagedMetric`](#managed-metric): Metrics for Crossplane managed resources
+- [`FederatedMetric`](#federated-metric): Metrics across multiple clusters
+- [`FederatedManagedMetric`](#federated-managed-metric): Managed resource metrics across multiple clusters
+
+### Examples and Detailed Documentation
+
+For complete examples and more detailed configuration options:
+
+- See the [`examples/datasink/`](examples/datasink/) directory for practical examples
+- Read the comprehensive [DataSink Configuration Guide](docs/datasink-configuration.md) for detailed documentation
+
+The examples directory contains:
+- Basic DataSink configuration examples
+- Examples showing DataSink usage with different metric types
+- Migration guidance from legacy configurations
+
+The detailed guide covers:
+- Complete specification reference
+- Multiple DataSink scenarios
+- Advanced configuration options
+- Troubleshooting and best practices
+
+### Migration from Legacy Configuration
+
+**Important**: The old method of using hardcoded secret names (such as `co-dynatrace-credentials`) has been deprecated and removed. You must now use DataSink resources to configure your metrics destinations.
+
+To migrate:
+1. Create a DataSink resource pointing to your existing authentication secret
+2. Update your metric resources to reference the DataSink using `dataSinkRef`
+3. Remove any hardcoded secret references from your configuration
+
 ## Data Sink Integration
 
-The Metrics Operator sends collected data to a configured data sink for storage and analysis. The data sink (e.g., Dynatrace) provides tools for data aggregation, filtering, and visualization.
+The Metrics Operator sends collected data to configured data sinks for storage and analysis. Data sinks (e.g., Dynatrace) provide tools for data aggregation, filtering, and visualization.
 
 To make the most of your metrics:
 
-1. Configure your data sink according to its documentation.
+1. Configure your DataSink resources according to your data sink's documentation.
 2. Use the data sink's query language or UI to create custom views of your metrics.
 3. Set up alerts based on metric thresholds or patterns.
 4. Leverage the data sink's analysis tools to gain insights into your system's behavior and performance.

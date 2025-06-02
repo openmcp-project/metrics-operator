@@ -18,26 +18,23 @@ package controller
 
 import (
 	"context"
-
 	"fmt"
-
 	"time"
 
 	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NewFederatedMetricReconciler creates a new FederatedMetricReconciler
@@ -68,6 +65,12 @@ func (r *FederatedMetricReconciler) getClient() client.Client {
 
 func (r *FederatedMetricReconciler) getRestConfig() *rest.Config {
 	return r.RestConfig
+}
+
+// getDataSinkCredentials fetches DataSink configuration and credentials
+func (r *FederatedMetricReconciler) getDataSinkCredentials(ctx context.Context, federatedMetric *v1alpha1.FederatedMetric, l logr.Logger) (common.DataSinkCredentials, error) {
+	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
+	return retriever.GetDataSinkCredentials(ctx, federatedMetric.Spec.DataSinkRef, federatedMetric, l)
 }
 
 func handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
@@ -102,6 +105,8 @@ func shouldReconcile(metric *v1alpha1.FederatedMetric) bool {
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile handles the reconciliation of the FederatedMetric object
 //
@@ -128,14 +133,12 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	/*
-		1.1 Get the Secret that holds the Dynatrace credentials
+		1.1 Get DataSink configuration and credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(ctx, r.getClient())
-	if errSecret != nil {
-		return r.handleSecretError(l, errSecret, metric)
+	credentials, err := r.getDataSinkCredentials(ctx, &metric, l)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
-
-	credentials := common.GetCredentialData(secret)
 
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
@@ -146,7 +149,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
 
 	if errCli != nil {
 		l.Error(errCli, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
@@ -221,12 +224,6 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Requeue:      true,
 		RequeueAfter: requeueTime,
 	}, nil
-}
-
-func (r *FederatedMetricReconciler) handleSecretError(l logr.Logger, errSecret error, metric v1alpha1.FederatedMetric) (ctrl.Result, error) {
-	l.Error(errSecret, fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-	r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, errSecret
 }
 
 // SetupWithManager sets up the controller with the Manager.

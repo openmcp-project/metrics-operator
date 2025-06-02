@@ -74,6 +74,12 @@ func (r *MetricReconciler) getRestConfig() *rest.Config {
 	return r.RestConfig
 }
 
+// getDataSinkCredentials fetches DataSink configuration and credentials
+func (r *MetricReconciler) getDataSinkCredentials(ctx context.Context, metric *v1alpha1.Metric, l logr.Logger) (common.DataSinkCredentials, error) {
+	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
+	return retriever.GetDataSinkCredentials(ctx, metric.Spec.DataSinkRef, metric, l)
+}
+
 func (r *MetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (ctrl.Result, error) {
 
 	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
@@ -106,6 +112,8 @@ func (r *MetricReconciler) handleGetError(err error, log logr.Logger) (ctrl.Resu
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile handles the reconciliation of a Metric object
 //
@@ -130,16 +138,12 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	/*
-		1.1 Get the Secret that holds the Dynatrace credentials
+		1.1 Get DataSink configuration and credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(ctx, r.getClient())
-	if errSecret != nil {
-		l.Error(errSecret, fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-		r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errSecret
+	credentials, err := r.getDataSinkCredentials(ctx, &metric, l)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
-
-	credentials := common.GetCredentialData(secret)
 
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
@@ -149,7 +153,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
 	if errCli != nil {
 		l.Error(errCli, fmt.Sprintf("metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		// TODO: Update status?

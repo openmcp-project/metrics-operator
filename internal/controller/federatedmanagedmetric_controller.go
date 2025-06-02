@@ -67,6 +67,12 @@ func (r *FederatedManagedMetricReconciler) getRestConfig() *rest.Config {
 	return r.RestConfig
 }
 
+// getDataSinkCredentials fetches DataSink configuration and credentials
+func (r *FederatedManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, federatedManagedMetric *v1alpha1.FederatedManagedMetric, l logr.Logger) (common.DataSinkCredentials, error) {
+	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
+	return retriever.GetDataSinkCredentials(ctx, federatedManagedMetric.Spec.DataSinkRef, federatedManagedMetric, l)
+}
+
 func (r *FederatedManagedMetricReconciler) handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
 	// We'll ignore not-found errors. They can't be fixed by an immediate requeue.
 	// We'll need to wait for a new notification. We can also get them on delete requests.
@@ -99,6 +105,8 @@ func (r *FederatedManagedMetricReconciler) shouldReconcile(metric *v1alpha1.Fede
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmanagedmetrics,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmanagedmetrics/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmanagedmetrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 //
 //nolint:gocyclo
 func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -123,14 +131,12 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	/*
-		1.1 Get the Secret that holds the Dynatrace credentials
+		1.1 Get the DataSink credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(ctx, r.getClient())
-	if errSecret != nil {
-		return r.handleSecretError(l, errSecret, metric)
+	credentials, errCredentials := r.getDataSinkCredentials(ctx, &metric, l)
+	if errCredentials != nil {
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCredentials
 	}
-
-	credentials := common.GetCredentialData(secret)
 
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
@@ -141,7 +147,7 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
 
 	if errCli != nil {
 		l.Error(errCli, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
@@ -216,12 +222,6 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		Requeue:      true,
 		RequeueAfter: requeueTime,
 	}, nil
-}
-
-func (r *FederatedManagedMetricReconciler) handleSecretError(l logr.Logger, errSecret error, metric v1alpha1.FederatedManagedMetric) (ctrl.Result, error) {
-	l.Error(errSecret, fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-	r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, errSecret
 }
 
 // SetupWithManager sets up the controller with the Manager.

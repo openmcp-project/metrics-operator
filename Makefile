@@ -79,7 +79,7 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go start
+	OPERATOR_CONFIG_NAMESPACE=metrics-operator-system go run ./cmd/main.go start
 
 .PHONY: build-docker-binary
 build-docker-binary: manifests generate fmt vet ## Build manager binary.
@@ -238,11 +238,9 @@ dev-local-all:
 	$(MAKE) crossplane-provider-sample
 	$(MAKE) dev-namespace
 	$(MAKE) dev-secret
+	$(MAKE) dev-operator-namespace
 	$(MAKE) dev-basic-metric
 	$(MAKE) dev-managed-metric
-
-
-
 
 
 .PHONY: dev-secret
@@ -253,6 +251,10 @@ dev-secret:
 dev-namespace:
 	kubectl apply -f examples/namespace.yaml
 
+.PHONY: dev-operator-namespace
+dev-operator-namespace:
+	kubectl create namespace metrics-operator-system --dry-run=client -o yaml | kubectl apply -f -
+
 .PHONY: dev-basic-metric
 dev-basic-metric:
 	kubectl apply -f examples/basic_metric.yaml
@@ -260,6 +262,14 @@ dev-basic-metric:
 .PHONY: dev-managed-metric
 dev-managed-metric:
 	kubectl apply -f examples/managed_metric.yaml
+
+.PHONY: dev-apply-dynatrace-prod-setup
+dev-apply-dynatrace-prod-setup:
+	kubectl apply -f examples/datasink/dynatrace-prod-setup.yaml
+
+.PHONY: dev-apply-metric-dynatrace-prod
+dev-apply-metric-dynatrace-prod:
+	kubectl apply -f examples/datasink/metric-using-dynatrace-prod.yaml
 
 .PHONY: dev-v1beta1-compmetric
 dev-v1beta1-compmetric:

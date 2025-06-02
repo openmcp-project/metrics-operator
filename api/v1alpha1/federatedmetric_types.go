@@ -44,6 +44,12 @@ type FederatedMetricSpec struct {
 	// +kubebuilder:default:="10m"
 	Interval metav1.Duration `json:"interval,omitempty"`
 
+	// DataSinkRef specifies the DataSink to be used for this federated metric.
+	// If not specified, the DataSink named "default" in the operator's
+	// namespace will be used.
+	// +optional
+	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
+
 	FederatedClusterAccessRef FederateClusterAccessRef `json:"federateClusterAccessRef,omitempty"`
 }
 

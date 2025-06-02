@@ -1,0 +1,28 @@
+# Basic DataSink configuration for Dynatrace
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: DataSink
+metadata:
+  name: default
+  namespace: metrics-operator-system
+spec:
+  connection:
+    endpoint: "https://your-tenant.live.dynatrace.com/api/v2/metrics/ingest/otlp/v1/metrics"
+    protocol: "http"
+    insecureSkipVerify: false
+  authentication:
+    apiKey:
+      secretKeyRef:
+        name: dynatrace-credentials
+        key: api-token
+---
+# Secret containing the Dynatrace API token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dynatrace-credentials
+  namespace: metrics-operator-system
+type: Opaque
+data:
+  # Base64 encoded Dynatrace API token
+  # Replace with your actual token: echo -n "your-api-token" | base64
+  api-token: eW91ci1hcGktdG9rZW4=
