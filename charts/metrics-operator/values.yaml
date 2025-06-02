@@ -1,4 +1,4 @@
-# Default values for co-metrics-operator.
+# Default values for metrics-operator.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 

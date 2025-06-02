@@ -11,7 +11,7 @@ import (
 
 const (
 	// SecretNameSpace is the namespace where the secret is deployed
-	SecretNameSpace string = "co-metrics-operator"
+	SecretNameSpace string = "metrics-operator"
 	// SecretName is the name of the secret
 	SecretName string = "co-dynatrace-credentials"
 )

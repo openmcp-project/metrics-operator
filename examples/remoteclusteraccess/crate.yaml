@@ -8,5 +8,5 @@ spec:
     clusterSecretRef:
       name: crate-cluster
       namespace: cola-system
-    serviceAccountName: co-monitor-co-metrics-operator
-    serviceAccountNamespace: co-metrics-operator
+    serviceAccountName: co-monitor-metrics-operator
+    serviceAccountNamespace: metrics-operator
