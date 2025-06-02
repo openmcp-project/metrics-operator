@@ -37,6 +37,39 @@ func Updated() metav1.Condition {
 	}
 }
 
+// ReadyTrue returns a condition that indicates the resource is ready and functioning correctly
+func ReadyTrue(message string) metav1.Condition {
+	return metav1.Condition{
+		Type:               v1alpha1.TypeReady,
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             "ReconciliationSucceeded",
+		Message:            message,
+	}
+}
+
+// ReadyFalse returns a condition that indicates the resource is not ready due to an error
+func ReadyFalse(reason, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:               v1alpha1.TypeReady,
+		Status:             metav1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// ReadyUnknown returns a condition that indicates the resource readiness is unknown
+func ReadyUnknown(reason, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:               v1alpha1.TypeReady,
+		Status:             metav1.ConditionUnknown,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
 // Error returns a condition that indicates a unspecified error has occurred
 func Error(message string) metav1.Condition {
 	return metav1.Condition{

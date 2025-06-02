@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -132,6 +133,18 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.handleGetError(errLoad, l)
 	}
 
+	// Defer status update to ensure it's always called
+	defer func() {
+		if err := r.getClient().Status().Update(ctx, &metric); err != nil {
+			l.Error(err, "Failed to update Metric status")
+		}
+	}()
+
+	// Initialize Ready condition if not present
+	if meta.FindStatusCondition(metric.Status.Conditions, v1alpha1.TypeReady) == nil {
+		metric.SetConditions(common.ReadyUnknown("Reconciling", "Initial reconciliation"))
+	}
+
 	// Check if enough time has passed since the last reconciliation
 	if !r.shouldReconcile(&metric) {
 		return r.scheduleNextReconciliation(&metric)
@@ -142,6 +155,8 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	*/
 	credentials, err := r.getDataSinkCredentials(ctx, &metric, l)
 	if err != nil {
+		metric.SetConditions(common.ReadyFalse("DataSinkUnavailable", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
@@ -150,13 +165,16 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	*/
 	queryConfig, err := createQC(ctx, metric.Spec.RemoteClusterAccessRef, r)
 	if err != nil {
+		metric.SetConditions(common.ReadyFalse("QueryConfigCreationFailed", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
 	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
 	if errCli != nil {
+		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errCli, fmt.Sprintf("metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		// TODO: Update status?
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
 	defer func() {
@@ -169,8 +187,9 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
 	if errGauge != nil {
+		metric.SetConditions(common.ReadyFalse("MetricCreationFailed", errGauge.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errGauge, fmt.Sprintf("metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		// TODO: Update status?
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
 	/*
@@ -178,6 +197,8 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	*/
 	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithMetric(metric, gaugeMetric) // Pass gaugeMetric
 	if errOrch != nil {
+		metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errOrch, "unable to create metric orchestrator monitor")
 		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
@@ -186,20 +207,13 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	result, errMon := orchestrator.Handler.Monitor(ctx)
 
 	if errMon != nil {
-		metric.Status.Ready = v1alpha1.StatusFalse
+		metric.SetConditions(common.ReadyFalse("MonitoringFailed", errMon.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errMon, fmt.Sprintf("metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		// Update status before returning
-		_ = r.getClient().Status().Update(ctx, &metric) // Best effort status update on error
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
 	}
 
 	errExport := metricClient.ExportMetrics(ctx)
-	if errExport != nil {
-		metric.Status.Ready = v1alpha1.StatusFalse
-		l.Error(errExport, fmt.Sprintf("metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-	} else {
-		metric.Status.Ready = v1alpha1.StatusTrue
-	}
 
 	/*
 		3. Update the status of the metric with conditions and phase
@@ -219,11 +233,16 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	cObs := result.Observation.(*v1alpha1.MetricObservation)
 
-	// Override Ready status if export failed
+	// Set Ready condition based on export result
 	if errExport != nil {
-		metric.Status.Ready = "False"
+		metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		l.Error(errExport, fmt.Sprintf("metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+	} else {
+		metric.SetConditions(common.ReadyTrue("Metric reconciled successfully"))
+		metric.Status.Ready = v1alpha1.StatusStringTrue
 	}
-	// metric.Status.Observation = v1beta1.MetricObservation{Timestamp: result.Observation.GetTimestamp(), Dimensions: cObs.Dimensions, LatestValue: cObs.LatestValue}
+
 	metric.Status.Observation = v1alpha1.MetricObservation{
 		Timestamp:   result.Observation.GetTimestamp(),
 		LatestValue: cObs.LatestValue,
@@ -233,12 +252,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Update LastReconcileTime
 	metric.Status.Observation.Timestamp.Time = metav1.Now().Time
 
-	// conditions are not persisted until the status is updated
-	errUp := r.getClient().Status().Update(ctx, &metric)
-	if errUp != nil {
-		l.Error(errUp, fmt.Sprintf("metric '%s' failed to update status, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errUp
-	}
+	// Note: Status update is handled by the defer function at the beginning
 
 	/*
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred

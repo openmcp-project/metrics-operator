@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -125,6 +126,18 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		return r.handleGetError(errLoad, l)
 	}
 
+	// Defer status update to ensure it's always called
+	defer func() {
+		if err := r.getClient().Status().Update(ctx, &metric); err != nil {
+			l.Error(err, "Failed to update FederatedManagedMetric status")
+		}
+	}()
+
+	// Initialize Ready condition if not present
+	if meta.FindStatusCondition(metric.Status.Conditions, v1alpha1.TypeReady) == nil {
+		metric.SetConditions(common.ReadyUnknown("Reconciling", "Initial reconciliation"))
+	}
+
 	// Check if enough time has passed since the last reconciliation
 	if !r.shouldReconcile(&metric) {
 		return r.scheduleNextReconciliation(&metric)
@@ -135,6 +148,8 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	*/
 	credentials, errCredentials := r.getDataSinkCredentials(ctx, &metric, l)
 	if errCredentials != nil {
+		metric.SetConditions(common.ReadyFalse("DataSinkUnavailable", errCredentials.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCredentials
 	}
 
@@ -143,6 +158,8 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	*/
 	queryConfigs, err := config.CreateExternalQueryConfigSet(ctx, metric.Spec.FederatedClusterAccessRef, r.getClient(), r.getRestConfig())
 	if err != nil {
+		metric.SetConditions(common.ReadyFalse("QueryConfigCreationFailed", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(err, "unable to create query configs")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
@@ -150,6 +167,8 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
 
 	if errCli != nil {
+		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errCli, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
@@ -165,6 +184,8 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 
 	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
 	if errGauge != nil {
+		metric.SetConditions(common.ReadyFalse("MetricCreationFailed", errGauge.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errGauge, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
@@ -173,6 +194,8 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 
 		orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithFederatedManaged(metric, gaugeMetric)
 		if errOrch != nil {
+			metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
 			l.Error(errOrch, "unable to create federate metric orchestrator monitor")
 			r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
@@ -181,6 +204,8 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		_, errMon := orchestrator.Handler.Monitor(ctx)
 
 		if errMon != nil {
+			metric.SetConditions(common.ReadyFalse("MonitoringFailed", errMon.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
 			l.Error(errMon, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
 		}
@@ -189,22 +214,19 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 
 	errExport := metricClient.ExportMetrics(ctx)
 	if errExport != nil {
-		metric.Status.Ready = "False"
+		metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errExport, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 	} else {
-		metric.Status.Ready = "True"
+		metric.SetConditions(common.ReadyTrue("Federated managed metric reconciled successfully"))
+		metric.Status.Ready = v1alpha1.StatusStringTrue
 	}
 
 	// Update LastReconcileTime
 	now := metav1.Now()
 	metric.Status.LastReconcileTime = &now
 
-	// conditions are not persisted until the status is updated
-	errUp := r.getClient().Status().Update(ctx, &metric)
-	if errUp != nil {
-		l.Error(errUp, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errUp
-	}
+	// Note: Status update is handled by the defer function at the beginning
 
 	/*
 		4. Re-queue the metric after the frequency or 2 minutes if an error occurred
