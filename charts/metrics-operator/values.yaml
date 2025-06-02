@@ -108,6 +108,15 @@ rbac:
   clusterRole:
     rules:
       - apiGroups:
+          - metrics.cloud.sap
+        resources:
+          - managedmetrics
+          - metrics
+          - metrics/status
+          - managedmetrics/status
+        verbs:
+          - "*"
+      - apiGroups:
           - ""
         resources:
           - secrets
@@ -115,60 +124,9 @@ rbac:
           - get
           - list
           - watch
-      - apiGroups:
-          - ""
-        resources:
-          - events
-        verbs:
-          - create
-          - patch
-      - apiGroups:
-          - metrics.cloud.sap
-        resources:
-          - clusteraccesses
-          - datasinks
-          - federatedclusteraccesses
-          - federatedmanagedmetrics
-          - federatedmetrics
-          - managedmetrics
-          - metrics
-          - remoteclusteraccesses
-        verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-      - apiGroups:
-          - metrics.cloud.sap
-        resources:
-          - clusteraccesses/finalizers
-          - datasinks/finalizers
-          - federatedclusteraccesses/finalizers
-          - federatedmanagedmetrics/finalizers
-          - federatedmetrics/finalizers
-          - managedmetrics/finalizers
-          - metrics/finalizers
-          - remoteclusteraccesses/finalizers
-        verbs:
-          - update
-      - apiGroups:
-          - metrics.cloud.sap
-        resources:
-          - clusteraccesses/status
-          - datasinks/status
-          - federatedclusteraccesses/status
-          - federatedmanagedmetrics/status
-          - federatedmetrics/status
-          - managedmetrics/status
-          - metrics/status
-          - remoteclusteraccesses/status
-        verbs:
-          - get
-          - patch
-          - update
+      - apiGroups: [ "*" ]
+        resources: [ "*" ]
+        verbs: [ "get", "list", "watch" ]
 
   role:
     rules: []
