@@ -13,7 +13,7 @@ const (
 	// SecretNameSpace is the namespace where the secret is deployed
 	SecretNameSpace string = "metrics-operator"
 	// SecretName is the name of the secret
-	SecretName string = "co-dynatrace-credentials"
+	SecretName string = "dynatrace-credentials"
 )
 
 // GetCredentialsSecret Get the Secret with access token from the cluster, which you deployed earlier into the system
