@@ -5,6 +5,12 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
   - metrics.cloud.sap
   resources:
   - clusteraccesses
@@ -39,3 +45,11 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - metrics.cloud.sap
+  resources:
+  - datasinks
+  verbs:
+  - get
+  - list
+  - watch

@@ -3,7 +3,7 @@ package clientoptl
 import (
 	"context"
 	"fmt"
-	"path"
+	"net/url"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -53,22 +53,34 @@ func (dp *DataPoint) SetValue(value int64) *DataPoint {
 }
 
 // NewMetricClient creates a new metric client
-func NewMetricClient(ctx context.Context, dtAPIHost, dtAPIBasePath, dtAPIToken string) (*MetricClient, error) {
+func NewMetricClient(ctx context.Context, dtAPIHost, dtAPIToken string) (*MetricClient, error) {
 	authHeader := map[string]string{"Authorization": "Api-Token " + dtAPIToken}
 
 	deltaTemporalitySelector := func(sdkmetric.InstrumentKind) metricdata.Temporality {
 		return metricdata.DeltaTemporality
 	}
 
-	urlPath := path.Join(dtAPIBasePath, "/otlp/v1/metrics")
+	// Parse the dtAPIHost URL to extract host and path components
+	// dtAPIHost is the full endpoint from DataSink, e.g., "https://.../otlp/v1/metrics"
+	parsedURL, err := url.Parse(dtAPIHost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse endpoint URL: %w", err)
+	}
 
-	metricsExporter, err := otlpmetrichttp.New(
-		ctx,
-		otlpmetrichttp.WithEndpoint(dtAPIHost),
-		otlpmetrichttp.WithURLPath(urlPath),
+	// Construct OTLP options with proper URL parsing
+	opts := []otlpmetrichttp.Option{
+		otlpmetrichttp.WithEndpoint(parsedURL.Host),
+		otlpmetrichttp.WithURLPath(parsedURL.Path), // Use the path directly from the DataSink endpoint
 		otlpmetrichttp.WithHeaders(authHeader),
 		otlpmetrichttp.WithTemporalitySelector(deltaTemporalitySelector),
-	)
+	}
+
+	// Add insecure option if scheme is http
+	if parsedURL.Scheme == "http" {
+		opts = append(opts, otlpmetrichttp.WithInsecure())
+	}
+
+	metricsExporter, err := otlpmetrichttp.New(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
 	}

@@ -46,6 +46,12 @@ type ManagedMetricSpec struct {
 	// +kubebuilder:default:="10m"
 	Interval metav1.Duration `json:"interval,omitempty"`
 
+	// DataSinkRef specifies the DataSink to be used for this managed metric.
+	// If not specified, the DataSink named "default" in the operator's
+	// namespace will be used.
+	// +optional
+	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
+
 	// +optional
 	*RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 }

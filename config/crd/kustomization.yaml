@@ -4,6 +4,7 @@
 resources:
 - bases/metrics.cloud.sap_metrics.yaml
 - bases/metrics.cloud.sap_managedmetrics.yaml
+- bases/metrics.cloud.sap_datasinks.yaml
 - bases/metrics.cloud.sap_remoteclusteraccesses.yaml
 - bases/metrics.cloud.sap_federatedmetrics.yaml
 - bases/metrics.cloud.sap_clusteraccesses.yaml

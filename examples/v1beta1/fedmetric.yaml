@@ -16,4 +16,8 @@ spec:
   federateClusterAccessRef:
     name: federate-ca-sample
     namespace: default
+  # Uses default DataSink (named "default" in metrics-operator-system namespace)
+  # To use a custom DataSink, uncomment and specify:
+  # dataSinkRef:
+  #   name: custom-sink
 ---

@@ -13,6 +13,10 @@ spec:
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring
+  # Uses default DataSink (named "default" in metrics-operator-system namespace)
+  # To use a custom DataSink, uncomment and specify:
+  # dataSinkRef:
+  #   name: custom-sink
 ---
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
@@ -29,6 +33,10 @@ spec:
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring
+  # Uses default DataSink (named "default" in metrics-operator-system namespace)
+  # To use a custom DataSink, uncomment and specify:
+  # dataSinkRef:
+  #   name: custom-sink
 ---
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
@@ -45,4 +53,8 @@ spec:
   remoteClusterAccessRef:
     name: crate-cluster
     namespace: test-monitoring
+  # Uses default DataSink (named "default" in metrics-operator-system namespace)
+  # To use a custom DataSink, uncomment and specify:
+  # dataSinkRef:
+  #   name: custom-sink
 ---

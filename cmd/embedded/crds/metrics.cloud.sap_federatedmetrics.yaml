@@ -39,6 +39,18 @@ spec:
           spec:
             description: FederatedMetricSpec defines the desired state of FederatedMetric
             properties:
+              dataSinkRef:
+                description: |-
+                  DataSinkRef specifies the DataSink to be used for this federated metric.
+                  If not specified, the DataSink named "default" in the operator's
+                  namespace will be used.
+                properties:
+                  name:
+                    description: Name is the name of the DataSink resource.
+                    type: string
+                required:
+                - name
+                type: object
               description:
                 type: string
               federateClusterAccessRef:

@@ -10,4 +10,8 @@ spec:
     group: landscaper-service.gardener.cloud
     version: v1alpha1
   interval: "1m" # in minutes
+  # Uses default DataSink (named "default" in metrics-operator-system namespace)
+  # To use a custom DataSink, uncomment and specify:
+  # dataSinkRef:
+  #   name: custom-sink
 ---

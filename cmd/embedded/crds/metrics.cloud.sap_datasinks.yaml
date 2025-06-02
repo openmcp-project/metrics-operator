@@ -4,30 +4,27 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: managedmetrics.metrics.cloud.sap
+  name: datasinks.metrics.cloud.sap
 spec:
   group: metrics.cloud.sap
   names:
-    kind: ManagedMetric
-    listKind: ManagedMetricList
-    plural: managedmetrics
-    singular: managedmetric
+    kind: DataSink
+    listKind: DataSinkList
+    plural: datasinks
+    singular: datasink
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.ready
-      name: READY
+    - jsonPath: .spec.connection.endpoint
+      name: ENDPOINT
       type: string
-    - jsonPath: .status.observation.resources
-      name: VALUE
-      type: string
-    - jsonPath: .status.observation.timestamp
-      name: OBSERVED
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
       type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ManagedMetric is the Schema for the managedmetrics API
+        description: DataSink is the Schema for the datasinks API
         properties:
           apiVersion:
             description: |-
@@ -47,63 +44,58 @@ spec:
           metadata:
             type: object
           spec:
-            description: ManagedMetricSpec defines the desired state of ManagedMetric
+            description: DataSinkSpec defines the desired state of DataSink
             properties:
-              dataSinkRef:
-                description: |-
-                  DataSinkRef specifies the DataSink to be used for this managed metric.
-                  If not specified, the DataSink named "default" in the operator's
-                  namespace will be used.
+              authentication:
+                description: Authentication specifies the authentication configuration
                 properties:
-                  name:
-                    description: Name is the name of the DataSink resource.
+                  apiKey:
+                    description: APIKey specifies API key authentication configuration
+                    properties:
+                      secretKeyRef:
+                        description: SecretKeyRef references a key in a Kubernetes
+                          Secret containing the API key
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                    required:
+                    - secretKeyRef
+                    type: object
+                type: object
+              connection:
+                description: Connection specifies the connection details for the data
+                  sink
+                properties:
+                  endpoint:
+                    description: Endpoint specifies the target endpoint URL
                     type: string
                 required:
-                - name
+                - endpoint
                 type: object
-              description:
-                description: Sets the description that will be used to identify the
-                  metric in Dynatrace(or other providers)
-                type: string
-              fieldSelector:
-                description: Define fields of your object to adapt filters of the
-                  query
-                type: string
-              group:
-                description: Define the group of your object that should be instrumented
-                  (without version at the end)
-                type: string
-              interval:
-                default: 10m
-                description: Define in what interval the query should be recorded
-                type: string
-              kind:
-                description: Decide which kind the metric should keep track of (needs
-                  to be plural version)
-                type: string
-              labelSelector:
-                description: Define labels of your object to adapt filters of the
-                  query
-                type: string
-              name:
-                description: Sets the name that will be used to identify the metric
-                  in Dynatrace(or other providers)
-                type: string
-              remoteClusterAccessRef:
-                description: RemoteClusterAccessRef is to be used by other types to
-                  reference a RemoteClusterAccess type
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                type: object
-              version:
-                description: Define version of the object you want to intrsument
-                type: string
+            required:
+            - connection
             type: object
           status:
-            description: ManagedMetricStatus defines the observed state of ManagedMetric
+            description: DataSinkStatus defines the observed state of DataSink
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -163,24 +155,6 @@ spec:
                   - type
                   type: object
                 type: array
-              observation:
-                description: Observation represent the latest available observation
-                  of an object's state
-                properties:
-                  resources:
-                    description: Number of resources of the managed metric (i.e. how
-                      many managed resource are there that match the query)
-                    type: string
-                  timestamp:
-                    description: The timestamp of the observation
-                    format: date-time
-                    type: string
-                type: object
-              ready:
-                description: |-
-                  Is set when Metric is Successfully executed and keeps track of the current cycle.
-                  The cycle starts anew and the status will be set to active if execution was successful
-                type: string
             type: object
         type: object
     served: true

@@ -31,3 +31,4 @@ Dockerfile.cross
 examples/sample_secret.yaml
 examples/dynatrace_secret.yaml
 examples/secret.yaml
+/examples/datasink/dynatrace-prod-setup.yaml

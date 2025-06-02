@@ -36,6 +36,13 @@ const (
 	PhasePending PhaseType = "Pending"
 )
 
+// DataSinkReference holds a reference to a DataSink resource.
+type DataSinkReference struct {
+	// Name is the name of the DataSink resource.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+}
+
 // MetricSpec defines the desired state of Metric
 type MetricSpec struct {
 	// Sets the name that will be used to identify the metric in Dynatrace(or other providers)
@@ -54,6 +61,12 @@ type MetricSpec struct {
 	// Define in what interval the query should be recorded
 	// +kubebuilder:default:="10m"
 	Interval metav1.Duration `json:"interval,omitempty"`
+
+	// DataSinkRef specifies the DataSink to be used for this metric.
+	// If not specified, the DataSink named "default" in the operator's
+	// namespace will be used.
+	// +optional
+	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
 
 	// +optional
 	*RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
