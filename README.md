@@ -151,9 +151,9 @@ The projections are then translated to dimensions in the metric.
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
 metadata:
-  name: comp-pod
+  name: pod
 spec:
-  name: comp-metric-pods
+  name: metric-pods
   description: Pods
   target:
     kind: Pod
