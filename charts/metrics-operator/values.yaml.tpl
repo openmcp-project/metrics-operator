@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: deploy-releases-hyperspace-docker.common.cdn.repositories.cloud.sap/cloud-orchestration/co-metrics-operator
+  repository: ghcr.io/sap/github.com/sap/metrics-operator/images/metrics-operator
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: $OPERATOR_VERSION
