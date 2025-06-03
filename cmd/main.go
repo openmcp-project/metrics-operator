@@ -168,19 +168,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: to deprecate v1beta1 resources
 	setupMetricController(mgr)
+
 	setupManagedMetricController(mgr)
 
-	setupReconcilersV1beta1(mgr)
+	setupFederatedMetricController(mgr)
 
-	if err = (&controller.ClusterAccessReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ClusterAccess")
-		os.Exit(1)
-	}
+	setupFederatedManagedMetricController(mgr)
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -199,17 +194,18 @@ func main() {
 	}
 }
 
-func setupReconcilersV1beta1(mgr ctrl.Manager) {
+func setupFederatedMetricController(mgr ctrl.Manager) {
 	if err := (controller.NewFederatedMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create reconciler", "controller", "federated metric")
 		os.Exit(1)
 	}
+}
 
+func setupFederatedManagedMetricController(mgr ctrl.Manager) {
 	if err := (controller.NewFederatedManagedMetricReconciler(mgr)).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create reconciler", "controller", "federated managed metric")
 		os.Exit(1)
 	}
-
 }
 
 func setupMetricController(mgr ctrl.Manager) {
