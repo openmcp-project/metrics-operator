@@ -37,14 +37,14 @@ resources:
   controller: true
   domain: metrics.cloud.sap
   kind: FederatedMetric
-  path: github.com/SAP/metrics-operator/api/v1beta1
+  path: github.com/SAP/metrics-operator/api/v1alpha1
   version: v1beta1
 - api:
     crdVersion: v1
     namespaced: true
   domain: metrics.cloud.sap
   kind: FederatedClusterAccess
-  path: github.com/SAP/metrics-operator/api/v1beta1
+  path: github.com/SAP/metrics-operator/api/v1alpha1
   version: v1beta1
 - api:
     crdVersion: v1
@@ -52,6 +52,6 @@ resources:
   controller: true
   domain: metrics.cloud.sap
   kind: FederatedManagedMetric
-  path: github.com/SAP/metrics-operator/api/v1beta1
+  path: github.com/SAP/metrics-operator/api/v1alpha1
   version: v1beta1
 version: "3"
