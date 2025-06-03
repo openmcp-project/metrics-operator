@@ -7,7 +7,7 @@ import (
 
 func TestNewMetricClient_Real(t *testing.T) {
 	t.Skip("skipping test")
-	client, err := NewMetricClient(context.TODO(), "canary.eu21.apm.services.cloud.sap", "/e/1b9c6fb0-eb17-4fce-96b0-088cee0861b3/api/v2/", "dt0c01..")
+	client, err := NewMetricClient(context.TODO(), "https://canary.eu21.apm.services.cloud.sap/e/1b9c6fb0-eb17-4fce-96b0-088cee0861b3/api/v2/otlp/v1/metrics", "dt0c01..")
 
 	if err != nil {
 		t.Errorf("Failed to create OTLP exporter: %v", err)

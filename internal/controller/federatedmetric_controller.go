@@ -18,26 +18,24 @@ package controller
 
 import (
 	"context"
-
 	"fmt"
-
 	"time"
 
 	"github.com/go-logr/logr"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/SAP/metrics-operator/api/v1alpha1"
 	"github.com/SAP/metrics-operator/internal/clientoptl"
 	"github.com/SAP/metrics-operator/internal/common"
 	"github.com/SAP/metrics-operator/internal/config"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // NewFederatedMetricReconciler creates a new FederatedMetricReconciler
@@ -68,6 +66,12 @@ func (r *FederatedMetricReconciler) getClient() client.Client {
 
 func (r *FederatedMetricReconciler) getRestConfig() *rest.Config {
 	return r.RestConfig
+}
+
+// getDataSinkCredentials fetches DataSink configuration and credentials
+func (r *FederatedMetricReconciler) getDataSinkCredentials(ctx context.Context, federatedMetric *v1alpha1.FederatedMetric, l logr.Logger) (common.DataSinkCredentials, error) {
+	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
+	return retriever.GetDataSinkCredentials(ctx, federatedMetric.Spec.DataSinkRef, federatedMetric, l)
 }
 
 func handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
@@ -102,6 +106,8 @@ func shouldReconcile(metric *v1alpha1.FederatedMetric) bool {
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile handles the reconciliation of the FederatedMetric object
 //
@@ -122,33 +128,49 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return handleGetError(errLoad, l)
 	}
 
+	// Defer status update to ensure it's always called
+	defer func() {
+		if err := r.getClient().Status().Update(ctx, &metric); err != nil {
+			l.Error(err, "Failed to update FederatedMetric status")
+		}
+	}()
+
+	// Initialize Ready condition if not present
+	if meta.FindStatusCondition(metric.Status.Conditions, v1alpha1.TypeReady) == nil {
+		metric.SetConditions(common.ReadyUnknown("Reconciling", "Initial reconciliation"))
+	}
+
 	// Check if enough time has passed since the last reconciliation
 	if !shouldReconcile(&metric) {
 		return scheduleNextReconciliation(&metric)
 	}
 
 	/*
-		1.1 Get the Secret that holds the Dynatrace credentials
+		1.1 Get DataSink configuration and credentials
 	*/
-	secret, errSecret := common.GetCredentialsSecret(ctx, r.getClient())
-	if errSecret != nil {
-		return r.handleSecretError(l, errSecret, metric)
+	credentials, err := r.getDataSinkCredentials(ctx, &metric, l)
+	if err != nil {
+		metric.SetConditions(common.ReadyFalse("DataSinkUnavailable", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
-
-	credentials := common.GetCredentialData(secret)
 
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
 	queryConfigs, err := config.CreateExternalQueryConfigSet(ctx, metric.Spec.FederatedClusterAccessRef, r.getClient(), r.getRestConfig())
 	if err != nil {
+		metric.SetConditions(common.ReadyFalse("QueryConfigCreationFailed", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(err, "unable to create query configs")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Path, credentials.Token)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
 
 	if errCli != nil {
+		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errCli, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
@@ -164,6 +186,8 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
 	if errGauge != nil {
+		metric.SetConditions(common.ReadyFalse("MetricCreationFailed", errGauge.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errGauge, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
@@ -172,6 +196,8 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithFederated(metric, gaugeMetric)
 		if errOrch != nil {
+			metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
 			l.Error(errOrch, "unable to create federate metric orchestrator monitor")
 			r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
@@ -180,6 +206,8 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		_, errMon := orchestrator.Handler.Monitor(ctx)
 
 		if errMon != nil {
+			metric.SetConditions(common.ReadyFalse("MonitoringFailed", errMon.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
 			l.Error(errMon, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
 		}
@@ -188,22 +216,19 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	errExport := metricClient.ExportMetrics(ctx)
 	if errExport != nil {
-		metric.Status.Ready = "False"
+		metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errExport, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 	} else {
-		metric.Status.Ready = "True"
+		metric.SetConditions(common.ReadyTrue("Federated metric reconciled successfully"))
+		metric.Status.Ready = v1alpha1.StatusStringTrue
 	}
 
 	// Update LastReconcileTime
 	now := metav1.Now()
 	metric.Status.LastReconcileTime = &now
 
-	// conditions are not persisted until the status is updated
-	errUp := r.getClient().Status().Update(ctx, &metric)
-	if errUp != nil {
-		l.Error(errUp, fmt.Sprintf("generic metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errUp
-	}
+	// Note: Status update is handled by the defer function at the beginning
 
 	/*
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
@@ -221,12 +246,6 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		Requeue:      true,
 		RequeueAfter: requeueTime,
 	}, nil
-}
-
-func (r *FederatedMetricReconciler) handleSecretError(l logr.Logger, errSecret error, metric v1alpha1.FederatedMetric) (ctrl.Result, error) {
-	l.Error(errSecret, fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-	r.Recorder.Event(&metric, "Error", "SecretNotFound", fmt.Sprintf("unable to fetch secret '%s' in namespace '%s' that stores the credentials to data sink", common.SecretName, common.SecretNameSpace))
-	return ctrl.Result{RequeueAfter: RequeueAfterError}, errSecret
 }
 
 // SetupWithManager sets up the controller with the Manager.

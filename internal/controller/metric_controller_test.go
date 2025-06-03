@@ -27,7 +27,6 @@ import (
 	"github.com/SAP/metrics-operator/internal/common"
 	orc "github.com/SAP/metrics-operator/internal/orchestrator"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -166,7 +165,7 @@ func TestMetricController(t *testing.T) {
 	// Run the tests
 	t.Run("TestReconcileMetricHappyPath", testReconcileMetricHappyPath)
 	t.Run("TestReconcileMetricNotFound", testReconcileMetricNotFound)
-	t.Run("TestReconcileSecretNotFound", testReconcileSecretNotFound)
+	t.Run("TestReconcileDataSinkNotFound", testReconcileSecretNotFound)
 }
 
 // testReconcileMetricNotFound tests the behavior when the Metric is not found
@@ -203,23 +202,23 @@ func testReconcileMetricNotFound(t *testing.T) {
 	require.Equal(t, RequeueAfterError, result.RequeueAfter, "Should requeue after error time")
 }
 
-// testReconcileSecretNotFound tests the behavior when the Secret is not found
+// testReconcileSecretNotFound tests the behavior when the DataSink is not found
 func testReconcileSecretNotFound(t *testing.T) {
 	const (
-		MetricName      = "test-metric-no-secret"
+		MetricName      = "test-metric-no-datasink"
 		MetricNamespace = "default"
 	)
 
 	ctx := context.Background()
 
-	// Create a test Metric
+	// Create a test Metric (without DataSinkRef, so it will look for "default" DataSink)
 	metric := &v1alpha1.Metric{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      MetricName,
 			Namespace: MetricNamespace,
 		},
 		Spec: v1alpha1.MetricSpec{
-			Name:        "test-metric-no-secret",
+			Name:        "test-metric-no-datasink",
 			Description: "Test metric description",
 			Target: v1alpha1.GroupVersionKind{
 				Kind:    "Pod",
@@ -259,47 +258,21 @@ func testReconcileSecretNotFound(t *testing.T) {
 	result, err := reconciler.Reconcile(ctx, req)
 
 	// Verify the result
-	require.Error(t, err, "Reconcile should return an error when Secret is not found")
+	require.Error(t, err, "Reconcile should return an error when DataSink is not found")
 	require.Equal(t, RequeueAfterError, result.RequeueAfter, "Should requeue after error time")
 
-	// Verify that events were recorded
+	// Verify that events were recorded - now expecting DataSinkNotFound instead of SecretNotFound
 	event := <-recorder.Events
-	require.Contains(t, event, "SecretNotFound")
+	require.Contains(t, event, "DataSinkNotFound")
 }
 
 func testReconcileMetricHappyPath(t *testing.T) {
 	const (
 		MetricName      = "test-metric"
 		MetricNamespace = "default"
-		SecretName      = common.SecretName
-		SecretNamespace = common.SecretNameSpace
 	)
 
 	ctx := context.Background()
-
-	// Create namespace for the secret
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: SecretNamespace,
-		},
-	}
-	err := k8sClient.Create(ctx, namespace)
-	require.NoError(t, err)
-
-	// Create the Secret with credentials
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      SecretName,
-			Namespace: SecretNamespace,
-		},
-		Data: map[string][]byte{
-			"Host":  []byte("test-host"),
-			"Path":  []byte("test-path"),
-			"Token": []byte("test-token"),
-		},
-	}
-	err = k8sClient.Create(ctx, secret)
-	require.NoError(t, err)
 
 	// Create a test Metric
 	metric := &v1alpha1.Metric{
@@ -318,7 +291,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 			Interval: metav1.Duration{Duration: 5 * time.Minute},
 		},
 	}
-	err = k8sClient.Create(ctx, metric)
+	err := k8sClient.Create(ctx, metric)
 	require.NoError(t, err)
 
 	// Set up fake implementations
@@ -354,13 +327,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 
 	// Clean up resources after test
 	defer func() {
-		err := k8sClient.Delete(ctx, secret)
-		require.NoError(t, err)
-
-		err = k8sClient.Delete(ctx, metric)
-		require.NoError(t, err)
-
-		err = k8sClient.Delete(ctx, namespace)
+		err := k8sClient.Delete(ctx, metric)
 		require.NoError(t, err)
 	}()
 

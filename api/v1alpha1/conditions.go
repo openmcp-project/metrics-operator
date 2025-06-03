@@ -33,4 +33,14 @@ const (
 
 	// TypeError is a generic condition type that indicates an error has occurred
 	TypeError = "Error"
+
+	// TypeReady is a condition type that indicates the resource is ready
+	TypeReady = "Ready"
+
+	// StatusStringTrue represents the True status string.
+	StatusStringTrue string = "True"
+	// StatusStringFalse represents the False status string.
+	StatusStringFalse string = "False"
+	// StatusStringUnknown represents the Unknown status string.
+	StatusStringUnknown string = "Unknown"
 )

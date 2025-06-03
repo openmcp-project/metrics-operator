@@ -9,3 +9,7 @@ spec:
   group: helm.crossplane.io
   version: v1beta1
   interval: "1m" # in minutes
+  # Uses default DataSink (named "default" in metrics-operator-system namespace)
+  # To use a custom DataSink, uncomment and specify:
+  dataSinkRef:
+   name: other-datasink

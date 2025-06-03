@@ -10,6 +10,10 @@ spec:
     group: helm.crossplane.io
     version: v1beta1
   interval: 1m # in minutes
+  # Uses default DataSink (named "default" in metrics-operator-system namespace)
+  # To use a custom DataSink, uncomment and specify:
+  # dataSinkRef:
+  #   name: default
 ---
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
@@ -39,18 +43,3 @@ spec:
     group: ""
     version: v1
   interval: 1m # in minutes
-
-#apiVersion: metrics.cloud.sap/v1alpha1
-#kind: Metric
-#metadata:
-#  name: ext-sa-metric
-#spec:
-#  name: ext-subaccount-metric
-#  description: Subaccounts in mirza mcp cluster
-#  kind: Subaccount
-#  group: account.btp.orchestrate.cloud.sap
-#  version: v1alpha1
-#  frequency: 1 # in minutes
-#  remoteClusterAccessRef:
-#    name: remote-cluster-access
-#    namespace: default

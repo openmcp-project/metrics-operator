@@ -1,0 +1,14 @@
+# Metric Custom Resource using Dynatrace Production DataSink
+apiVersion: metrics.cloud.sap/v1alpha1
+kind: Metric
+metadata:
+  name: example-metric-dynatrace-prod
+  namespace: metrics-operator-system
+spec:
+  dataSinkRef:
+    name: default
+  interval: "10m"
+  target:
+    kind: ConfigMap
+    group: ""
+    version: v1
