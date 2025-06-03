@@ -21,9 +21,9 @@ spec:
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
 metadata:
-  name: crate-co-metric
+  name: crate-metric
 spec:
-  name: crate-co-metric
+  name: crate-metric
   description: Number of CloudOrchestrators in the Crate cluster
   target:
     kind: CloudOrchestrator

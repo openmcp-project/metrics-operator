@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: co-monitor-metrics-operator
+  name: monitor-metrics-operator
 rules:
   - apiGroups:
       - cola.cloud.sap
@@ -46,12 +46,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: co-monitor-metrics-operator
+  name: monitor-metrics-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: co-monitor-metrics-operator
+  name: monitor-metrics-operator
 subjects:
   - apiGroup: rbac.authorization.k8s.io
     kind: User
-    name: dev-core:system:serviceaccount:metrics-operator:co-monitor-metrics-operator
+    name: dev-core:system:serviceaccount:metrics-operator:monitor-metrics-operator

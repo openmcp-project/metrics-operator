@@ -416,7 +416,7 @@ The detailed guide covers:
 
 ### Migration from Legacy Configuration
 
-**Important**: The old method of using hardcoded secret names (such as `co-dynatrace-credentials`) has been deprecated and removed. You must now use DataSink resources to configure your metrics destinations.
+**Important**: The old method of using hardcoded secret names (such as `dynatrace-credentials`) has been deprecated and removed. You must now use DataSink resources to configure your metrics destinations.
 
 To migrate:
 1. Create a DataSink resource pointing to your existing authentication secret
