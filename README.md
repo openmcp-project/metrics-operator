@@ -37,12 +37,12 @@ graph LR
     M -.->|optional| RCA[RemoteClusterAccess]
     RCA -->|accesses remote cluster| K8S
     M -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class M metricType
     class RCA accessType
     class K8S targetType
@@ -57,12 +57,12 @@ graph LR
     MM -.->|optional| RCA[RemoteClusterAccess]
     RCA -->|accesses remote cluster| MR
     MM -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class MM metricType
     class RCA accessType
     class MR targetType
@@ -78,12 +78,12 @@ graph LR
     FCA -->|provides access to| MC[Multiple Clusters]
     FM -->|targets across clusters| K8S[Kubernetes Objects<br/>across federated clusters]
     FM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class FM metricType
     class FCA accessType
     class CP,MC,K8S targetType
@@ -99,12 +99,12 @@ graph LR
     FCA -->|provides access to| MC[Multiple Clusters]
     FMM -->|targets managed resources<br/>across clusters| MR[Managed Resources<br/>with 'crossplane' & 'managed' categories]
     FMM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class FMM metricType
     class FCA accessType
     class CP,MC,MR targetType
@@ -154,9 +154,9 @@ The projections are then translated to dimensions in the metric.
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
 metadata:
-  name: pod
+  name: metric-pod-count
 spec:
-  name: metric-pods
+  name: metric-pod-count
   description: Pods
   target:
     kind: Pod
