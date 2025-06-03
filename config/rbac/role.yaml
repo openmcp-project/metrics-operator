@@ -13,6 +13,14 @@ rules:
 - apiGroups:
   - metrics.cloud.sap
   resources:
+  - datasinks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.cloud.sap
+  resources:
   - federatedmetrics
   - managedmetrics
   - metrics
@@ -42,11 +50,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - metrics.cloud.sap
-  resources:
-  - datasinks
-  verbs:
-  - get
-  - list
-  - watch
