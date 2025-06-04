@@ -7,7 +7,6 @@ resources:
 - bases/metrics.cloud.sap_datasinks.yaml
 - bases/metrics.cloud.sap_remoteclusteraccesses.yaml
 - bases/metrics.cloud.sap_federatedmetrics.yaml
-- bases/metrics.cloud.sap_clusteraccesses.yaml
 - bases/metrics.cloud.sap_federatedclusteraccesses.yaml
 - bases/metrics.cloud.sap_federatedmanagedmetrics.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
