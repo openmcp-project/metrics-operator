@@ -1,4 +1,30 @@
-
+#
+# =========================
+# Metrics Operator Makefile
+# =========================
+#
+# This Makefile provides targets for building, testing, deploying, and developing the metrics-operator.
+# It is designed for contributors and maintainers working with a Kubebuilder-based project.
+#
+# Key Target Categories:
+#   - General: Help, all, and core build/test targets
+#   - Build: Build binaries and Docker images
+#   - Development: Local dev cluster, install, and test helpers
+#   - Deployment: Install/uninstall/deploy/undeploy to Kubernetes
+#   - Linting: Code quality and formatting
+#   - Helm: Helm chart packaging and install
+#   - Crossplane: Crossplane installation and provider setup
+#
+# Usage:
+#   make help         # Show all available targets and their descriptions
+#   make build        # Build the operator binary
+#   make test         # Run all tests
+#   make deploy       # Deploy the operator to your current K8s context
+#   make dev-local    # Setup a local dev cluster and install CRDs
+#   make lint         # Run all linters
+#   make helm-install-local # Install Helm chart locally
+#
+# For more details, see the README.md.
 
 PROJECT_NAME := metrics
 PROJECT_FULL_NAME := metrics-operator
@@ -28,25 +54,75 @@ CONTAINER_TOOL ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+# Tool Binaries and Versions
+# --------------------------
+# These variables define the locations and versions of required CLI tools.
+# You can override them via environment variables if needed.
+#
+# KUBECTL:        Path to kubectl (default: kubectl in PATH)
+# KIND:           Path to kind (default: kind in PATH)
+# KUSTOMIZE:      Path to kustomize (default: ./bin/kustomize)
+# CONTROLLER_GEN: Path to controller-gen (default: ./bin/controller-gen)
+# ENVTEST:        Path to setup-envtest (default: ./bin/setup-envtest)
+# GOTESTSUM:      Path to gotestsum (default: ./bin/gotestsum)
+# GOLANGCILINT:   Path to golangci-lint (default: ./bin/golangci-lint)
+#
+# To update a tool version, change the corresponding *_VERSION variable below.
+#
+KUBECTL ?= kubectl
+KIND ?= kind
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+GOTESTSUM ?= $(LOCALBIN)/gotestsum
+GOLANGCILINT ?= $(LOCALBIN)/golangci-lint
+
+KUSTOMIZE_VERSION ?= v5.4.1
+CONTROLLER_TOOLS_VERSION ?= v0.17.2
+GOLANGCILINT_VERSION ?= v2.0.2
+
 .PHONY: all
-all: build
+all: build ## Build the operator binary (default target)
 
 ##@ General
 
-# The help target prints out all targets with their descriptions organized
-# beneath their categories. The categories are represented by '##@' and the
-# target descriptions by '##'. The awk commands is responsible for reading the
-# entire set of makefiles included in this invocation, looking for lines of the
-# file as xyz: ## something, and then pretty-format the target and help. Then,
-# if there's a line with ##@ something, that gets pretty-printed as a category.
-# More info on the usage of ANSI control characters for terminal formatting:
-# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
-# More info on the awk command:
-# http://linuxcommand.org/lc3_adv_awk.php
-
 .PHONY: help
-help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+help: ## Display this help message and list all available targets.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Build
+
+.PHONY: build
+build: manifests generate fmt vet ## Build the operator binary.
+	go build -o bin/manager cmd/main.go
+
+.PHONY: build-docker-binary
+build-docker-binary: manifests generate fmt vet ## Build the Linux/amd64 manager binary for Docker image.
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o bin/manager-linux.amd64 cmd/main.go
+
+.PHONY: docker-build
+# Build the Docker image for the operator. Use IMG to override the image name.
+docker-build: build-docker-binary test ## Build Docker image with the manager.
+	$(CONTAINER_TOOL) build -t ${IMG} .
+
+.PHONY: docker-push
+# Push the Docker image to a registry. Use IMG to override the image name.
+docker-push: ## Push Docker image with the manager.
+	$(CONTAINER_TOOL) push ${IMG}
+
+.PHONY: docker-buildx
+# Build and tag Docker images for multiple platforms using Docker Buildx.
+docker-buildx: ## Build and tag Docker image for each platform locally using --load
+	sed '1 s/^FROM/FROM --platform=$${BUILDPLATFORM}/' Dockerfile > Dockerfile.cross
+	$(CONTAINER_TOOL) buildx create --name project-v3-builder || true
+	$(CONTAINER_TOOL) buildx use project-v3-builder
+	@for platform in $(PLATFORMS); do \
+		tag="$(IMG)-$$(echo $$platform | tr / -)"; \
+		echo "Building $$tag for $$platform"; \
+		$(CONTAINER_TOOL) buildx build --platform=$$platform --tag $$tag --load -f Dockerfile.cross .; \
+	done
+	$(CONTAINER_TOOL) buildx rm project-v3-builder
+	rm Dockerfile.cross
 
 ##@ Development
 
@@ -68,168 +144,16 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet envtest ## Run all Go tests with coverage.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
-##@ Build
-
-.PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
-
-.PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	OPERATOR_CONFIG_NAMESPACE=metrics-operator-system go run ./cmd/main.go start
-
-.PHONY: build-docker-binary
-build-docker-binary: manifests generate fmt vet ## Build manager binary.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o bin/manager-linux.amd64 cmd/main.go
-
-
-# If you wish built the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-.PHONY: docker-build
-docker-build: build-docker-binary test ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) push ${IMG}
-
-# PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
-# - have enable BuildKit, More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image for your registry (i.e. if you do not inform a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To properly provided solutions that supports more than one platform you should use this option.
-PLATFORMS ?= linux/arm64 linux/amd64
-.PHONY: docker-buildx
-docker-buildx: #test ## Build and tag docker image for each platform locally using --load
-	sed '1 s/^FROM/FROM --platform=$${BUILDPLATFORM}/' Dockerfile > Dockerfile.cross
-	$(CONTAINER_TOOL) buildx create --name project-v3-builder || true
-	$(CONTAINER_TOOL) buildx use project-v3-builder
-	@for platform in $(PLATFORMS); do \
-		tag="$(IMG)-$$(echo $$platform | tr / -)"; \
-		echo "Building $$tag for $$platform"; \
-		$(CONTAINER_TOOL) buildx build --platform=$$platform --tag $$tag --load -f Dockerfile.cross .; \
-	done
-	$(CONTAINER_TOOL) buildx rm project-v3-builder
-	rm Dockerfile.cross
-
-##@ Deployment
-
-ifndef ignore-not-found
-  ignore-not-found = false
-endif
-
-.PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
-
-.PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-
-.PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-
-.PHONY: undeploy
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-
-##@ Build Dependencies
-
-## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
-$(LOCALBIN):
-	mkdir -p $(LOCALBIN)
-
-## Tool Binaries
-KUBECTL ?= kubectl
-KIND ?= kind # fix this to use tools
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-GOTESTSUM ?= $(LOCALBIN)/gotestsum
-GOLANGCILINT ?= $(LOCALBIN)/golangci-lint
-
-
-
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.1
-CONTROLLER_TOOLS_VERSION ?= v0.17.2
-GOLANGCILINT_VERSION ?= v2.0.2
-
-.PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
-$(KUSTOMIZE): $(LOCALBIN)
-	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
-		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
-		rm -rf $(LOCALBIN)/kustomize; \
-	fi
-	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
-
-.PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
-
-.PHONY: envtest
-envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-
-.PHONY: envtest-bins
-envtest-bins: envtest ## Download envtest binaries
-	$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN)
-
-.PHONY: gotestsum
-gotestsum: $(GOTESTSUM) ## Download gotestsum locally if necessary.
-$(GOTESTSUM): $(LOCALBIN)
-	test -s $(LOCALBIN)/gotestsum || GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@latest
-
-
-### ------------------------------------ DEVELOPMENT - LOCAL ------------------------------------ ###
-
-.PHONY: dev-all
-dev-all-deploy:
-	$(MAKE) dev-deploy
-	$(MAKE) crossplane-install
-	$(MAKE) crossplane-provider-install
-	$(MAKE) crossplane-provider-sample
-
-
-.PHONY: dev-deploy
-dev-deploy: manifests kustomize dev-clean
-	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
-	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
-
-
-.PHONY: dev-build
-dev-build: docker-build
-	@echo "Finished building docker image" ${IMG}
-
-.PHONY: dev-base
-dev-base: manifests kustomize dev-build dev-clean dev-cluster helm-install-local
-
-.PHONY: dev-cluster
-dev-cluster:
-	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
-	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
-
 .PHONY: dev-local
-dev-local:
+dev-local: ## Create a local dev cluster and install CRDs.
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(MAKE) install
 
 .PHONY: dev-local-all
-dev-local-all:
+dev-local-all: ## Full local dev environment: cluster, CRDs, Crossplane, providers, and sample resources.
 	$(MAKE) dev-clean
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(MAKE) install
@@ -242,121 +166,104 @@ dev-local-all:
 	$(MAKE) dev-basic-metric
 	$(MAKE) dev-managed-metric
 
-
-.PHONY: dev-secret
-dev-secret:
-	kubectl apply -f examples/secret.yaml
-
-.PHONY: dev-namespace
-dev-namespace:
-	kubectl apply -f examples/namespace.yaml
-
-.PHONY: dev-operator-namespace
-dev-operator-namespace:
-	kubectl create namespace metrics-operator-system --dry-run=client -o yaml | kubectl apply -f -
-
-.PHONY: dev-basic-metric
-dev-basic-metric:
-	kubectl apply -f examples/basic_metric.yaml
-
-.PHONY: dev-managed-metric
-dev-managed-metric:
-	kubectl apply -f examples/managed_metric.yaml
-
-.PHONY: dev-apply-dynatrace-prod-setup
-dev-apply-dynatrace-prod-setup:
-	kubectl apply -f examples/datasink/dynatrace-prod-setup.yaml
-
-.PHONY: dev-apply-metric-dynatrace-prod
-dev-apply-metric-dynatrace-prod:
-	kubectl apply -f examples/datasink/metric-using-dynatrace-prod.yaml
-
-.PHONY: dev-v1beta1-compmetric
-dev-v1beta1-compmetric:
-	kubectl apply -f examples/v1beta1/compmetric.yaml
-
-
-.PHONY: dev-kind
-dev-kind:
-	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
-
 .PHONY: dev-clean
-dev-clean:
+dev-clean: ## Delete the local dev cluster.
 	$(KIND) delete cluster --name=$(PROJECT_FULL_NAME)-dev
 
 .PHONY: dev-run
-dev-run:
-	## todo: add flag --debug
+dev-run: ## Run the operator locally (for debugging).
 	go run ./cmd/main.go
 
-$(GOLANGCILINT): $(LOCALBIN)
-	@if test -x $(LOCALBIN)/golangci-lint && ! $(LOCALBIN)/golangci-lint version | grep -q $(GOLANGCILINT_VERSION); then \
-		echo "$(LOCALBIN)/golangci-lint version is not expected $(GOLANGCILINT_VERSION). Removing it before installing."; \
-		rm -rf $(LOCALBIN)/golangci-lint; \
-	fi
-	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
+.PHONY: dev-secret
+dev-secret: ## Apply the example secret for local dev.
+	kubectl apply -f examples/secret.yaml
 
+.PHONY: dev-namespace
+dev-namespace: ## Apply the example namespace for local dev.
+	kubectl apply -f examples/namespace.yaml
+
+.PHONY: dev-operator-namespace
+dev-operator-namespace: ## Create the operator namespace for local dev.
+	kubectl create namespace metrics-operator-system --dry-run=client -o yaml | kubectl apply -f -
+
+.PHONY: dev-basic-metric
+dev-basic-metric: ## Apply the basic metric example for local dev.
+	kubectl apply -f examples/basic_metric.yaml
+
+.PHONY: dev-managed-metric
+dev-managed-metric: ## Apply the managed metric example for local dev.
+	kubectl apply -f examples/managed_metric.yaml
+
+.PHONY: dev-apply-dynatrace-prod-setup
+dev-apply-dynatrace-prod-setup: ## Apply the Dynatrace prod setup example.
+	kubectl apply -f examples/datasink/dynatrace-prod-setup.yaml
+
+.PHONY: dev-apply-metric-dynatrace-prod
+dev-apply-metric-dynatrace-prod: ## Apply the metric using Dynatrace prod example.
+	kubectl apply -f examples/datasink/metric-using-dynatrace-prod.yaml
+
+.PHONY: dev-v1beta1-compmetric
+dev-v1beta1-compmetric: ## Apply the v1beta1 compmetric example.
+	kubectl apply -f examples/v1beta1/compmetric.yaml
+
+##@ Deployment
+
+.PHONY: install
+install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+
+.PHONY: uninstall
+uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster. Use ignore-not-found=true to ignore errors.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: deploy
+deploy: manifests kustomize ## Deploy the operator to the K8s cluster.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+
+.PHONY: undeploy
+undeploy: ## Remove the operator from the K8s cluster.
+	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+##@ Linting
 
 .PHONY: lint
-lint: $(GOLANGCILINT)
+lint: $(GOLANGCILINT) ## Run all linters.
 	$(GOLANGCILINT) config verify
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint-fix
-lint-fix:
+lint-fix: ## Run all linters and auto-fix issues.
 	golangci-lint run --fix
 
-### ------------------------------------ HELM ------------------------------------ ###
-
+##@ Helm
 
 .PHONY: helm-chart
-helm-chart:
+helm-chart: ## Render Helm chart templates with the current version.
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/Chart.yaml.tpl > charts/$(PROJECT_FULL_NAME)/Chart.yaml
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/values.yaml.tpl > charts/$(PROJECT_FULL_NAME)/values.yaml
 
 .PHONY: helm-install-local
-helm-install-local: docker-build
+helm-install-local: docker-build ## Install the Helm chart locally and load the image into the dev cluster.
 	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
-
-
 .PHONY: helm-work
-helm-work: dev-kind crossplane-install helm-install-local
+helm-work: dev-kind crossplane-install helm-install-local ## Full Helm workflow: dev cluster, Crossplane, and Helm install.
 	echo "Helm work done"
 
-# initializes pre-commit hooks using lefthook https://github.com/evilmartians/lefthook
-lefthook:
-	lefthook install
-
-# ensure go generate doesn't create a diff
-check-diff: generate manifests
-	@echo checking clean branch
-	@if git status --porcelain | grep . ; then echo Uncommitted changes found after running make generate manifests. Please ensure you commit all generated files in this branch after running make generate. && false; else echo branch is clean; fi
-
-reviewable:
-	@$(MAKE) generate
-	@$(MAKE) lint
-	@$(MAKE) test
-### ------------------------------------ CROSSPLANE ------------------------------------ ###
-
-# Namespace where Crossplane is installed
-CROSSPLANE_NAMESPACE ?= crossplane-system
+##@ Crossplane
 
 .PHONY: crossplane-install
-crossplane-install:
+crossplane-install: ## Install Crossplane into the dev cluster.
 	helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait
 
-# Install the Kubernetes provider using kubectl
-crossplane-provider-install:
+.PHONY: crossplane-provider-install
+crossplane-provider-install: ## Install the Kubernetes provider for Crossplane.
 	kubectl apply -f examples/crossplane/provider.yaml -n $(CROSSPLANE_NAMESPACE)
 	kubectl wait --for=condition=Healthy provider/provider-helm --timeout=1m
 	kubectl apply -f examples/crossplane/provider-config.yaml -n $(CROSSPLANE_NAMESPACE)
 
-
-
-.PHONY: install-k8s-provider
-
-.PHONY: helm-provider-sample
-crossplane-provider-sample:
+.PHONY: crossplane-provider-sample
+crossplane-provider-sample: ## Apply a sample Crossplane release.
 	kubectl apply -f examples/crossplane/release.yaml -n $(CROSSPLANE_NAMESPACE)
