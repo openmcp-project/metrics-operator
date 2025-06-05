@@ -53,7 +53,7 @@ type ManagedMetricSpec struct {
 	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
 
 	// +optional
-	*RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
+	RemoteClusterAccessRef *RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 }
 
 // ManagedObservation represents the latest available observation of an object's state
