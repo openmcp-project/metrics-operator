@@ -30,7 +30,6 @@ SHELL = /usr/bin/env bash -o pipefail
 all: build
 
 ##@ General
-
 # The help target prints out all targets with their descriptions organized
 # beneath their categories. The categories are represented by '##@' and the
 # target descriptions by '##'. The awk commands is responsible for reading the
@@ -44,100 +43,9 @@ all: build
 
 .PHONY: help
 help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-25s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-##@ Development
-
-.PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=cmd/embedded/crds
-
-.PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-.PHONY: fmt
-fmt: ## Run go fmt against code.
-	go fmt ./...
-
-.PHONY: vet
-vet: ## Run go vet against code.
-	go vet ./...
-
-.PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
-
-##@ Build
-
-.PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
-
-.PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	OPERATOR_CONFIG_NAMESPACE=metrics-operator-system go run ./cmd/main.go start
-
-.PHONY: build-docker-binary
-build-docker-binary: manifests generate fmt vet ## Build manager binary.
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o bin/manager-linux.amd64 cmd/main.go
-
-
-# If you wish built the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-.PHONY: docker-build
-docker-build: build-docker-binary test ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	$(CONTAINER_TOOL) push ${IMG}
-
-# PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
-# - have enable BuildKit, More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image for your registry (i.e. if you do not inform a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To properly provided solutions that supports more than one platform you should use this option.
-PLATFORMS ?= linux/arm64 linux/amd64
-.PHONY: docker-buildx
-docker-buildx: #test ## Build and tag docker image for each platform locally using --load
-	sed '1 s/^FROM/FROM --platform=$${BUILDPLATFORM}/' Dockerfile > Dockerfile.cross
-	$(CONTAINER_TOOL) buildx create --name project-v3-builder || true
-	$(CONTAINER_TOOL) buildx use project-v3-builder
-	@for platform in $(PLATFORMS); do \
-		tag="$(IMG)-$$(echo $$platform | tr / -)"; \
-		echo "Building $$tag for $$platform"; \
-		$(CONTAINER_TOOL) buildx build --platform=$$platform --tag $$tag --load -f Dockerfile.cross .; \
-	done
-	$(CONTAINER_TOOL) buildx rm project-v3-builder
-	rm Dockerfile.cross
-
-##@ Deployment
-
-ifndef ignore-not-found
-  ignore-not-found = false
-endif
-
-.PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
-
-.PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-
-.PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-
-.PHONY: undeploy
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
-
+#----------------------------------------------------------------------------------------------
 ##@ Build Dependencies
 
 ## Location to install dependencies to
@@ -190,46 +98,131 @@ gotestsum: $(GOTESTSUM) ## Download gotestsum locally if necessary.
 $(GOTESTSUM): $(LOCALBIN)
 	test -s $(LOCALBIN)/gotestsum || GOBIN=$(LOCALBIN) go install gotest.tools/gotestsum@latest
 
+.PHONY: lint
+lint: $(GOLANGCILINT) ## Run golangci-lint against code.
+	$(GOLANGCILINT) config verify
+	$(GOLANGCILINT) run ./...
 
-### ------------------------------------ DEVELOPMENT - LOCAL ------------------------------------ ###
-##@ Local Development
-.PHONY: dev-all
-dev-all-deploy: # Build the Docker image, create a local kind cluster, deploy the Operator, and install Crossplane and Helm provider.
-	$(MAKE) dev-deploy
-	$(MAKE) crossplane-install
-	$(MAKE) crossplane-provider-install
-	$(MAKE) helm-provider-sample
+.PHONY: lint-fix
+lint-fix: ## Run golangci-lint with --fix option to automatically fix issues.
+	$(GOLANGCILINT) run --fix
 
+#----------------------------------------------------------------------------------------------
+##@ Code Generation & Formatting
+.PHONY: manifests
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=cmd/embedded/crds
 
-.PHONY: dev-deploy
-dev-deploy: manifests kustomize dev-clean ## Deploy the Operator to a local kind cluster via Kustomize.
-	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
+.PHONY: generate
+generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+.PHONY: fmt
+fmt: ## Run go fmt against code.
+	go fmt ./...
+
+.PHONY: vet
+vet: ## Run go vet against code.
+	go vet ./...
+
+#----------------------------------------------------------------------------------------------
+##@ Build
+.PHONY: build
+build: manifests generate fmt vet ## Build manager binary.
+	go build -o bin/manager cmd/main.go
+
+.PHONY: build-docker-binary
+build-docker-binary: manifests generate fmt vet ## Build manager binary for Docker image.
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o bin/manager-linux.amd64 cmd/main.go
+
+.PHONY: docker-build
+docker-build: build-docker-binary test ## Build docker image with the manager.
+	$(CONTAINER_TOOL) build -t ${IMG} .
+
+.PHONY: docker-push
+docker-push: ## Push docker image with the manager.
+	$(CONTAINER_TOOL) push ${IMG}
+
+# PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
+# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
+# - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
+# - have enable BuildKit, More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+# - be able to push the image for your registry (i.e. if you do not inform a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
+# To properly provided solutions that supports more than one platform you should use this option.
+PLATFORMS ?= linux/arm64 linux/amd64
+.PHONY: docker-buildx
+docker-buildx: ## Build and tag docker image for each platform locally using --load
+	sed '1 s/^FROM/FROM --platform=$${BUILDPLATFORM}/' Dockerfile > Dockerfile.cross
+	$(CONTAINER_TOOL) buildx create --name project-v3-builder || true
+	$(CONTAINER_TOOL) buildx use project-v3-builder
+	@for platform in $(PLATFORMS); do \
+		tag="$(IMG)-$$(echo $$platform | tr / -)"; \
+		echo "Building $$tag for $$platform"; \
+		$(CONTAINER_TOOL) buildx build --platform=$$platform --tag $$tag --load -f Dockerfile.cross .; \
+	done
+	$(CONTAINER_TOOL) buildx rm project-v3-builder
+	rm Dockerfile.cross
+
+#----------------------------------------------------------------------------------------------
+##@ Deployment
+.PHONY: install
+install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+
+.PHONY: uninstall
+uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: deploy
+deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
-	$(KIND) load docker-image ${IMG} --name=$(PROJECT_NAME)-dev
+	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
+.PHONY: undeploy
+undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+#----------------------------------------------------------------------------------------------
+##@ Local Development Utilities
 .PHONY: dev-build
 dev-build: docker-build ## Build the Docker image for local development.
 	@echo "Finished building docker image" ${IMG}
 
-.PHONY: dev-base
-dev-base: manifests kustomize dev-build dev-clean dev-cluster helm-install-local # Build the Docker image, create a local kind cluster, and deploys the Operator.
-
-.PHONY: dev-cluster
-dev-cluster: ## Create a local kind cluster and load the Docker image.
-	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
+.PHONY: kind-load-image
+kind-load-image: ## Load the Docker image into the local kind cluster for development.
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
+.PHONY: kind-cluster
+kind-cluster: ## Create a kind cluster for development (no CRDs or resources applied).
+	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
+
+.PHONY: dev-clean
+dev-clean: ## Delete the local kind cluster used for development.
+	$(KIND) delete cluster --name=$(PROJECT_FULL_NAME)-dev
+
+.PHONY: dev-run
+dev-run: ## Run the operator locally (for debugging/development).
+	## todo: add flag --debug
+	go run ./cmd/main.go start
+
+#----------------------------------------------------------------------------------------------
+##@ Testing
+.PHONY: test
+test: manifests generate fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+
+#----------------------------------------------------------------------------------------------
+##@ Testing: Run Operator outside of the cluster
 .PHONY: dev-local
 dev-local: ## Create a local kind cluster and install CRDs for development.
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(MAKE) install
 
 .PHONY: dev-local-all
-dev-local-all: ## Full local dev setup: clean, create cluster, install CRDs, Crossplane, namespaces, secrets, and sample metrics.
+dev-local-all: ## Full local dev setup: clean-up, create cluster, install CRDs, Crossplane, namespaces, secrets, and sample metrics.
 	$(MAKE) dev-clean
-	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
+	$(MAKE) kind-cluster
 	$(MAKE) install
 	$(MAKE) crossplane-install
 	$(MAKE) crossplane-provider-install
@@ -240,7 +233,14 @@ dev-local-all: ## Full local dev setup: clean, create cluster, install CRDs, Cro
 	$(MAKE) dev-basic-metric
 	$(MAKE) dev-managed-metric
 
-##@ Examples for local development
+#----------------------------------------------------------------------------------------------
+##@ Testing: Run Operator inside the cluster (production scenario)
+
+.PHONY: dev-deploy
+dev-deploy: manifests kustomize dev-build dev-clean kind-cluster kind-load-image helm-install-local ## Build the Docker image, create a local kind cluster, and deploy the Operator.
+
+#----------------------------------------------------------------------------------------------
+##@ Example Resources
 .PHONY: dev-secret
 dev-secret: ## Apply the example secret to the cluster.
 	kubectl apply -f examples/secret.yaml
@@ -273,84 +273,51 @@ dev-apply-metric-dynatrace-prod: ## Apply metric using Dynatrace production exam
 dev-v1beta1-compmetric: ## Apply v1beta1 compmetric example to the cluster.
 	kubectl apply -f examples/v1beta1/compmetric.yaml
 
-.PHONY: dev-kind
-dev-kind: ## Create a kind cluster for development (no CRDs or resources applied).
-	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
-
-.PHONY: dev-clean
-dev-clean: ## Delete the local kind cluster used for development.
-	$(KIND) delete cluster --name=$(PROJECT_FULL_NAME)-dev
-
-.PHONY: dev-run
-dev-run: ## Run the operator locally (for debugging/development).
-	## todo: add flag --debug
-	go run ./cmd/main.go
-
-$(GOLANGCILINT): $(LOCALBIN)
-	@if test -x $(LOCALBIN)/golangci-lint && ! $(LOCALBIN)/golangci-lint version | grep -q $(GOLANGCILINT_VERSION); then \
-		echo "$(LOCALBIN)/golangci-lint version is not expected $(GOLANGCILINT_VERSION). Removing it before installing."; \
-		rm -rf $(LOCALBIN)/golangci-lint; \
-	fi
-	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
-
-
-.PHONY: lint
-lint: ## Run golangci-lint against code.
-	$(GOLANGCILINT) config verify
-	$(GOLANGCILINT) run ./...
-
-.PHONY: lint-fix
-lint-fix: ## Run golangci-lint with --fix option to automatically fix issues.
-	$(GOLANGCILINT) run --fix
-
-### ------------------------------------ HELM ------------------------------------ ###
-##@ Local Testing
-
+#----------------------------------------------------------------------------------------------
+##@ Helm
 .PHONY: helm-chart
 helm-chart: ## Generate Helm chart files from templates.
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/Chart.yaml.tpl > charts/$(PROJECT_FULL_NAME)/Chart.yaml
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/values.yaml.tpl > charts/$(PROJECT_FULL_NAME)/values.yaml
 
 .PHONY: helm-install-local
-helm-install-local: docker-build # Build the Docker image and install the Helm chart locally
+helm-install-local: ## Install the Helm chart locally using the Docker image
 	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
-.PHONY: helm-work
-helm-work: dev-kind crossplane-install helm-install-local # Install Crossplane and Helm provider, then deploy the Helm chart
-	echo "Helm work done"
+#----------------------------------------------------------------------------------------------
+##@ Crossplane
 
-.PHONY: lefthook
-lefthook: # Initializes pre-commit hooks using lefthook https://github.com/evilmartians/lefthook
-	lefthook install
-
-.PHONY: check-diff
-check-diff: generate manifests # Ensures that go generate doesn't create a diff
-	@echo checking clean branch
-	@if git status --porcelain | grep . ; then echo Uncommitted changes found after running make generate manifests. Please ensure you commit all generated files in this branch after running make generate. && false; else echo branch is clean; fi
-
-.PHONY: reviewable
-reviewable: # Ensures that the code is reviewable by running generate, lint, and test
-	@$(MAKE) generate
-	@$(MAKE) lint
-	@$(MAKE) test
-
-### ------------------------------------ CROSSPLANE ------------------------------------ ###
-
-# Namespace where Crossplane is installed
+# CROSSPLANE_NAMESPACE defines the namespace where Crossplane will be installed.
 CROSSPLANE_NAMESPACE ?= crossplane-system
 
 .PHONY: crossplane-install
-crossplane-install: # Install Crossplane into the cluster.
-	helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait
+crossplane-install: ## Install Crossplane into the cluster.
+	helm install crossplane crossplane-stable/crossplane --namespace $(CROSSPLANE_NAMESPACE) --create-namespace --wait
 
 .PHONY: crossplane-provider-install
-crossplane-provider-install: # Install the Helm provider using kubectl
+crossplane-provider-install: ## Install the Helm provider using kubectl
 	kubectl apply -f examples/crossplane/provider.yaml -n $(CROSSPLANE_NAMESPACE)
 	kubectl wait --for=condition=Healthy provider/provider-helm --timeout=1m
 	kubectl apply -f examples/crossplane/provider-config.yaml -n $(CROSSPLANE_NAMESPACE)
 
-
 .PHONY: helm-provider-sample
-helm-provider-sample: # Apply the Helm provider sample to the cluster.
+helm-provider-sample: ## Apply the Helm provider sample to the cluster.
 	kubectl apply -f examples/crossplane/release.yaml -n $(CROSSPLANE_NAMESPACE)
+
+#----------------------------------------------------------------------------------------------
+##@ Utility
+.PHONY: lefthook
+lefthook: ## Initializes pre-commit hooks using lefthook https://github.com/evilmartians/lefthook
+	lefthook install
+
+.PHONY: check-diff
+check-diff: generate manifests ## Ensures that go generate doesn't create a diff
+	@echo checking clean branch
+	@if git status --porcelain | grep . ; then echo Uncommitted changes found after running make generate manifests. Please ensure you commit all generated files in this branch after running make generate. && false; else echo branch is clean; fi
+
+.PHONY: reviewable
+reviewable: ## Ensures that the code is reviewable by running generate, lint, and test
+	@$(MAKE) generate
+	@$(MAKE) lint
+	@$(MAKE) test
