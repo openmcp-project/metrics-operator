@@ -198,7 +198,7 @@ dev-all-deploy:
 	$(MAKE) dev-deploy
 	$(MAKE) crossplane-install
 	$(MAKE) crossplane-provider-install
-	$(MAKE) crossplane-provider-sample
+	$(MAKE) helm-provider-sample
 
 
 .PHONY: dev-deploy
@@ -233,7 +233,7 @@ dev-local-all: ## Full local dev setup: clean, create cluster, install CRDs, Cro
 	$(MAKE) install
 	$(MAKE) crossplane-install
 	$(MAKE) crossplane-provider-install
-	$(MAKE) crossplane-provider-sample
+	$(MAKE) helm-provider-sample
 	$(MAKE) dev-namespace
 	$(MAKE) dev-secret
 	$(MAKE) dev-operator-namespace
@@ -307,23 +307,21 @@ lint-fix:
 ##@ Local Testing
 
 .PHONY: helm-chart
-helm-chart:
+helm-chart: ## Generate Helm chart files from templates.
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/Chart.yaml.tpl > charts/$(PROJECT_FULL_NAME)/Chart.yaml
 	OPERATOR_VERSION=$(shell cat VERSION) envsubst < charts/$(PROJECT_FULL_NAME)/values.yaml.tpl > charts/$(PROJECT_FULL_NAME)/values.yaml
 
 .PHONY: helm-install-local
-helm-install-local: docker-build
+helm-install-local: docker-build # Build the Docker image and install the Helm chart locally
 	helm upgrade --install $(PROJECT_FULL_NAME) charts/$(PROJECT_FULL_NAME)/ --set image.repository=$(IMG_BASE) --set image.tag=$(IMG_VERSION) --set image.pullPolicy=Never
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
-
-
 .PHONY: helm-work
-helm-work: dev-kind crossplane-install helm-install-local
+helm-work: dev-kind crossplane-install helm-install-local # Install Crossplane and Helm provider, then deploy the Helm chart
 	echo "Helm work done"
 
 .PHONY: lefthook
-lefthook: # initializes pre-commit hooks using lefthook https://github.com/evilmartians/lefthook
+lefthook: # Initializes pre-commit hooks using lefthook https://github.com/evilmartians/lefthook
 	lefthook install
 
 .PHONY: check-diff
@@ -353,5 +351,5 @@ crossplane-provider-install: # Install the Helm provider using kubectl
 
 
 .PHONY: helm-provider-sample
-crossplane-provider-sample: # Apply the Helm provider sample to the cluster.
+helm-provider-sample: # Apply the Helm provider sample to the cluster.
 	kubectl apply -f examples/crossplane/release.yaml -n $(CROSSPLANE_NAMESPACE)
