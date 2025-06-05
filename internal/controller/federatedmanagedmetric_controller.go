@@ -89,7 +89,6 @@ func (r *FederatedManagedMetricReconciler) scheduleNextReconciliation(metric *v1
 
 	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
 	}, nil
 }
@@ -241,7 +240,6 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	l.Info(fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: requeueTime,
 	}, nil
 }

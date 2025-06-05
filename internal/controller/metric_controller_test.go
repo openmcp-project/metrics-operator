@@ -123,7 +123,6 @@ func (r *TestMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Requeue
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: metric.Spec.Interval.Duration,
 	}, nil
 }

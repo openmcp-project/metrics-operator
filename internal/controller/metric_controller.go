@@ -85,7 +85,6 @@ func (r *MetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (
 
 	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
 	}, nil
 }
@@ -267,7 +266,6 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	l.Info(fmt.Sprintf("metric '%s' re-queued for execution in %v\n", metric.Spec.Name, requeueTime))
 
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: requeueTime,
 	}, nil
 }
