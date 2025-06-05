@@ -123,7 +123,6 @@ func (r *TestMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Requeue
 	return ctrl.Result{
-		Requeue:      true,
 		RequeueAfter: metric.Spec.Interval.Duration,
 	}, nil
 }
@@ -342,7 +341,6 @@ func testReconcileMetricHappyPath(t *testing.T) {
 
 	// Verify the result
 	require.NoError(t, err)
-	require.True(t, result.Requeue)
 	require.Equal(t, 5*time.Minute, result.RequeueAfter)
 
 	// Verify the Metric status was updated correctly
