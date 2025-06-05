@@ -227,9 +227,8 @@ dev-local-all: ## Full local dev setup: clean-up, create cluster, install CRDs, 
 	$(MAKE) crossplane-install
 	$(MAKE) crossplane-provider-install
 	$(MAKE) helm-provider-sample
-	$(MAKE) dev-namespace
-	$(MAKE) dev-secret
 	$(MAKE) dev-operator-namespace
+	$(MAKE) dev-apply-dynatrace-prod-setup
 	$(MAKE) dev-basic-metric
 	$(MAKE) dev-managed-metric
 
@@ -241,14 +240,6 @@ dev-deploy: manifests kustomize dev-build dev-clean kind-cluster kind-load-image
 
 #----------------------------------------------------------------------------------------------
 ##@ Example Resources
-.PHONY: dev-secret
-dev-secret: ## Apply the example secret to the cluster.
-	kubectl apply -f examples/secret.yaml
-
-.PHONY: dev-namespace
-dev-namespace: ## Apply the example namespace to the cluster.
-	kubectl apply -f examples/namespace.yaml
-
 .PHONY: dev-operator-namespace
 dev-operator-namespace: ## Create the operator namespace if it does not exist.
 	kubectl create namespace metrics-operator-system --dry-run=client -o yaml | kubectl apply -f -
@@ -268,10 +259,6 @@ dev-apply-dynatrace-prod-setup: ## Apply Dynatrace production setup example to t
 .PHONY: dev-apply-metric-dynatrace-prod
 dev-apply-metric-dynatrace-prod: ## Apply metric using Dynatrace production example to the cluster.
 	kubectl apply -f examples/datasink/metric-using-dynatrace-prod.yaml
-
-.PHONY: dev-v1beta1-compmetric
-dev-v1beta1-compmetric: ## Apply v1beta1 compmetric example to the cluster.
-	kubectl apply -f examples/v1beta1/compmetric.yaml
 
 #----------------------------------------------------------------------------------------------
 ##@ Helm
