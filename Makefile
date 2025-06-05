@@ -201,10 +201,10 @@ kind-cluster: ## Create a kind cluster for development (no CRDs or resources app
 dev-clean: ## Delete the local kind cluster used for development.
 	$(KIND) delete cluster --name=$(PROJECT_FULL_NAME)-dev
 
-.PHONY: dev-run
-dev-run: ## Run the operator locally (for debugging/development).
+.PHONY: run
+run: ## Run the operator locally (for debugging/development).
 	## todo: add flag --debug
-	go run ./cmd/main.go start
+	OPERATOR_CONFIG_NAMESPACE=metrics-operator-system go run ./cmd/main.go start
 
 #----------------------------------------------------------------------------------------------
 ##@ Testing
