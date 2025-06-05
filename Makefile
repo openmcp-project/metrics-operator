@@ -1,5 +1,3 @@
-
-
 PROJECT_NAME := metrics
 PROJECT_FULL_NAME := metrics-operator
 
@@ -194,7 +192,7 @@ $(GOTESTSUM): $(LOCALBIN)
 
 
 ### ------------------------------------ DEVELOPMENT - LOCAL ------------------------------------ ###
-
+##@ Local Development
 .PHONY: dev-all
 dev-all-deploy:
 	$(MAKE) dev-deploy
@@ -224,12 +222,12 @@ dev-cluster:
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
 .PHONY: dev-local
-dev-local:
+dev-local: ## Create a local kind cluster and install CRDs for development.
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(MAKE) install
 
 .PHONY: dev-local-all
-dev-local-all:
+dev-local-all: ## Full local dev setup: clean, create cluster, install CRDs, Crossplane, namespaces, secrets, and sample metrics.
 	$(MAKE) dev-clean
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(MAKE) install
@@ -244,48 +242,47 @@ dev-local-all:
 
 
 .PHONY: dev-secret
-dev-secret:
+dev-secret: ## Apply the example secret to the cluster.
 	kubectl apply -f examples/secret.yaml
 
 .PHONY: dev-namespace
-dev-namespace:
+dev-namespace: ## Apply the example namespace to the cluster.
 	kubectl apply -f examples/namespace.yaml
 
 .PHONY: dev-operator-namespace
-dev-operator-namespace:
+dev-operator-namespace: ## Create the operator namespace if it does not exist.
 	kubectl create namespace metrics-operator-system --dry-run=client -o yaml | kubectl apply -f -
 
 .PHONY: dev-basic-metric
-dev-basic-metric:
+dev-basic-metric: ## Apply the basic metric example to the cluster.
 	kubectl apply -f examples/basic_metric.yaml
 
 .PHONY: dev-managed-metric
-dev-managed-metric:
+dev-managed-metric: ## Apply the managed metric example to the cluster.
 	kubectl apply -f examples/managed_metric.yaml
 
 .PHONY: dev-apply-dynatrace-prod-setup
-dev-apply-dynatrace-prod-setup:
+dev-apply-dynatrace-prod-setup: ## Apply Dynatrace production setup example to the cluster.
 	kubectl apply -f examples/datasink/dynatrace-prod-setup.yaml
 
 .PHONY: dev-apply-metric-dynatrace-prod
-dev-apply-metric-dynatrace-prod:
+dev-apply-metric-dynatrace-prod: ## Apply metric using Dynatrace production example to the cluster.
 	kubectl apply -f examples/datasink/metric-using-dynatrace-prod.yaml
 
 .PHONY: dev-v1beta1-compmetric
-dev-v1beta1-compmetric:
+dev-v1beta1-compmetric: ## Apply v1beta1 compmetric example to the cluster.
 	kubectl apply -f examples/v1beta1/compmetric.yaml
 
-
 .PHONY: dev-kind
-dev-kind:
+dev-kind: ## Create a kind cluster for development (no CRDs or resources applied).
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 
 .PHONY: dev-clean
-dev-clean:
+dev-clean: ## Delete the local kind cluster used for development.
 	$(KIND) delete cluster --name=$(PROJECT_FULL_NAME)-dev
 
 .PHONY: dev-run
-dev-run:
+dev-run: ## Run the operator locally (for debugging/development).
 	## todo: add flag --debug
 	go run ./cmd/main.go
 
@@ -307,7 +304,7 @@ lint-fix:
 	golangci-lint run --fix
 
 ### ------------------------------------ HELM ------------------------------------ ###
-
+##@ Local Testing
 
 .PHONY: helm-chart
 helm-chart:
@@ -325,15 +322,16 @@ helm-install-local: docker-build
 helm-work: dev-kind crossplane-install helm-install-local
 	echo "Helm work done"
 
-# initializes pre-commit hooks using lefthook https://github.com/evilmartians/lefthook
-lefthook:
+.PHONY: lefthook
+lefthook: # initializes pre-commit hooks using lefthook https://github.com/evilmartians/lefthook
 	lefthook install
 
-# ensure go generate doesn't create a diff
-check-diff: generate manifests
+.PHONY: check-diff
+check-diff: generate manifests # Ensures that go generate doesn't create a diff
 	@echo checking clean branch
 	@if git status --porcelain | grep . ; then echo Uncommitted changes found after running make generate manifests. Please ensure you commit all generated files in this branch after running make generate. && false; else echo branch is clean; fi
 
+.PHONY: reviewable
 reviewable:
 	@$(MAKE) generate
 	@$(MAKE) lint
@@ -344,19 +342,16 @@ reviewable:
 CROSSPLANE_NAMESPACE ?= crossplane-system
 
 .PHONY: crossplane-install
-crossplane-install:
+crossplane-install: # Install Crossplane into the cluster.
 	helm install crossplane crossplane-stable/crossplane --namespace crossplane-system --create-namespace --wait
 
-# Install the Kubernetes provider using kubectl
-crossplane-provider-install:
+.PHONY: crossplane-provider-install
+crossplane-provider-install: # Install the Helm provider using kubectl
 	kubectl apply -f examples/crossplane/provider.yaml -n $(CROSSPLANE_NAMESPACE)
 	kubectl wait --for=condition=Healthy provider/provider-helm --timeout=1m
 	kubectl apply -f examples/crossplane/provider-config.yaml -n $(CROSSPLANE_NAMESPACE)
 
 
-
-.PHONY: install-k8s-provider
-
 .PHONY: helm-provider-sample
-crossplane-provider-sample:
+crossplane-provider-sample: # Apply the Helm provider sample to the cluster.
 	kubectl apply -f examples/crossplane/release.yaml -n $(CROSSPLANE_NAMESPACE)
