@@ -11,5 +11,5 @@ spec:
   interval: "1m" # in minutes
   # Uses default DataSink (named "default" in metrics-operator-system namespace)
   # To use a custom DataSink, uncomment and specify:
-  dataSinkRef:
-    name: other-datasink
+  # dataSinkRef:
+  #  name: other-datasink
