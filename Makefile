@@ -194,7 +194,7 @@ $(GOTESTSUM): $(LOCALBIN)
 ### ------------------------------------ DEVELOPMENT - LOCAL ------------------------------------ ###
 ##@ Local Development
 .PHONY: dev-all
-dev-all-deploy:
+dev-all-deploy: # Build the Docker image, create a local kind cluster, deploy the Operator, and install Crossplane and Helm provider.
 	$(MAKE) dev-deploy
 	$(MAKE) crossplane-install
 	$(MAKE) crossplane-provider-install
@@ -202,7 +202,7 @@ dev-all-deploy:
 
 
 .PHONY: dev-deploy
-dev-deploy: manifests kustomize dev-clean
+dev-deploy: manifests kustomize dev-clean ## Deploy the Operator to a local kind cluster via Kustomize.
 	$(KIND) create cluster --name=$(PROJECT_NAME)-dev
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
@@ -210,14 +210,14 @@ dev-deploy: manifests kustomize dev-clean
 
 
 .PHONY: dev-build
-dev-build: docker-build
+dev-build: docker-build ## Build the Docker image for local development.
 	@echo "Finished building docker image" ${IMG}
 
 .PHONY: dev-base
-dev-base: manifests kustomize dev-build dev-clean dev-cluster helm-install-local
+dev-base: manifests kustomize dev-build dev-clean dev-cluster helm-install-local # Build the Docker image, create a local kind cluster, and deploys the Operator.
 
 .PHONY: dev-cluster
-dev-cluster:
+dev-cluster: ## Create a local kind cluster and load the Docker image.
 	$(KIND) create cluster --name=$(PROJECT_FULL_NAME)-dev
 	$(KIND) load docker-image ${IMG} --name=$(PROJECT_FULL_NAME)-dev
 
@@ -240,7 +240,7 @@ dev-local-all: ## Full local dev setup: clean, create cluster, install CRDs, Cro
 	$(MAKE) dev-basic-metric
 	$(MAKE) dev-managed-metric
 
-
+##@ Examples for local development
 .PHONY: dev-secret
 dev-secret: ## Apply the example secret to the cluster.
 	kubectl apply -f examples/secret.yaml
@@ -295,13 +295,13 @@ $(GOLANGCILINT): $(LOCALBIN)
 
 
 .PHONY: lint
-lint: $(GOLANGCILINT)
+lint: ## Run golangci-lint against code.
 	$(GOLANGCILINT) config verify
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint-fix
-lint-fix:
-	golangci-lint run --fix
+lint-fix: ## Run golangci-lint with --fix option to automatically fix issues.
+	$(GOLANGCILINT) run --fix
 
 ### ------------------------------------ HELM ------------------------------------ ###
 ##@ Local Testing
@@ -330,10 +330,11 @@ check-diff: generate manifests # Ensures that go generate doesn't create a diff
 	@if git status --porcelain | grep . ; then echo Uncommitted changes found after running make generate manifests. Please ensure you commit all generated files in this branch after running make generate. && false; else echo branch is clean; fi
 
 .PHONY: reviewable
-reviewable:
+reviewable: # Ensures that the code is reviewable by running generate, lint, and test
 	@$(MAKE) generate
 	@$(MAKE) lint
 	@$(MAKE) test
+
 ### ------------------------------------ CROSSPLANE ------------------------------------ ###
 
 # Namespace where Crossplane is installed
