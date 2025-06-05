@@ -69,7 +69,7 @@ type MetricSpec struct {
 	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
 
 	// +optional
-	*RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
+	RemoteClusterAccessRef *RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 
 	Projections []Projection `json:"projections,omitempty"`
 }
