@@ -118,12 +118,13 @@ graph LR
 
 ### Resource Type Descriptions:
 
-- **Metric**: Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
-- **ManagedMetric**: Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
-- **FederatedMetric**: Monitors resources across multiple clusters, aggregating data from federated sources
-- **FederatedManagedMetric**: Monitors Crossplane managed resources across multiple clusters
-- **RemoteClusterAccess**: Provides access configuration for monitoring resources in remote clusters
-- **FederatedClusterAccess**: Discovers and provides access to multiple clusters for federated monitoring
+- [**Metric**](config/crd/bases/metrics.cloud.sap_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- [**ManagedMetric**](config/crd/bases/metrics.cloud.sap_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- [**FederatedMetric**](config/crd/bases/metrics.cloud.sap_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
+- [**FederatedManagedMetric**](config/crd/bases/metrics.cloud.sap_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
+- [**RemoteClusterAccess**](config/crd/bases/metrics.cloud.sap_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
+- [**FederatedClusterAccess**](config/crd/bases/metrics.cloud.sap_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
+- [**DataSink**](config/crd/bases/metrics.cloud.sap_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
 
 ## Installation
 
