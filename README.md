@@ -6,19 +6,45 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 
 ## Table of Contents
 
-- [Key Features](#key-features)
-- [Architecture Overview](#architecture-overview)
-- [Installation](#installation)
-- [Getting Started](#getting-started)
-- [Usage](#usage)
-- [Remote Cluster Access](#remote-cluster-access)
-- [RBAC Configuration](#rbac-configuration)
-- [DataSink Configuration](#datasink-configuration)
-- [Data Sink Integration](#data-sink-integration)
-- [Support, Feedback, Contributing](#support-feedback-contributing)
-- [Security / Disclosure](#security--disclosure)
-- [Code of Conduct](#code-of-conduct)
-- [Licensing](#licensing)
+- [Metrics Operator](#metrics-operator)
+  - [Table of Contents](#table-of-contents)
+  - [Key Features](#key-features)
+  - [Architecture Overview](#architecture-overview)
+    - [Metric Resource Flow](#metric-resource-flow)
+    - [ManagedMetric Resource Flow](#managedmetric-resource-flow)
+    - [FederatedMetric Resource Flow](#federatedmetric-resource-flow)
+    - [FederatedManagedMetric Resource Flow](#federatedmanagedmetric-resource-flow)
+  - [Resource Type Descriptions:](#resource-type-descriptions)
+  - [Installation](#installation)
+    - [Prerequisites](#prerequisites)
+    - [Deployment](#deployment)
+  - [Getting Started](#getting-started)
+    - [Quickstart](#quickstart)
+    - [Common Development Tasks](#common-development-tasks)
+  - [Usage](#usage)
+    - [Metric](#metric)
+    - [Managed Metric](#managed-metric)
+    - [Federated Metric](#federated-metric)
+    - [Federated Managed Metric](#federated-managed-metric)
+  - [Remote Cluster Access](#remote-cluster-access)
+    - [Remote Cluster Access](#remote-cluster-access-1)
+    - [Federated Cluster Access](#federated-cluster-access)
+  - [RBAC Configuration](#rbac-configuration)
+  - [DataSink Configuration](#datasink-configuration)
+    - [Creating a DataSink](#creating-a-datasink)
+    - [DataSink Specification](#datasink-specification)
+      - [Connection](#connection)
+      - [Authentication](#authentication)
+    - [Using DataSink in Metrics](#using-datasink-in-metrics)
+    - [Default Behavior](#default-behavior)
+    - [Supported Metric Types](#supported-metric-types)
+    - [Examples and Detailed Documentation](#examples-and-detailed-documentation)
+    - [Migration from Legacy Configuration](#migration-from-legacy-configuration)
+  - [Data Sink Integration](#data-sink-integration)
+  - [Support, Feedback, Contributing](#support-feedback-contributing)
+  - [Security / Disclosure](#security--disclosure)
+  - [Code of Conduct](#code-of-conduct)
+  - [Licensing](#licensing)
 
 ## Key Features
 
@@ -116,7 +142,7 @@ graph LR
     class DS dataType
 ```
 
-### Resource Type Descriptions:
+## Resource Type Descriptions:
 
 - [**Metric**](config/crd/bases/metrics.cloud.sap_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
 - [**ManagedMetric**](config/crd/bases/metrics.cloud.sap_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
