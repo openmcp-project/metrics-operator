@@ -9,11 +9,16 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 - [Key Features](#key-features)
 - [Architecture Overview](#architecture-overview)
 - [Installation](#installation)
+- [Getting Started](#getting-started)
 - [Usage](#usage)
-- [RBAC Configuration](#rbac-configuration)
 - [Remote Cluster Access](#remote-cluster-access)
+- [RBAC Configuration](#rbac-configuration)
 - [DataSink Configuration](#datasink-configuration)
 - [Data Sink Integration](#data-sink-integration)
+- [Support, Feedback, Contributing](#support-feedback-contributing)
+- [Security / Disclosure](#security--disclosure)
+- [Code of Conduct](#code-of-conduct)
+- [Licensing](#licensing)
 
 ## Key Features
 
@@ -141,6 +146,37 @@ helm upgrade --install metrics-operator ghcr.io/sap/github.com/sap/metrics-opera
 Replace `<operator-namespace>` and `<version>` with appropriate values.
 
 After deployment, create your DataSink configuration as described in the [DataSink Configuration](#datasink-configuration) section.
+
+## Getting Started
+You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
+**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+
+### Running on the cluster
+1. Install Instances of Custom Resources:
+
+```sh
+make dev-local-all
+```
+
+2. Run the controller:
+
+```sh
+make dev-run
+```
+Or run it from your IDE.
+
+### Delete Kind Cluster
+Delete Kind cluster
+```sh
+make dev-clean
+```
+
+### Modifying the API definitions
+If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
+
+```sh
+make manifests generate
+```
 
 ## Usage
 
@@ -436,37 +472,6 @@ To make the most of your metrics:
 
 For specific instructions on using your data sink's features, refer to its documentation. For example, if using Dynatrace, consult the Dynatrace documentation for information on creating custom charts, setting up alerts, and performing advanced analytics on your metric data.
 
-
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
-
-### Running on the cluster
-1. Install Instances of Custom Resources:
-
-```sh
-make dev-local-all
-```
-
-2. Run the controller:
-
-```sh
-make dev-run
-```
-Or run it from your IDE.
-
-### Delete Kind Cluster
-Delete Kind cluster
-```sh
-make dev-clean
-```
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests generate
-```
 
 ## Support, Feedback, Contributing
 
