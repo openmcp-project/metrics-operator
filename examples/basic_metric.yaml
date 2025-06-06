@@ -6,7 +6,7 @@ spec:
   name: helm-release-metric
   description: Helm Release Metric Helm Crossplane Provider
   target:
-    kind: release
+    kind: Release
     group: helm.crossplane.io
     version: v1beta1
   interval: 1m # in minutes
@@ -23,7 +23,7 @@ spec:
   name: pods-metric
   description: Pods
   target:
-    kind: pod
+    kind: Pod
     group: ""
     version: v1
   interval: 1m # in minutes
@@ -39,7 +39,7 @@ spec:
   name: pods-metric-total
   description: Pods
   target:
-    kind: pod
+    kind: Pod
     group: ""
     version: v1
   interval: 1m # in minutes

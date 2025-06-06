@@ -37,6 +37,7 @@ import (
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	"github.com/go-logr/logr"
 	"github.com/openmcp-project/controller-utils/pkg/api"
 	"github.com/openmcp-project/controller-utils/pkg/init/crds"
 	"github.com/openmcp-project/controller-utils/pkg/init/webhooks"
@@ -110,12 +111,15 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var useEventDrivenController bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&useEventDrivenController, "use-event-driven-controller", true,
+		"Use the new event-driven controller instead of the traditional metric controller.")
 
 	opts := zap.Options{
 		Development: true,
@@ -169,7 +173,12 @@ func main() {
 	}
 
 	// TODO: to deprecate v1beta1 resources
-	setupMetricController(mgr)
+	// Choose between traditional and event-driven controller based on feature flag
+	if useEventDrivenController {
+		setupEventDrivenController(mgr) // New event-driven controller for Metric CRs
+	} else {
+		setupMetricController(mgr) // Traditional metric controller
+	}
 	setupManagedMetricController(mgr)
 
 	setupReconcilersV1beta1(mgr)
@@ -217,6 +226,47 @@ func setupMetricController(mgr ctrl.Manager) {
 		setupLog.Error(err, "unable to create reconciler", "controller", "metric")
 		os.Exit(1)
 	}
+}
+
+func setupEventDrivenController(mgr ctrl.Manager) {
+	// Create and setup the new event-driven controller
+	eventDrivenController := controller.NewEventDrivenController(mgr)
+	if err := eventDrivenController.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create event-driven controller", "controller", "EventDriven")
+		os.Exit(1)
+	}
+
+	// Add a runnable to start the event-driven system when the manager starts
+	err := mgr.Add(&eventDrivenRunnable{
+		controller: eventDrivenController,
+		logger:     setupLog,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to add event-driven runnable to manager")
+		os.Exit(1)
+	}
+}
+
+// eventDrivenRunnable implements manager.Runnable to properly integrate with the controller manager lifecycle
+type eventDrivenRunnable struct {
+	controller *controller.EventDrivenController
+	logger     logr.Logger
+}
+
+func (r *eventDrivenRunnable) Start(ctx context.Context) error {
+	r.logger.Info("Starting event-driven runnable")
+
+	// Start the event-driven system with the proper context
+	if err := r.controller.Start(ctx); err != nil {
+		r.logger.Error(err, "failed to start event-driven controller")
+		return err
+	}
+
+	// Keep running until context is cancelled
+	<-ctx.Done()
+	r.logger.Info("Event-driven runnable stopping")
+	r.controller.Stop()
+	return nil
 }
 
 func setupManagedMetricController(mgr ctrl.Manager) {
