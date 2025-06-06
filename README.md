@@ -151,32 +151,25 @@ After deployment, create your DataSink configuration as described in the [DataSi
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+### Quickstart
 
-```sh
-make dev-local-all
-```
+1. Clone the repository and install prerequisites (Go, Docker, kind, kubectl).
+2. Configure your data sink by copying the configuration in [`examples/datasink/basic-datasink.yaml`](examples/datasink/basic-datasink.yaml) and modifying it to suit your environment.
+   - For example, if using Dynatrace, create a Kubernetes Secret with your API token and update the DataSink resource accordingly.
+   - The file should be placed and named like this: `examples/datasink/dynatrace-prod-setup.yaml`. (automatically excluded in [.gitignore](.gitignore))
+3. Run `make dev-local-all` to set up a local development environment.
+4. Run `make run` to start the Metrics Operator locally.
+5. Check your data sink for incoming metrics.
 
-2. Run the controller:
+### Common Development Tasks
+This project uses a Makefile to streamline development tasks. Common targets include:
 
-```sh
-make dev-run
-```
-Or run it from your IDE.
-
-### Delete Kind Cluster
-Delete Kind cluster
-```sh
-make dev-clean
-```
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests generate
-```
+- `make dev-local-all` – Set up a local kind cluster with all CRDs, Crossplane, and sample resources.
+- `make run` – Run the operator locally for development.
+- `make dev-clean` – Delete the local kind cluster.
+- `make test` – Run all Go tests.
+- `make lint` – Run golangci-lint on the codebase.
+- `make manifests generate` – Regenerate CRDs and deepcopy code after API changes.
 
 ## Usage
 
