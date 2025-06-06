@@ -78,6 +78,13 @@ $(KUSTOMIZE): $(LOCALBIN)
 	fi
 	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
 
+$(GOLANGCILINT): $(LOCALBIN)
+	@if test -x $(LOCALBIN)/golangci-lint && ! $(LOCALBIN)/golangci-lint version | grep -q $(GOLANGCILINT_VERSION); then \
+		echo "$(LOCALBIN)/golangci-lint version is not expected $(GOLANGCILINT_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/golangci-lint; \
+	fi
+	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCILINT_VERSION)
+
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
 $(CONTROLLER_GEN): $(LOCALBIN)
@@ -104,7 +111,7 @@ lint: $(GOLANGCILINT) ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint-fix
-lint-fix: ## Run golangci-lint with --fix option to automatically fix issues.
+lint-fix: $(GOLANGCILINT) ## Run golangci-lint with --fix option to automatically fix issues.
 	$(GOLANGCILINT) run --fix
 
 #----------------------------------------------------------------------------------------------
