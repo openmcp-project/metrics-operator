@@ -13,7 +13,14 @@ rules:
 - apiGroups:
   - metrics.cloud.sap
   resources:
-  - clusteraccesses
+  - datasinks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metrics.cloud.sap
+  resources:
   - federatedmetrics
   - managedmetrics
   - metrics
@@ -28,7 +35,6 @@ rules:
 - apiGroups:
   - metrics.cloud.sap
   resources:
-  - clusteraccesses/finalizers
   - federatedmetrics/finalizers
   - managedmetrics/finalizers
   - metrics/finalizers
@@ -37,7 +43,6 @@ rules:
 - apiGroups:
   - metrics.cloud.sap
   resources:
-  - clusteraccesses/status
   - federatedmetrics/status
   - managedmetrics/status
   - metrics/status
@@ -45,11 +50,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - metrics.cloud.sap
-  resources:
-  - datasinks
-  verbs:
-  - get
-  - list
-  - watch

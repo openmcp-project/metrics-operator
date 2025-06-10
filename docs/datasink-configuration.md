@@ -304,8 +304,8 @@ Previously, the operator used hardcoded secret names:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: co-dynatrace-credentials  # Hardcoded name
-  namespace: co-metrics-operator  # Hardcoded namespace
+  name: dynatrace-credentials  # Hardcoded name
+  namespace: metrics-operator  # Hardcoded namespace
 type: Opaque
 data:
   api-token: <base64-encoded-token>
@@ -371,7 +371,7 @@ data:
 
 **Error**: `401 Unauthorized` or similar authentication errors
 
-**Solution**: 
+**Solution**:
 - Verify the API token is correct and has the necessary permissions
 - Check that the token is properly base64 encoded in the secret
 - Ensure the endpoint URL is correct for your data sink

@@ -6,14 +6,45 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 
 ## Table of Contents
 
-- [Key Features](#key-features)
-- [Architecture Overview](#architecture-overview)
-- [Installation](#installation)
-- [Usage](#usage)
-- [RBAC Configuration](#rbac-configuration)
-- [Remote Cluster Access](#remote-cluster-access)
-- [DataSink Configuration](#datasink-configuration)
-- [Data Sink Integration](#data-sink-integration)
+- [Metrics Operator](#metrics-operator)
+  - [Table of Contents](#table-of-contents)
+  - [Key Features](#key-features)
+  - [Architecture Overview](#architecture-overview)
+    - [Metric Resource Flow](#metric-resource-flow)
+    - [ManagedMetric Resource Flow](#managedmetric-resource-flow)
+    - [FederatedMetric Resource Flow](#federatedmetric-resource-flow)
+    - [FederatedManagedMetric Resource Flow](#federatedmanagedmetric-resource-flow)
+  - [Resource Type Descriptions:](#resource-type-descriptions)
+  - [Installation](#installation)
+    - [Prerequisites](#prerequisites)
+    - [Deployment](#deployment)
+  - [Getting Started](#getting-started)
+    - [Quickstart](#quickstart)
+    - [Common Development Tasks](#common-development-tasks)
+  - [Usage](#usage)
+    - [Metric](#metric)
+    - [Managed Metric](#managed-metric)
+    - [Federated Metric](#federated-metric)
+    - [Federated Managed Metric](#federated-managed-metric)
+  - [Remote Cluster Access](#remote-cluster-access)
+    - [Remote Cluster Access](#remote-cluster-access-1)
+    - [Federated Cluster Access](#federated-cluster-access)
+  - [RBAC Configuration](#rbac-configuration)
+  - [DataSink Configuration](#datasink-configuration)
+    - [Creating a DataSink](#creating-a-datasink)
+    - [DataSink Specification](#datasink-specification)
+      - [Connection](#connection)
+      - [Authentication](#authentication)
+    - [Using DataSink in Metrics](#using-datasink-in-metrics)
+    - [Default Behavior](#default-behavior)
+    - [Supported Metric Types](#supported-metric-types)
+    - [Examples and Detailed Documentation](#examples-and-detailed-documentation)
+    - [Migration from Legacy Configuration](#migration-from-legacy-configuration)
+  - [Data Sink Integration](#data-sink-integration)
+  - [Support, Feedback, Contributing](#support-feedback-contributing)
+  - [Security / Disclosure](#security--disclosure)
+  - [Code of Conduct](#code-of-conduct)
+  - [Licensing](#licensing)
 
 ## Key Features
 
@@ -37,12 +68,12 @@ graph LR
     M -.->|optional| RCA[RemoteClusterAccess]
     RCA -->|accesses remote cluster| K8S
     M -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class M metricType
     class RCA accessType
     class K8S targetType
@@ -57,12 +88,12 @@ graph LR
     MM -.->|optional| RCA[RemoteClusterAccess]
     RCA -->|accesses remote cluster| MR
     MM -->|sends data to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class MM metricType
     class RCA accessType
     class MR targetType
@@ -78,12 +109,12 @@ graph LR
     FCA -->|provides access to| MC[Multiple Clusters]
     FM -->|targets across clusters| K8S[Kubernetes Objects<br/>across federated clusters]
     FM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class FM metricType
     class FCA accessType
     class CP,MC,K8S targetType
@@ -99,26 +130,27 @@ graph LR
     FCA -->|provides access to| MC[Multiple Clusters]
     FMM -->|targets managed resources<br/>across clusters| MR[Managed Resources<br/>with 'crossplane' & 'managed' categories]
     FMM -->|aggregates & sends to| DS[Data Sink<br/>Dynatrace, etc.]
-    
+
     classDef metricType fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef accessType fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef targetType fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef dataType fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    
+
     class FMM metricType
     class FCA accessType
     class CP,MC,MR targetType
     class DS dataType
 ```
 
-### Resource Type Descriptions:
+## Resource Type Descriptions:
 
-- **Metric**: Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
-- **ManagedMetric**: Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
-- **FederatedMetric**: Monitors resources across multiple clusters, aggregating data from federated sources
-- **FederatedManagedMetric**: Monitors Crossplane managed resources across multiple clusters
-- **RemoteClusterAccess**: Provides access configuration for monitoring resources in remote clusters
-- **FederatedClusterAccess**: Discovers and provides access to multiple clusters for federated monitoring
+- [**Metric**](config/crd/bases/metrics.cloud.sap_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- [**ManagedMetric**](config/crd/bases/metrics.cloud.sap_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- [**FederatedMetric**](config/crd/bases/metrics.cloud.sap_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
+- [**FederatedManagedMetric**](config/crd/bases/metrics.cloud.sap_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
+- [**RemoteClusterAccess**](config/crd/bases/metrics.cloud.sap_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
+- [**FederatedClusterAccess**](config/crd/bases/metrics.cloud.sap_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
+- [**DataSink**](config/crd/bases/metrics.cloud.sap_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
 
 ## Installation
 
@@ -132,7 +164,7 @@ graph LR
 Deploy the Metrics Operator using the Helm chart:
 
 ```bash
-helm upgrade --install metrics-operator ghcr.io/sap/github.com/sap/metrics-operator/charts/metrics-operator \
+helm upgrade --install metrics-operator oci://ghcr.io/sap/github.com/sap/metrics-operator/charts/metrics-operator \
   --namespace <operator-namespace> \
   --create-namespace \
   --version=<version>
@@ -141,6 +173,30 @@ helm upgrade --install metrics-operator ghcr.io/sap/github.com/sap/metrics-opera
 Replace `<operator-namespace>` and `<version>` with appropriate values.
 
 After deployment, create your DataSink configuration as described in the [DataSink Configuration](#datasink-configuration) section.
+
+## Getting Started
+You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
+**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+
+### Quickstart
+
+1. Clone the repository and install prerequisites (Go, Docker, kind, kubectl).
+2. Configure your data sink by copying the configuration in [`examples/datasink/basic-datasink.yaml`](examples/datasink/basic-datasink.yaml) and modifying it to suit your environment.
+   - For example, if using Dynatrace, create a Kubernetes Secret with your API token and update the DataSink resource accordingly.
+   - The file should be placed and named like this: `examples/datasink/dynatrace-prod-setup.yaml`. (automatically excluded in [.gitignore](.gitignore))
+3. Run `make dev-local-all` to set up a local development environment.
+4. Run `make run` to start the Metrics Operator locally.
+5. Check your data sink for incoming metrics.
+
+### Common Development Tasks
+This project uses a Makefile to streamline development tasks. Common targets include:
+
+- `make dev-local-all` – Set up a local kind cluster with all CRDs, Crossplane, and sample resources.
+- `make run` – Run the operator locally for development.
+- `make dev-clean` – Delete the local kind cluster.
+- `make test` – Run all Go tests.
+- `make lint` – Run golangci-lint on the codebase.
+- `make manifests generate` – Regenerate CRDs and deepcopy code after API changes.
 
 ## Usage
 
@@ -154,9 +210,9 @@ The projections are then translated to dimensions in the metric.
 apiVersion: metrics.cloud.sap/v1alpha1
 kind: Metric
 metadata:
-  name: comp-pod
+  name: metric-pod-count
 spec:
-  name: comp-metric-pods
+  name: metric-pod-count
   description: Pods
   target:
     kind: Pod
@@ -416,7 +472,7 @@ The detailed guide covers:
 
 ### Migration from Legacy Configuration
 
-**Important**: The old method of using hardcoded secret names (such as `co-dynatrace-credentials`) has been deprecated and removed. You must now use DataSink resources to configure your metrics destinations.
+**Important**: The old method of using hardcoded secret names (such as `dynatrace-credentials`) has been deprecated and removed. You must now use DataSink resources to configure your metrics destinations.
 
 To migrate:
 1. Create a DataSink resource pointing to your existing authentication secret
@@ -436,37 +492,6 @@ To make the most of your metrics:
 
 For specific instructions on using your data sink's features, refer to its documentation. For example, if using Dynatrace, consult the Dynatrace documentation for information on creating custom charts, setting up alerts, and performing advanced analytics on your metric data.
 
-
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
-
-### Running on the cluster
-1. Install Instances of Custom Resources:
-
-```sh
-make dev-local-all
-```
-
-2. Run the controller:
-
-```sh
-make dev-run
-```
-Or run it from your IDE.
-
-### Delete Kind Cluster
-Delete Kind cluster
-```sh
-make dev-clean
-```
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests generate
-```
 
 ## Support, Feedback, Contributing
 
