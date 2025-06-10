@@ -164,7 +164,7 @@ graph LR
 Deploy the Metrics Operator using the Helm chart:
 
 ```bash
-helm upgrade --install metrics-operator ghcr.io/sap/github.com/sap/metrics-operator/charts/metrics-operator \
+helm upgrade --install metrics-operator oci://ghcr.io/sap/github.com/sap/metrics-operator/charts/metrics-operator \
   --namespace <operator-namespace> \
   --create-namespace \
   --version=<version>
