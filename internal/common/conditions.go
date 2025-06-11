@@ -3,7 +3,7 @@ package common
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/SAP/metrics-operator/api/v1alpha1"
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 )
 
 // Creating returns a condition that indicates the resource being monitored is currently being created

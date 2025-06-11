@@ -41,9 +41,9 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/init/crds"
 	"github.com/openmcp-project/controller-utils/pkg/init/webhooks"
 
-	"github.com/SAP/metrics-operator/internal/controller"
+	"github.com/openmcp-project/metrics-operator/internal/controller"
 
-	metricsv1alpha1 "github.com/SAP/metrics-operator/api/v1alpha1"
+	metricsv1alpha1 "github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

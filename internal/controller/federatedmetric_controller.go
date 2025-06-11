@@ -31,11 +31,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/internal/clientoptl"
-	"github.com/SAP/metrics-operator/internal/common"
-	"github.com/SAP/metrics-operator/internal/config"
-	orc "github.com/SAP/metrics-operator/internal/orchestrator"
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
+	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
+	"github.com/openmcp-project/metrics-operator/internal/common"
+	"github.com/openmcp-project/metrics-operator/internal/config"
+	orc "github.com/openmcp-project/metrics-operator/internal/orchestrator"
 )
 
 // NewFederatedMetricReconciler creates a new FederatedMetricReconciler
