@@ -6,7 +6,7 @@ spec:
   name: xfed-subaccounts
   description: subaccounts
   target:
-    group:  account.btp.orchestrate.cloud.sap
+    group:  account.btp.sap.crossplane.io
     kind: Subaccount
     version: v1alpha1
   interval: "1m" # in minutes

@@ -6,7 +6,7 @@ spec:
   name: xfed-entitlements
   description: entitlements
   target:
-    group:  account.btp.orchestrate.cloud.sap
+    group:  account.btp.sap.crossplane.io
     kind: Entitlement
     version: v1alpha1
   interval: "1m" # in minutes
