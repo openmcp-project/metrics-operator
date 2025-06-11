@@ -1,9 +1,0 @@
-apiVersion: metrics.openmcp.cloud/v1beta1
-kind: FederatedManagedMetric
-metadata:
-  labels:
-    app.kubernetes.io/name: metrics-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: federatedmanagedmetric-sample
-spec:
-  # TODO(user): Add fields here
