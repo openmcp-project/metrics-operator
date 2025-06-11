@@ -1,8 +1,8 @@
 package orchestrator
 
 import (
-	insight "github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/internal/extensions"
+	insight "github.com/openmcp-project/metrics-operator/api/v1alpha1"
+	"github.com/openmcp-project/metrics-operator/internal/extensions"
 )
 
 // MonitorResult is used to monitor the metric

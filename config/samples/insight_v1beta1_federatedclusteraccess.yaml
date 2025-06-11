@@ -1,9 +1,0 @@
-apiVersion: metrics.cloud.sap/v1beta1
-kind: FederatedClusterAccess
-metadata:
-  labels:
-    app.kubernetes.io/name: metrics-operator
-    app.kubernetes.io/managed-by: kustomize
-  name: federatedclusteraccess-sample
-spec:
-  # TODO(user): Add fields here

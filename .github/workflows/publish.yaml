@@ -4,13 +4,13 @@ on:
     tags:
       - v*
   workflow_dispatch:
-    
 
-permissions: 
+
+permissions:
   packages: write
 
 env:
-  OCI_URL: ghcr.io/sap
+  OCI_URL: ghcr.io/openmcp-project
 
 jobs:
   release_tag:
@@ -67,7 +67,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      
+
       - name: Build the ${{ github.repository }}
         run: |
           make reviewable
@@ -75,7 +75,7 @@ jobs:
 
       - name: Build Images
         run: |
-          IMG=ghcr.io/sap/metrics-operator:${{ env.version }} make docker-buildx
+          IMG=ghcr.io/openmcp-project/metrics-operator:${{ env.version }} make docker-buildx
 
       - name: setup OCM
         uses: open-component-model/ocm-setup-action@main
@@ -88,4 +88,4 @@ jobs:
 
       - name: Push CTF
         run: |
-          ocm transfer ctf --overwrite ./ctf ${{ env.OCI_URL }} 
+          ocm transfer ctf --overwrite ./ctf ${{ env.OCI_URL }}

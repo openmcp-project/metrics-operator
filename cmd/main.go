@@ -41,9 +41,9 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/init/crds"
 	"github.com/openmcp-project/controller-utils/pkg/init/webhooks"
 
-	"github.com/SAP/metrics-operator/internal/controller"
+	"github.com/openmcp-project/metrics-operator/internal/controller"
 
-	metricsv1alpha1 "github.com/SAP/metrics-operator/api/v1alpha1"
+	metricsv1alpha1 "github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -149,7 +149,7 @@ func main() {
 		Metrics:                server.Options{BindAddress: metricsAddr},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "82620e19.orchestrate.cloud.sap",
+		LeaderElectionID:       "82620e19.metrics.openmcp.cloud",
 		Logger:                 logger,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the

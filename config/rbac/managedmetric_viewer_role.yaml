@@ -12,7 +12,7 @@ metadata:
   name: managedmetric-viewer-role
 rules:
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - managedmetrics
   verbs:
@@ -20,7 +20,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - managedmetrics/status
   verbs:

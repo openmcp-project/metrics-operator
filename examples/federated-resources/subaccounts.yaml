@@ -1,4 +1,4 @@
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-subaccounts
@@ -6,7 +6,7 @@ spec:
   name: xfed-subaccounts
   description: subaccounts
   target:
-    group:  account.btp.orchestrate.cloud.sap
+    group:  account.btp.sap.crossplane.io
     kind: Subaccount
     version: v1alpha1
   interval: "1m" # in minutes

@@ -1,4 +1,4 @@
 COMPONENT_NAME: metrics-operator
-COMPONENT_NAME_PREFIX: github.com/sap
+COMPONENT_NAME_PREFIX: github.com/openmcp-project
 PROVIDER: openmcp-project
-COMPONENT_REPO_PREFIX: ghcr.io/sap/metrics-operator
+COMPONENT_REPO_PREFIX: ghcr.io/openmcp-project/metrics-operator

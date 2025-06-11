@@ -11,7 +11,7 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - datasinks
   verbs:
@@ -19,7 +19,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - federatedmetrics
   - managedmetrics
@@ -33,7 +33,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - federatedmetrics/finalizers
   - managedmetrics/finalizers
@@ -41,7 +41,7 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - federatedmetrics/status
   - managedmetrics/status

@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/sap/github.com/sap/metrics-operator/images/metrics-operator
+  repository: ghcr.io/openmcp-project/github.com/openmcp-project/metrics-operator/images/metrics-operator
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: v0.6.0-dev
@@ -108,7 +108,7 @@ rbac:
   clusterRole:
     rules:
       - apiGroups:
-          - metrics.cloud.sap
+          - metrics.openmcp.cloud
         resources:
           - managedmetrics
           - metrics

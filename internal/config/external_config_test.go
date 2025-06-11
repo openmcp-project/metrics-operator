@@ -12,8 +12,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	insight "github.com/SAP/metrics-operator/api/v1alpha1"
-	orc "github.com/SAP/metrics-operator/internal/orchestrator"
+	insight "github.com/openmcp-project/metrics-operator/api/v1alpha1"
+	orc "github.com/openmcp-project/metrics-operator/internal/orchestrator"
 )
 
 // MockClient is a custom mock implementation of client.Client

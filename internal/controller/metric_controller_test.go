@@ -23,9 +23,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/internal/common"
-	orc "github.com/SAP/metrics-operator/internal/orchestrator"
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
+	"github.com/openmcp-project/metrics-operator/internal/common"
+	orc "github.com/openmcp-project/metrics-operator/internal/orchestrator"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

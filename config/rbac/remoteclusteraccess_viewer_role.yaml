@@ -8,7 +8,7 @@ metadata:
   name: remoteclusteraccess-viewer-role
 rules:
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - remoteclusteraccesses
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - remoteclusteraccesses/status
   verbs:

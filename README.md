@@ -1,4 +1,4 @@
-[![REUSE status](https://api.reuse.software/badge/github.com/SAP/metrics-operator)](https://api.reuse.software/info/github.com/SAP/metrics-operator)
+[![REUSE status](https://api.reuse.software/badge/github.com/openmcp-project/metrics-operator)](https://api.reuse.software/info/github.com/openmcp-project/metrics-operator)
 
 # Metrics Operator
 
@@ -144,13 +144,13 @@ graph LR
 
 ## Resource Type Descriptions:
 
-- [**Metric**](config/crd/bases/metrics.cloud.sap_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
-- [**ManagedMetric**](config/crd/bases/metrics.cloud.sap_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
-- [**FederatedMetric**](config/crd/bases/metrics.cloud.sap_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
-- [**FederatedManagedMetric**](config/crd/bases/metrics.cloud.sap_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
-- [**RemoteClusterAccess**](config/crd/bases/metrics.cloud.sap_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
-- [**FederatedClusterAccess**](config/crd/bases/metrics.cloud.sap_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
-- [**DataSink**](config/crd/bases/metrics.cloud.sap_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
+- [**Metric**](config/crd/bases/metrics.openmcp.cloud_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- [**ManagedMetric**](config/crd/bases/metrics.openmcp.cloud_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- [**FederatedMetric**](config/crd/bases/metrics.openmcp.cloud_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
+- [**FederatedManagedMetric**](config/crd/bases/metrics.openmcp.cloud_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
+- [**RemoteClusterAccess**](config/crd/bases/metrics.openmcp.cloud_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
+- [**FederatedClusterAccess**](config/crd/bases/metrics.openmcp.cloud_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
+- [**DataSink**](config/crd/bases/metrics.openmcp.cloud_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
 
 ## Installation
 
@@ -164,7 +164,7 @@ graph LR
 Deploy the Metrics Operator using the Helm chart:
 
 ```bash
-helm upgrade --install metrics-operator oci://ghcr.io/sap/github.com/sap/metrics-operator/charts/metrics-operator \
+helm upgrade --install metrics-operator oci://ghcr.io/openmcp-project/github.com/openmcp-project/metrics-operator/charts/metrics-operator \
   --namespace <operator-namespace> \
   --create-namespace \
   --version=<version>
@@ -207,7 +207,7 @@ This can be useful for tracking additional dimensions of the resource, such as f
 The projections are then translated to dimensions in the metric.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: metric-pod-count
@@ -230,7 +230,7 @@ spec:
 Managed metrics are used to monitor crossplane managed resources. They automatically track resources that have the "crossplane" and "managed" categories in their CRDs.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: ManagedMetric
 metadata:
   name: managed-metric
@@ -248,7 +248,7 @@ spec:
 Federated metrics deal with resources that are spread across multiple clusters. To monitor these resources, you need to define a `FederatedMetric` resource.
 They offer capabilities to aggregate data as well as filtering down to a specific cluster or field using projections.
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-prov
@@ -276,7 +276,7 @@ The pre-condition here is that if a resource comes from a crossplane provider, i
 
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: xfed-managed
@@ -300,7 +300,7 @@ The Metrics Operator can monitor both the cluster it's deployed in and remote cl
 This remote cluster access resource can be used by `Metric` and `ManagedMetric` resources to monitor resources in the remote cluster.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
@@ -320,7 +320,7 @@ spec:
 To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ca-sample
@@ -388,7 +388,7 @@ The Metrics Operator uses DataSink custom resources to define where and how metr
 Define a DataSink resource to specify the connection details and authentication for your metrics destination:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: default
@@ -425,7 +425,7 @@ The `DataSinkSpec` contains the following fields:
 All metric types support the `dataSinkRef` field to specify which DataSink to use:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: pod-count
@@ -495,15 +495,15 @@ For specific instructions on using your data sink's features, refer to its docum
 
 ## Support, Feedback, Contributing
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/metrics-operator/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/openmcp-project/metrics-operator/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
 ## Security / Disclosure
-If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/SAP/metrics-operator/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
+If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/openmcp-project/metrics-operator/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
 
 ## Code of Conduct
 
-We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone. By participating in this project, you agree to abide by its [Code of Conduct](https://github.com/SAP/.github/blob/main/CODE_OF_CONDUCT.md) at all times.
+We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone. By participating in this project, you agree to abide by its [Code of Conduct](https://github.com/openmcp-project/.github/blob/main/CODE_OF_CONDUCT.md) at all times.
 
 ## Licensing
 
-Copyright 2024 SAP SE or an SAP affiliate company and metrics-operator contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/metrics-operator).
+Copyright 2025 SAP SE or an SAP affiliate company and metrics-operator contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/openmcp-project/metrics-operator).

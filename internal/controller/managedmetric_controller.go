@@ -32,15 +32,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/SAP/metrics-operator/internal/clientoptl"
-	"github.com/SAP/metrics-operator/internal/common"
-	"github.com/SAP/metrics-operator/internal/config"
-	"github.com/SAP/metrics-operator/internal/orchestrator"
 	"github.com/go-logr/logr"
+	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
+	"github.com/openmcp-project/metrics-operator/internal/common"
+	"github.com/openmcp-project/metrics-operator/internal/config"
+	"github.com/openmcp-project/metrics-operator/internal/orchestrator"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/SAP/metrics-operator/api/v1alpha1"
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 )
 
 // NewManagedMetricReconciler creates a new ManagedMetricReconciler
@@ -91,10 +91,10 @@ func (r *ManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, ma
 	return retriever.GetDataSinkCredentials(ctx, managedMetric.Spec.DataSinkRef, managedMetric, l)
 }
 
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/finalizers,verbs=update
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/finalizers,verbs=update
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=datasinks,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

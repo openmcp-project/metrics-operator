@@ -14,8 +14,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/internal/clientoptl"
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
+	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 )
 
 // NewFederatedManagedHandler creates a new FederatedManagedHandler

@@ -1,4 +1,4 @@
-module github.com/SAP/metrics-operator
+module github.com/openmcp-project/metrics-operator
 
 go 1.23.0
 

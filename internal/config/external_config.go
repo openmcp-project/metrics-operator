@@ -21,8 +21,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/SAP/metrics-operator/api/v1alpha1"
-	"github.com/SAP/metrics-operator/internal/orchestrator"
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
+	"github.com/openmcp-project/metrics-operator/internal/orchestrator"
 )
 
 const (
