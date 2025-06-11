@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: federatedclusteraccesses.metrics.cloud.sap
+  name: federatedclusteraccesses.metrics.openmcp.cloud
 spec:
-  group: metrics.cloud.sap
+  group: metrics.openmcp.cloud
   names:
     kind: FederatedClusterAccess
     listKind: FederatedClusterAccessList

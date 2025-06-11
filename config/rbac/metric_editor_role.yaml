@@ -12,7 +12,7 @@ metadata:
   name: metric-editor-role
 rules:
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - metrics
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - metrics.cloud.sap
+  - metrics.openmcp.cloud
   resources:
   - metrics/status
   verbs:

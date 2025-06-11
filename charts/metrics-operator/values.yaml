@@ -108,7 +108,7 @@ rbac:
   clusterRole:
     rules:
       - apiGroups:
-          - metrics.cloud.sap
+          - metrics.openmcp.cloud
         resources:
           - managedmetrics
           - metrics

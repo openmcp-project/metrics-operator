@@ -109,10 +109,10 @@ func (r *MetricReconciler) handleGetError(err error, log logr.Logger) (ctrl.Resu
 	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 }
 
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=metrics/finalizers,verbs=update
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=metrics,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=metrics/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=metrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=datasinks,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile handles the reconciliation of a Metric object

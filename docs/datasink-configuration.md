@@ -11,7 +11,7 @@ DataSink is a custom resource that defines where and how the Metrics Operator sh
 ### Complete Example
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: production-dynatrace
@@ -106,7 +106,7 @@ kubectl create secret generic dynatrace-production-credentials \
 Specify the DataSink to use in your metric resources:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: pod-metrics
@@ -128,7 +128,7 @@ spec:
 If no `dataSinkRef` is specified, the operator automatically uses a DataSink named "default" in the operator's namespace:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: pod-metrics-default
@@ -151,7 +151,7 @@ You can configure multiple DataSinks for different purposes:
 ```yaml
 ---
 # Development environment DataSink
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: dev-dynatrace
@@ -167,7 +167,7 @@ spec:
         key: api-token
 ---
 # Production environment DataSink
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: prod-dynatrace
@@ -188,7 +188,7 @@ spec:
 ```yaml
 ---
 # Platform team DataSink
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: platform-metrics
@@ -204,7 +204,7 @@ spec:
         key: api-token
 ---
 # Application team DataSink
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: app-metrics
@@ -227,7 +227,7 @@ All metric resource types support the `dataSinkRef` field:
 ### Metric
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: service-count
@@ -244,7 +244,7 @@ spec:
 ### ManagedMetric
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: ManagedMetric
 metadata:
   name: crossplane-releases
@@ -260,7 +260,7 @@ spec:
 ### FederatedMetric
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedMetric
 metadata:
   name: federated-providers
@@ -280,7 +280,7 @@ spec:
 ### FederatedManagedMetric
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: federated-managed-resources
@@ -318,7 +318,7 @@ Now you must use DataSink resources:
 ```yaml
 ---
 # 1. Create the DataSink
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: default
@@ -443,7 +443,7 @@ To verify your DataSink configuration is working:
 DataSink supports any HTTP or gRPC endpoint:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: custom-endpoint
@@ -464,7 +464,7 @@ spec:
 For gRPC endpoints:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: grpc-endpoint

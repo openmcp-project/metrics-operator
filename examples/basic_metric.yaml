@@ -1,4 +1,4 @@
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: basic-metric
@@ -15,7 +15,7 @@ spec:
   # dataSinkRef:
   #   name: default
 ---
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: basic-pods
@@ -31,7 +31,7 @@ spec:
     - name: pod-namespace
       fieldPath: "metadata.namespace"
 ---
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: basic-total-pods

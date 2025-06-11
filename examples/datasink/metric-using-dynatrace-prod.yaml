@@ -1,5 +1,5 @@
 # Metric Custom Resource using Dynatrace Production DataSink
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: example-metric-dynatrace-prod

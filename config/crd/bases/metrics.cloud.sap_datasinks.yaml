@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: datasinks.metrics.cloud.sap
+  name: datasinks.metrics.openmcp.cloud
 spec:
-  group: metrics.cloud.sap
+  group: metrics.openmcp.cloud
   names:
     kind: DataSink
     listKind: DataSinkList

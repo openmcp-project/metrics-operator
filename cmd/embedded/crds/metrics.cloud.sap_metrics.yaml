@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: metrics.metrics.cloud.sap
+  name: metrics.metrics.openmcp.cloud
 spec:
-  group: metrics.cloud.sap
+  group: metrics.openmcp.cloud
   names:
     kind: Metric
     listKind: MetricList

@@ -144,13 +144,13 @@ graph LR
 
 ## Resource Type Descriptions:
 
-- [**Metric**](config/crd/bases/metrics.cloud.sap_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
-- [**ManagedMetric**](config/crd/bases/metrics.cloud.sap_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
-- [**FederatedMetric**](config/crd/bases/metrics.cloud.sap_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
-- [**FederatedManagedMetric**](config/crd/bases/metrics.cloud.sap_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
-- [**RemoteClusterAccess**](config/crd/bases/metrics.cloud.sap_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
-- [**FederatedClusterAccess**](config/crd/bases/metrics.cloud.sap_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
-- [**DataSink**](config/crd/bases/metrics.cloud.sap_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
+- [**Metric**](config/crd/bases/metrics.openmcp.cloud_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- [**ManagedMetric**](config/crd/bases/metrics.openmcp.cloud_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- [**FederatedMetric**](config/crd/bases/metrics.openmcp.cloud_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
+- [**FederatedManagedMetric**](config/crd/bases/metrics.openmcp.cloud_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
+- [**RemoteClusterAccess**](config/crd/bases/metrics.openmcp.cloud_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
+- [**FederatedClusterAccess**](config/crd/bases/metrics.openmcp.cloud_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
+- [**DataSink**](config/crd/bases/metrics.openmcp.cloud_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
 
 ## Installation
 
@@ -207,7 +207,7 @@ This can be useful for tracking additional dimensions of the resource, such as f
 The projections are then translated to dimensions in the metric.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: metric-pod-count
@@ -230,7 +230,7 @@ spec:
 Managed metrics are used to monitor crossplane managed resources. They automatically track resources that have the "crossplane" and "managed" categories in their CRDs.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: ManagedMetric
 metadata:
   name: managed-metric
@@ -248,7 +248,7 @@ spec:
 Federated metrics deal with resources that are spread across multiple clusters. To monitor these resources, you need to define a `FederatedMetric` resource.
 They offer capabilities to aggregate data as well as filtering down to a specific cluster or field using projections.
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-prov
@@ -276,7 +276,7 @@ The pre-condition here is that if a resource comes from a crossplane provider, i
 
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: xfed-managed
@@ -300,7 +300,7 @@ The Metrics Operator can monitor both the cluster it's deployed in and remote cl
 This remote cluster access resource can be used by `Metric` and `ManagedMetric` resources to monitor resources in the remote cluster.
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
@@ -320,7 +320,7 @@ spec:
 To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ca-sample
@@ -388,7 +388,7 @@ The Metrics Operator uses DataSink custom resources to define where and how metr
 Define a DataSink resource to specify the connection details and authentication for your metrics destination:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: DataSink
 metadata:
   name: default
@@ -425,7 +425,7 @@ The `DataSinkSpec` contains the following fields:
 All metric types support the `dataSinkRef` field to specify which DataSink to use:
 
 ```yaml
-apiVersion: metrics.cloud.sap/v1alpha1
+apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: Metric
 metadata:
   name: pod-count

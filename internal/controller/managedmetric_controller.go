@@ -91,10 +91,10 @@ func (r *ManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, ma
 	return retriever.GetDataSinkCredentials(ctx, managedMetric.Spec.DataSinkRef, managedMetric, l)
 }
 
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=managedmetrics/finalizers,verbs=update
-//+kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/finalizers,verbs=update
+//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=datasinks,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

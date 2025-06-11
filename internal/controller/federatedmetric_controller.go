@@ -102,10 +102,10 @@ func shouldReconcile(metric *v1alpha1.FederatedMetric) bool {
 	return elapsed >= metric.Spec.Interval.Duration
 }
 
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=federatedmetrics/finalizers,verbs=update
-// +kubebuilder:rbac:groups=metrics.cloud.sap,resources=datasinks,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=federatedmetrics,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=federatedmetrics/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=federatedmetrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=datasinks,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile handles the reconciliation of the FederatedMetric object
