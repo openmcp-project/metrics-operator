@@ -143,7 +143,7 @@ build-docker-binary: manifests generate fmt vet ## Build manager binary for Dock
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o bin/manager-linux.amd64 cmd/main.go
 
 .PHONY: docker-build
-docker-build: build-docker-binary test ## Build docker image with the manager.
+docker-build: test build-docker-binary ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
