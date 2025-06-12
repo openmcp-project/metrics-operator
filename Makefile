@@ -262,7 +262,7 @@ dev-apply-metric-dynatrace-prod: ## Apply metric using Dynatrace production exam
 ##@ Helm
 
 HELM_VERSION ?= v3.18.0
-OCI_REGISTRY ?= ghcr.io/sap/charts
+OCI_REGISTRY ?= ghcr.io/openmcp-project/charts
 
 $(HELM): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/helm && ! $(LOCALBIN)/helm version --short | grep -q $(HELM_VERSION); then \
@@ -275,11 +275,11 @@ $(HELM): $(LOCALBIN)
 	rm -rf /tmp/$(shell uname | tr '[:upper:]' '[:lower:]')-amd64)
 
 .PHONY: helm-package
-helm-package: $(HELM) helm-chart
-	$(LOCALBIN)/helm package charts/$(PROJECT_FULL_NAME)/ -d ./ --version $(shell cat VERSION) 
+helm-package: $(HELM) helm-chart ## Package the Helm chart.
+	$(LOCALBIN)/helm package charts/$(PROJECT_FULL_NAME)/ -d ./ --version $(shell cat VERSION)
 
 .PHONY: helm-push
-helm-push: $(HELM)
+helm-push: $(HELM) ## Push the Helm chart to the OCI registry.
 	$(LOCALBIN)/helm push $(PROJECT_FULL_NAME)-$(shell cat VERSION).tgz oci://$(OCI_REGISTRY)
 
 .PHONY: helm-chart
