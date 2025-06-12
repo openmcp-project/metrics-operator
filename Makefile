@@ -160,7 +160,7 @@ PLATFORMS ?= linux/arm64,linux/amd64
 
 .PHONY: docker-buildx
 docker-buildx: test
-    $(CONTAINER_TOOL) buildx build --platform=$(PLATFORMS) --tag $(IMG) --load -f Dockerfile .
+	$(CONTAINER_TOOL) buildx build --platform=$(PLATFORMS) --tag $(IMG) --load -f Dockerfile .
 
 #----------------------------------------------------------------------------------------------
 ##@ Deployment
