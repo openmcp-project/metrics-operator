@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      
+
 permissions:
   contents: write # we need this to be able to push tags
   pull-requests: read
-  
+
 jobs:
   release_tag:
     name: Release version
@@ -38,7 +38,7 @@ jobs:
           echo "Skipping development version release: ${{ env.version }}"
           echo "SKIP=true" >> $GITHUB_ENV
           exit 0
-    
+
       - name: Check if VERSION is already tagged
         id: check_tag
         run: |
@@ -67,7 +67,7 @@ jobs:
 
       - name: Build Changelog
         id: github_release
-        
+
         uses: mikepenz/release-changelog-builder-action@v5
         with:
           mode: "PR"
@@ -99,7 +99,7 @@ jobs:
             }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Create GitHub release
         if: ${{ env.SKIP != 'true' }}
         uses: softprops/action-gh-release@v2
@@ -120,5 +120,5 @@ jobs:
           git config user.name "${{ env.AUTHOR_NAME }}"
           git config user.email "${{ env.AUTHOR_EMAIL }}"
           git add VERSION charts/metrics-operator/Chart.yaml charts/metrics-operator/values.yaml
-          git commit -m "Update VERSION to ${{ env.version }}-dev"
+          git commit -m "chore: update VERSION to ${{ env.version }}-dev"
           git push origin main
