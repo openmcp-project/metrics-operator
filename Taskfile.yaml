@@ -3,12 +3,13 @@ version: 3
 vars:
   NESTED_MODULES: api
   API_DIRS: '{{.ROOT_DIR}}/api/v1alpha1/...'
-  MANIFEST_OUT: '{{.ROOT_DIR}}/cmd/embedded/crds'
+  MANIFEST_OUT: '{{.ROOT_DIR}}/cmd/metrics-operator/embedded/crds'
   CODE_DIRS: '{{.ROOT_DIR}}/cmd/... {{.ROOT_DIR}}/internal/...  {{.ROOT_DIR}}/api/v1alpha1/...'
   COMPONENTS: 'metrics-operator'
   REPO_NAME: 'https://github.com/openmcp-project/metrics-operator'
+  REPO_URL: 'https://github.com/openmcp-project/metrics-operator'
   GENERATE_DOCS_INDEX: "false"
-
+  ENVTEST_REQUIRED: "true"
 includes:
   shared:
     taskfile: hack/common/Taskfile_controller.yaml
