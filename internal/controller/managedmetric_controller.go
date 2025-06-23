@@ -62,11 +62,11 @@ func (r *ManagedMetricReconciler) getRestConfig() *rest.Config {
 	return r.inRestConfig
 }
 
-func (r *ManagedMetricReconciler) scheduleNextReconciliation(metric *v1alpha1.ManagedMetric) (ctrl.Result, error) {
+func (r *ManagedMetricReconciler) scheduleNextReconciliation(metric *v1alpha1.ManagedMetric) ctrl.Result {
 	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
 	return ctrl.Result{
 		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
-	}, nil
+	}
 }
 
 func (r *ManagedMetricReconciler) shouldReconcile(metric *v1alpha1.ManagedMetric) bool {
@@ -92,11 +92,11 @@ func (r *ManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, ma
 	return retriever.GetDataSinkCredentials(ctx, managedMetric.Spec.DataSinkRef, managedMetric, l)
 }
 
-//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/finalizers,verbs=update
-//+kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=datasinks,verbs=get;list;watch
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=get
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=managedmetrics/finalizers,verbs=update
+// +kubebuilder:rbac:groups=metrics.openmcp.cloud,resources=datasinks,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -138,7 +138,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Check if enough time has passed since the last reconciliation
 	if !r.shouldReconcile(&metric) {
-		return r.scheduleNextReconciliation(&metric)
+		return r.scheduleNextReconciliation(&metric), nil
 	}
 
 	/*

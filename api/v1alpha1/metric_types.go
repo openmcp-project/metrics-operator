@@ -116,7 +116,7 @@ func (r *Metric) GvkToString() string {
 	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Target.Group, r.Spec.Target.Version, r.Spec.Target.Kind)
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // MetricList contains a list of Metric
 type MetricList struct {

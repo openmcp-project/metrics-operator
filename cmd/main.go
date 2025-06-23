@@ -44,7 +44,7 @@ import (
 	"github.com/openmcp-project/metrics-operator/internal/controller"
 
 	metricsv1alpha1 "github.com/openmcp-project/metrics-operator/api/v1alpha1"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 var _ = api.Target{}
@@ -65,7 +65,7 @@ func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 
 	utilruntime.Must(metricsv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 }
 
 func runInit(setupClient client.Client) {
@@ -176,7 +176,7 @@ func main() {
 
 	setupFederatedManagedMetricController(mgr)
 
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
