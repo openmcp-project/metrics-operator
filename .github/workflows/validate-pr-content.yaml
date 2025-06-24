@@ -1,0 +1,15 @@
+name: Validate Pull Request Content
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  validate_pr_content:
+    uses: openmcp-project/build/.github/workflows/validate-pr-content.lib.yaml@main
+    secrets: inherit
