@@ -59,6 +59,7 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 		dataPoint := clientoptl.NewDataPoint()
 		dataPoint.AddDimension("kind", cr.MangedResource.Kind)
 		dataPoint.AddDimension("apiversion", cr.MangedResource.APIVersion)
+		dataPoint.AddDimension("metadata.name", cr.MangedResource.Metadata.Name)
 
 		// Add cluster dimension if available
 		if h.clusterName != nil {
