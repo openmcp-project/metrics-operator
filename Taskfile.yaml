@@ -31,7 +31,8 @@ tasks:
     - dev:internal:kustomize
     - generate
     cmds:
-    - '{{.ROOT_DIR}}/bin/kustomize build config/crd | kubectl apply -f -'
+    # we need to use --load-restrictor=LoadRestrictionsNone because config/crd/bases is a symlink to cmd/embedded/crds, and that's considered an external dir, kustomize doesn't like that.
+    - '{{.ROOT_DIR}}/bin/kustomize build --load-restrictor=LoadRestrictionsNone config/crd | kubectl apply -f -'
 
   dev:crd:uninstall:
     desc: "Uninstall CRDs from the K8s cluster specified in ~/.kube/config"
@@ -57,7 +58,6 @@ tasks:
     - generate
     cmds:
     - '{{.ROOT_DIR}}/bin/kustomize build config/default | kubectl delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
-
 
   dev:kind-cluster:create:
     desc: "Create a kind cluster for development (no CRDs or resources applied)"
