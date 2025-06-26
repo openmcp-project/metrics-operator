@@ -180,23 +180,30 @@ You’ll need a Kubernetes cluster to run against. You can use [KIND](https://si
 
 ### Quickstart
 
-1. Clone the repository and install prerequisites (Go, Docker, kind, kubectl).
-2. Configure your data sink by copying the configuration in [`examples/datasink/basic-datasink.yaml`](examples/datasink/basic-datasink.yaml) and modifying it to suit your environment.
+This project uses [Taskfile](https://taskfile.dev/) to streamline development activities. Most of the common targets are shared among other OpenMCP components using a shared [build](https://github.com/openmcp-project/build/) repository. The build repository is included as a git submodule.
+
+This will ensure the submodule is pulled and updated to latest included revision. Some of the common tasks supported are:
+1. Clone the repository and install prerequisites (Go, Docker, kind, kubectl, task).
+2. Ensure the build submodule is initialized and updated:
+```bash
+git submodule update --init
+```
+3. Configure your data sink by copying the configuration in [`examples/datasink/basic-datasink.yaml`](examples/datasink/basic-datasink.yaml) and modifying it to suit your environment.
    - For example, if using Dynatrace, create a Kubernetes Secret with your API token and update the DataSink resource accordingly.
    - The file should be placed and named like this: `examples/datasink/dynatrace-prod-setup.yaml`. (automatically excluded in [.gitignore](.gitignore))
-3. Run `make dev-local-all` to set up a local development environment.
-4. Run `make run` to start the Metrics Operator locally.
-5. Check your data sink for incoming metrics.
+4. Run `task dev:local:all` to set up a local development environment.
+5. Run `task run` to start the Metrics Operator locally.
+6. Check your data sink for incoming metrics.
 
 ### Common Development Tasks
-This project uses a Makefile to streamline development tasks. Common targets include:
+To get a full list of the supported tasks, you can run the `task` command with no arguments. However, the most commonly used tasks are:
 
-- `make dev-local-all` – Set up a local kind cluster with all CRDs, Crossplane, and sample resources.
-- `make run` – Run the operator locally for development.
-- `make dev-clean` – Delete the local kind cluster.
-- `make test` – Run all Go tests.
-- `make lint` – Run golangci-lint on the codebase.
-- `make manifests generate` – Regenerate CRDs and deepcopy code after API changes.
+- `task dev:local:all` – Set up a local kind cluster with all CRDs, Crossplane, and sample resources.
+- `task run` – Run the operator locally for development.
+- `task dev:clean` – Delete the local kind cluster.
+- `task test` – Run all Go tests.
+- `task generate` – Regenerate CRDs and deepcopy code after API changes.
+- `task validate:lint` – Run golangci-lint on the codebase.
 
 ## Usage
 

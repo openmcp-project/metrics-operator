@@ -31,7 +31,7 @@ tasks:
     - dev:internal:kustomize
     - generate
     cmds:
-    # we need to use --load-restrictor=LoadRestrictionsNone because config/crd/bases is a symlink to cmd/embedded/crds, and that's considered an external dir, kustomize doesn't like that.
+    # we need to use --load-restrictor=LoadRestrictionsNone because config/crd/bases is a symlink to cmd/metrics-operator/embedded/crds/, and that's considered an external dir, kustomize doesn't like that.
     - '{{.ROOT_DIR}}/bin/kustomize build --load-restrictor=LoadRestrictionsNone config/crd | kubectl apply -f -'
 
   dev:crd:uninstall:
@@ -76,7 +76,7 @@ tasks:
     aliases:
       - run
     cmds:
-    - 'OPERATOR_CONFIG_NAMESPACE=metrics-operator-system go run ./cmd/main.go start'
+    - 'OPERATOR_CONFIG_NAMESPACE=metrics-operator-system go run ./cmd/metrics-operator/main.go start'
 
   dev:test:
     desc: "Run tests"
@@ -93,9 +93,9 @@ tasks:
     - task dev:crd:install
     - task dev:crossplane:all
     - task dev:operator-namespace
-    - task dev:dynatrace-prod-setup
     - task dev:basic-metric
     - task dev:managed-metric
+    - test -e {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml && task dev:dynatrace-prod-setup || echo -e '\n\nYou should add your dynatrace configuration here {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml\n\n'
      
 
   dev:operator-namespace:
@@ -125,10 +125,10 @@ tasks:
 
   dev:crossplane:all:
     desc: "Full Crossplane setup: install core, provider, and sample"
-    deps:
-      - dev:crossplane:install
-      - dev:crossplane:provider:install
-      - dev:helm-provider-sample
+    cmds:
+      - task dev:crossplane:install
+      - task dev:crossplane:provider:install
+      - task dev:helm-provider-sample
   
   dev:crossplane:install:
     desc: "Install Crossplane into the cluster via Helm"
