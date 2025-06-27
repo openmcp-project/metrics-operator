@@ -402,9 +402,7 @@ metadata:
   namespace: metrics-operator-system
 spec:
   connection:
-    endpoint: "https://your-tenant.live.dynatrace.com/api/v2/metrics/ingest"
-    protocol: "http"
-    insecureSkipVerify: false
+    endpoint: "https://your-tenant.live.dynatrace.com/api/v2/otlp/v1/metrics"
   authentication:
     apiKey:
       secretKeyRef:
@@ -418,8 +416,6 @@ The `DataSinkSpec` contains the following fields:
 
 #### Connection
 - **endpoint**: The target endpoint URL where metrics will be sent
-- **protocol**: Communication protocol (`http` or `grpc`)
-- **insecureSkipVerify**: (Optional) Skip TLS certificate verification
 
 #### Authentication
 - **apiKey**: API key authentication configuration
