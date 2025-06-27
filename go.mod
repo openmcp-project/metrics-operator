@@ -5,7 +5,8 @@ go 1.24.0
 require (
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/golang-lru v0.5.1
+	github.com/hashicorp/golang-lru v1.0.2
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/openmcp-project/controller-utils v0.4.2
 	github.com/samber/lo v1.47.0
 	github.com/stretchr/testify v1.10.0
