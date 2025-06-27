@@ -3,31 +3,22 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
-  name: managedmetrics.metrics.openmcp.cloud
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: federatedmanagedmetrics.metrics.openmcp.cloud
 spec:
   group: metrics.openmcp.cloud
   names:
-    kind: ManagedMetric
-    listKind: ManagedMetricList
-    plural: managedmetrics
-    singular: managedmetric
+    kind: FederatedManagedMetric
+    listKind: FederatedManagedMetricList
+    plural: federatedmanagedmetrics
+    singular: federatedmanagedmetric
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.ready
-      name: READY
-      type: string
-    - jsonPath: .status.observation.resources
-      name: VALUE
-      type: string
-    - jsonPath: .status.observation.timestamp
-      name: OBSERVED
-      type: date
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ManagedMetric is the Schema for the managedmetrics API
+        description: FederatedManagedMetric is the Schema for the federatedmanagedmetrics
+          API
         properties:
           apiVersion:
             description: |-
@@ -47,11 +38,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: ManagedMetricSpec defines the desired state of ManagedMetric
+            description: FederatedManagedMetricSpec defines the desired state of FederatedManagedMetric
             properties:
               dataSinkRef:
                 description: |-
-                  DataSinkRef specifies the DataSink to be used for this managed metric.
+                  DataSinkRef specifies the DataSink to be used for this federated managed metric.
                   If not specified, the DataSink named "default" in the operator's
                   namespace will be used.
                 properties:
@@ -62,48 +53,33 @@ spec:
                 - name
                 type: object
               description:
-                description: Sets the description that will be used to identify the
-                  metric in Dynatrace(or other providers)
                 type: string
-              fieldSelector:
-                description: Define fields of your object to adapt filters of the
-                  query
-                type: string
-              group:
-                description: Define the group of your object that should be instrumented
-                  (without version at the end)
-                type: string
-              interval:
-                default: 10m
-                description: Define in what interval the query should be recorded
-                type: string
-              kind:
-                description: Decide which kind the metric should keep track of (needs
-                  to be plural version)
-                type: string
-              labelSelector:
-                description: Define labels of your object to adapt filters of the
-                  query
-                type: string
-              name:
-                description: Sets the name that will be used to identify the metric
-                  in Dynatrace(or other providers)
-                type: string
-              remoteClusterAccessRef:
-                description: RemoteClusterAccessRef is to be used by other types to
-                  reference a RemoteClusterAccess type
+              federateClusterAccessRef:
+                description: FederateClusterAccessRef is a reference to a FederateCA
                 properties:
                   name:
                     type: string
                   namespace:
                     type: string
                 type: object
-              version:
-                description: Define version of the object you want to intrsument
+              fieldSelector:
+                description: Define fields of your object to adapt filters of the
+                  query
+                type: string
+              interval:
+                default: 10m
+                description: Define in what interval the query should be recorded
+                type: string
+              labelSelector:
+                description: Define labels of your object to adapt filters of the
+                  query
+                type: string
+              name:
                 type: string
             type: object
           status:
-            description: ManagedMetricStatus defines the observed state of ManagedMetric
+            description: FederatedManagedMetricStatus defines the observed state of
+              FederatedManagedMetric
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -163,23 +139,23 @@ spec:
                   - type
                   type: object
                 type: array
+              lastReconcileTime:
+                format: date-time
+                type: string
               observation:
-                description: Observation represent the latest available observation
-                  of an object's state
+                description: FederatedObservation represents the latest available
+                  observation of an object's state
                 properties:
-                  resources:
-                    description: Number of resources of the managed metric (i.e. how
-                      many managed resource are there that match the query)
-                    type: string
-                  timestamp:
-                    description: The timestamp of the observation
-                    format: date-time
-                    type: string
+                  activeCount:
+                    type: integer
+                  failedCount:
+                    type: integer
+                  pendingCount:
+                    type: integer
                 type: object
               ready:
-                description: |-
-                  Is set when Metric is Successfully executed and keeps track of the current cycle.
-                  The cycle starts anew and the status will be set to active if execution was successful
+                description: Ready is like a snapshot of the current state of the
+                  metric's lifecycle
                 type: string
             type: object
         type: object

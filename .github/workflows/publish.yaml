@@ -1,105 +1,15 @@
-name: publish
+name: Publish
+
 on:
   push:
     tags:
       - v*
   workflow_dispatch:
 
-
 permissions:
   packages: write
 
-env:
-  OCI_URL: ghcr.io/openmcp-project
-
 jobs:
-  release_tag:
-    name: Release version
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ssh-key: ${{ secrets.PUSH_KEY }}
-          fetch-tags: true
-          fetch-depth: 0
-
-      - name: Read and validate VERSION
-        id: version
-        run: |
-          VERSION=$(cat VERSION)
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-dev)?$ ]]; then
-            echo "Invalid version format in VERSION file: $VERSION"
-            exit 1
-          fi
-          echo "New version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_ENV
-
-      - name: Skip release if version is a dev version
-        if: contains(env.version, '-dev')
-        run: |
-          echo "Skipping development version release: ${{ env.version }}"
-          echo "SKIP=true" >> $GITHUB_ENV
-          exit 0
-
-      - name: Set up Docker
-        uses: docker/setup-docker-action@v4
-        with:
-          daemon-config: |
-            {
-              "features": {
-                "containerd-snapshotter": true
-              }
-            }
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Set up Docker Context for Buildx
-        id: buildx-context
-        run: |
-          docker context create builders
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        timeout-minutes: 5
-        uses: docker/setup-buildx-action@v2
-        with:
-          version: latest
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Build the ${{ github.repository }}
-        run: |
-          make reviewable
-          make build-docker-binary
-
-      - name: Build and push Images
-        run: |
-          IMG=ghcr.io/openmcp-project/metrics-operator:${{ env.version }} make docker-buildx docker-push
-
-      - name: Package and push helm chart
-        run: |
-          make helm-package helm-push
-
-      - name: setup OCM
-        uses: open-component-model/ocm-setup-action@main
-
-      - name: Create OCM CTF
-        run: |
-          ocm add componentversions --create \
-          --file ctf component-constructor.yaml \
-          --settings settings.yaml  -- VERSION=${{ env.version }}
-
-      - name: Push CTF
-        run: |
-          ocm transfer ctf --overwrite ./ctf ${{ env.OCI_URL }}
+  release_publish:
+   uses: openmcp-project/build/.github/workflows/publish.lib.yaml@main
+   secrets: inherit

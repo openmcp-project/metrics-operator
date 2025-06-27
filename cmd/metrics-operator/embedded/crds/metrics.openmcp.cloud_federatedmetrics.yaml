@@ -3,31 +3,21 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
-  name: metrics.metrics.openmcp.cloud
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: federatedmetrics.metrics.openmcp.cloud
 spec:
   group: metrics.openmcp.cloud
   names:
-    kind: Metric
-    listKind: MetricList
-    plural: metrics
-    singular: metric
+    kind: FederatedMetric
+    listKind: FederatedMetricList
+    plural: federatedmetrics
+    singular: federatedmetric
   scope: Namespaced
   versions:
-  - additionalPrinterColumns:
-    - jsonPath: .status.ready
-      name: READY
-      type: string
-    - jsonPath: .status.observation.latestValue
-      name: VALUE
-      type: string
-    - jsonPath: .status.observation.timestamp
-      name: OBSERVED
-      type: date
-    name: v1alpha1
+  - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Metric is the Schema for the metrics API
+        description: FederatedMetric is the Schema for the federatedmetrics API
         properties:
           apiVersion:
             description: |-
@@ -47,11 +37,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: MetricSpec defines the desired state of Metric
+            description: FederatedMetricSpec defines the desired state of FederatedMetric
             properties:
               dataSinkRef:
                 description: |-
-                  DataSinkRef specifies the DataSink to be used for this metric.
+                  DataSinkRef specifies the DataSink to be used for this federated metric.
                   If not specified, the DataSink named "default" in the operator's
                   namespace will be used.
                 properties:
@@ -62,9 +52,15 @@ spec:
                 - name
                 type: object
               description:
-                description: Sets the description that will be used to identify the
-                  metric in Dynatrace(or other providers)
                 type: string
+              federateClusterAccessRef:
+                description: FederateClusterAccessRef is a reference to a FederateCA
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                type: object
               fieldSelector:
                 description: Define fields of your object to adapt filters of the
                   query
@@ -78,8 +74,6 @@ spec:
                   query
                 type: string
               name:
-                description: Sets the name that will be used to identify the metric
-                  in Dynatrace(or other providers)
                 type: string
               projections:
                 items:
@@ -93,15 +87,6 @@ spec:
                       type: string
                   type: object
                 type: array
-              remoteClusterAccessRef:
-                description: RemoteClusterAccessRef is to be used by other types to
-                  reference a RemoteClusterAccess type
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                type: object
               target:
                 description: GroupVersionKind defines the group, version and kind
                   of the object that should be instrumented
@@ -120,7 +105,7 @@ spec:
             - target
             type: object
           status:
-            description: MetricStatus defines the observed state of ManagedMetric
+            description: FederatedMetricStatus defines the observed state of FederatedMetric
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -180,27 +165,19 @@ spec:
                   - type
                   type: object
                 type: array
+              lastReconcileTime:
+                format: date-time
+                type: string
               observation:
-                description: Observation represent the latest available observation
-                  of an object's state
+                description: FederatedObservation represents the latest available
+                  observation of an object's state
                 properties:
-                  dimensions:
-                    items:
-                      description: Dimension defines the dimension of the metric
-                      properties:
-                        name:
-                          type: string
-                        value:
-                          type: string
-                      type: object
-                    type: array
-                  latestValue:
-                    description: The latest value of the metric
-                    type: string
-                  timestamp:
-                    description: The timestamp of the observation
-                    format: date-time
-                    type: string
+                  activeCount:
+                    type: integer
+                  failedCount:
+                    type: integer
+                  pendingCount:
+                    type: integer
                 type: object
               ready:
                 description: Ready is like a snapshot of the current state of the

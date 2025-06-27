@@ -86,12 +86,12 @@ func handleGetError(err error, log logr.Logger) (ctrl.Result, error) {
 	return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 }
 
-func scheduleNextReconciliation(metric *v1alpha1.FederatedMetric) (ctrl.Result, error) {
+func scheduleNextReconciliation(metric *v1alpha1.FederatedMetric) ctrl.Result {
 
 	elapsed := time.Since(metric.Status.LastReconcileTime.Time)
 	return ctrl.Result{
 		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
-	}, nil
+	}
 }
 
 func shouldReconcile(metric *v1alpha1.FederatedMetric) bool {
@@ -141,7 +141,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Check if enough time has passed since the last reconciliation
 	if !shouldReconcile(&metric) {
-		return scheduleNextReconciliation(&metric)
+		return scheduleNextReconciliation(&metric), nil
 	}
 
 	/*

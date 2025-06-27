@@ -1,0 +1,153 @@
+version: 3
+
+vars:
+  API_DIRS: '{{.ROOT_DIR}}/api/v1alpha1/...'
+  MANIFEST_OUT: '{{.ROOT_DIR}}/cmd/metrics-operator/embedded/crds'
+  CODE_DIRS: '{{.ROOT_DIR}}/cmd/... {{.ROOT_DIR}}/internal/...  {{.ROOT_DIR}}/api/v1alpha1/...'
+  COMPONENTS: 'metrics-operator'
+  REPO_NAME: 'https://github.com/openmcp-project/metrics-operator'
+  REPO_URL: 'https://github.com/openmcp-project/metrics-operator'
+  GENERATE_DOCS_INDEX: "false"
+  ENVTEST_REQUIRED: "true"
+  # local tasks
+  KUSTOMIZE_VERSION: "v5.4.1"
+  CROSSPLANE_NAMESPACE: "crossplane-system"
+  IGNORE_NOT_FOUND: "false"
+includes:
+  shared:
+    taskfile: hack/common/Taskfile_controller.yaml
+    flatten: true
+
+tasks:
+  dev:internal:kustomize:
+    desc: "Download kustomize locally if necessary"
+    internal: true
+    cmds:
+    - test -s {{.ROOT_DIR}}/bin/kustomize || GOBIN={{.ROOT_DIR}}/bin/ GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
+  
+  dev:crd:install:
+    desc: "Install CRDs into the K8s cluster specified in ~/.kube/config"
+    deps:
+    - dev:internal:kustomize
+    - generate
+    cmds:
+    # we need to use --load-restrictor=LoadRestrictionsNone because config/crd/bases is a symlink to cmd/metrics-operator/embedded/crds/, and that's considered an external dir, kustomize doesn't like that.
+    - '{{.ROOT_DIR}}/bin/kustomize build --load-restrictor=LoadRestrictionsNone config/crd | kubectl apply -f -'
+
+  dev:crd:uninstall:
+    desc: "Uninstall CRDs from the K8s cluster specified in ~/.kube/config"
+    deps:
+    - dev:internal:kustomize
+    - generate
+    cmds:
+    - '{{.ROOT_DIR}}/bin/kustomize build config/crd | kubectl delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+
+  dev:manager:deploy:
+    desc: "Deploy controller to the K8s cluster specified in ~/.kube/config"
+    deps:
+    - dev:internal:kustomize
+    - generate
+    cmds:
+    - cd {{.ROOT_DIR}}/config/manager && {{.ROOT_DIR}}/bin/kustomize edit set image controller={{.IMG}}
+    - '{{.ROOT_DIR}}/bin/kustomize build config/default | kubectl apply -f -'
+
+  dev:manager:undeploy:
+    desc: "Undeploy controller from the K8s cluster specified in ~/.kube/config"
+    deps:
+    - dev:internal:kustomize
+    - generate
+    cmds:
+    - '{{.ROOT_DIR}}/bin/kustomize build config/default | kubectl delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+
+  dev:kind-cluster:create:
+    desc: "Create a kind cluster for development (no CRDs or resources applied)"
+    cmds:
+    - kind create cluster --name={{.COMPONENTS}}-dev
+
+  dev:kind-cluster:delete:
+    desc: "Delete the local kind cluster used for development"
+    aliases:
+      - dev:clean
+    cmds:
+    - kind delete cluster --name={{.COMPONENTS}}-dev
+
+  dev:run:
+    desc: "Run the operator locally (for debugging/development)"
+    aliases:
+      - run
+    cmds:
+    - 'OPERATOR_CONFIG_NAMESPACE=metrics-operator-system go run ./cmd/metrics-operator/main.go start'
+
+  dev:test:
+    desc: "Run tests"
+    aliases:
+      - test
+    deps:
+    - validate:all
+
+  dev:local:all:
+    desc: "Create a local kind cluster and install CRDs for development"
+    cmds: # we use cmds here to trick taskfile into run things in order and wait for each one!
+    - task dev:kind-cluster:delete
+    - task dev:kind-cluster:create
+    - task dev:crd:install
+    - task dev:crossplane:all
+    - task dev:operator-namespace
+    - task dev:basic-metric
+    - task dev:managed-metric
+    - test -e {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml && task dev:dynatrace-prod-setup || echo -e '\n\nYou should add your dynatrace configuration here {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml\n\n'
+     
+
+  dev:operator-namespace:
+    desc: "Create the operator namespace if it does not exist."
+    cmds:
+      - kubectl create namespace metrics-operator-system --dry-run=client -o yaml | kubectl apply -f -
+
+  dev:basic-metric:
+    desc: "Apply the basic metric example to the cluster."
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/examples/basic_metric.yaml
+
+  dev:managed-metric:
+    desc: "Apply the managed metric example to the cluster."
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/examples/managed_metric.yaml
+
+  dev:dynatrace-prod-setup:
+    desc: "Apply Dynatrace production setup example to the cluster."
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml
+
+  dev:metric-dynatrace-prod:
+    desc: "Apply metric using Dynatrace production example to the cluster."
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/examples/datasink/metric-using-dynatrace-prod.yaml
+
+  dev:crossplane:all:
+    desc: "Full Crossplane setup: install core, provider, and sample"
+    cmds:
+      - task dev:crossplane:install
+      - task dev:crossplane:provider:install
+      - task dev:helm-provider-sample
+  
+  dev:crossplane:install:
+    desc: "Install Crossplane into the cluster via Helm"
+    deps:
+      - build:ocm:tools:localbin
+      - build:helm:tools:helm
+    cmds:
+      - helm repo add crossplane-stable https://charts.crossplane.io/stable
+      - helm repo update
+      - helm install crossplane crossplane-stable/crossplane --namespace {{.CROSSPLANE_NAMESPACE}} --create-namespace --wait
+
+  dev:crossplane:provider:install:
+    desc: "Install the Helm provider via kubectl"
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/examples/crossplane/provider.yaml -n {{.CROSSPLANE_NAMESPACE}}
+      - kubectl wait --for=condition=Healthy provider/provider-helm --timeout=1m
+      - kubectl apply -f {{.ROOT_DIR}}/examples/crossplane/provider-config.yaml -n {{.CROSSPLANE_NAMESPACE}}
+
+  dev:helm-provider-sample:
+    desc: "Apply the Helm provider sample"
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/examples/crossplane/release.yaml -n {{.CROSSPLANE_NAMESPACE}}

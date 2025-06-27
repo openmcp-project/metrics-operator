@@ -81,12 +81,12 @@ func (r *MetricReconciler) getDataSinkCredentials(ctx context.Context, metric *v
 	return retriever.GetDataSinkCredentials(ctx, metric.Spec.DataSinkRef, metric, l)
 }
 
-func (r *MetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) (ctrl.Result, error) {
+func (r *MetricReconciler) scheduleNextReconciliation(metric *v1alpha1.Metric) ctrl.Result {
 
 	elapsed := time.Since(metric.Status.Observation.Timestamp.Time)
 	return ctrl.Result{
 		RequeueAfter: metric.Spec.Interval.Duration - elapsed,
-	}, nil
+	}
 }
 
 func (r *MetricReconciler) shouldReconcile(metric *v1alpha1.Metric) bool {
@@ -146,7 +146,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Check if enough time has passed since the last reconciliation
 	if !r.shouldReconcile(&metric) {
-		return r.scheduleNextReconciliation(&metric)
+		return r.scheduleNextReconciliation(&metric), nil
 	}
 
 	/*
