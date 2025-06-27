@@ -409,8 +409,6 @@ The `DataSinkSpec` contains the following fields:
 
 #### Connection
 - **endpoint**: The target endpoint URL where metrics will be sent
-- **protocol**: Communication protocol (`http` or `grpc`)
-- **insecureSkipVerify**: (Optional) Skip TLS certificate verification
 
 #### Authentication
 - **apiKey**: API key authentication configuration
