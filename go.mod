@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/openmcp-project/controller-utils v0.4.2
+	github.com/openmcp-project/controller-utils v0.11.0
 	github.com/samber/lo v1.47.0
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/otel v1.29.0
