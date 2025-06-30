@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,7 @@ var (
 // It is a singleton.
 type TokenManager struct {
 	client client.Client
-	cache  *lru.Cache
+	cache  *lru.Cache[string, cachedToken]
 
 	// refreshBuffer is the time before the actual expiration time to refresh the token
 	refreshBuffer time.Duration
@@ -60,7 +60,7 @@ func GetTokenManager(cli client.Client) (*TokenManager, error) {
 }
 
 func newTokenManager(client client.Client) (*TokenManager, error) {
-	cache, err := lru.New(cacheSize) // We only need one token per cluster
+	cache, err := lru.New[string, cachedToken](cacheSize) // We only need one token per cluster
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lru cache: %w", err)
 	}
@@ -85,8 +85,7 @@ func (tm *TokenManager) GetToken(ctx context.Context, namespace, serviceAccount,
 	}
 	key := uniqueTokenKey.getKey()
 
-	if tokenInterface, ok := tm.cache.Get(key); ok {
-		cachedToken := tokenInterface.(cachedToken)
+	if cachedToken, ok := tm.cache.Get(key); ok {
 		if time.Now().Add(tm.refreshBuffer).Before(cachedToken.expiration) {
 			return cachedToken.token, nil
 		}
