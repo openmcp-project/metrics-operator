@@ -55,6 +55,7 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
 - **Predictive Insights**: Aggregates data over time to identify emerging trends, supporting data-driven decision making for future system enhancements.
 - **Strategic Decision Support**: Offers data-backed insights to guide product evolution.
 - **Customizable Alerting System**: Allows defining alerts based on specific metric thresholds, enabling proactive response to potential issues or significant changes in system state.
+- **Standardized**: Exports all metrics using the [OpenTelemetry](https://opentelemetry.io) protocol for seamless observability and interoperability.
 
 ## Architecture Overview
 
