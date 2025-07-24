@@ -306,6 +306,12 @@ The Metrics Operator can monitor both the cluster it's deployed in and remote cl
 
 This remote cluster access resource can be used by `Metric` and `ManagedMetric` resources to monitor resources in the remote cluster.
 
+You can configure access to a remote cluster in one of two ways:
+
+1. Access via Service Account Token (recommended for in-cluster or service mesh setups)
+
+Use this method if you want the operator to assume a service account in the remote cluster using projected tokens and cluster credentials. This allows for dynamic access for clusters using an OIDC provider.
+
 ```yaml
 apiVersion: metrics.openmcp.cloud/v1alpha1
 kind: RemoteClusterAccess
@@ -320,7 +326,29 @@ spec:
     serviceAccountName: <service-account-name>
     serviceAccountNamespace: <service-account-namespace>
 ```
+`clusterSecretRef` must point to a Kubernetes Secret on the same cluster running `the metrics-operator` and contains:
+- `host`: API server endpoint of the remote cluster 
+- `caData`: CA bundle of the remote cluster API (base64-encoded) 
+- `audience`: Token audience to use when projecting the service account token
 
+You will also need to setup the required [RBAC configuration](#rbac-configuration) for the service account on the remote clusters. The RBAC configuration should allow the service account to monitor the resources defined in your `Metric` resources and use the proper service account name for remote access.
+
+2. Access via Kubeconfig Secret
+Use this method if you already have a kubeconfig for the remote cluster and want to provide it directly.
+
+```yaml
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: RemoteClusterAccess
+metadata:
+  name: remote-cluster
+  namespace: <monitoring-namespace>
+spec:
+  kubeConfigSecretRef:
+    name: remote-kubeconfig-secret
+    namespace: <secret-namespace>
+    key: kubeconfig
+```
+`kubeConfigSecretRef` points to a Kubernetes Secret that includes a valid kubeconfig under the specified `key`.
 
 ### Federated Cluster Access
 
