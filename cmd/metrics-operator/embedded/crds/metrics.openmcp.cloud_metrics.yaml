@@ -50,16 +50,16 @@ spec:
             description: MetricSpec defines the desired state of Metric
             properties:
               dataSinkRef:
+                default: {}
                 description: |-
                   DataSinkRef specifies the DataSink to be used for this metric.
                   If not specified, the DataSink named "default" in the operator's
                   namespace will be used.
                 properties:
                   name:
+                    default: default
                     description: Name is the name of the DataSink resource.
                     type: string
-                required:
-                - name
                 type: object
               description:
                 description: Sets the description that will be used to identify the

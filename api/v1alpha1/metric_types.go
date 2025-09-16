@@ -39,8 +39,9 @@ const (
 // DataSinkReference holds a reference to a DataSink resource.
 type DataSinkReference struct {
 	// Name is the name of the DataSink resource.
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	// +optional
+	// +kubebuilder:default:="default"
+	Name string `json:"name,omitempty"`
 }
 
 // MetricSpec defines the desired state of Metric
@@ -66,6 +67,7 @@ type MetricSpec struct {
 	// If not specified, the DataSink named "default" in the operator's
 	// namespace will be used.
 	// +optional
+	// +kubebuilder:default:={}
 	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
 
 	// +optional

@@ -45,6 +45,7 @@ type FederatedManagedMetricSpec struct {
 	// If not specified, the DataSink named "default" in the operator's
 	// namespace will be used.
 	// +optional
+	// +kubebuilder:default:={}
 	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
 
 	FederatedClusterAccessRef FederateClusterAccessRef `json:"federateClusterAccessRef,omitempty"`
