@@ -211,7 +211,8 @@ To get a full list of the supported tasks, you can run the `task` command with n
 ### Metric
 
 Metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
-This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation to access nested fields.
+This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation and supports [JSONPath selectors](https://www.rfc-editor.org/rfc/rfc9535.html#name-selectors) to access nested fields.
+Note that a single projection has to select a primitive value, collection type results are not supported.
 The projections are then translated to dimensions in the metric.
 
 ```yaml
