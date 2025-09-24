@@ -311,7 +311,7 @@ The following examples demonstrate the usage of different [JSONPath selectors](h
       fieldPath: "metadata.namespace"
     - name: pod-condition-ready-status
       # filter selector: selects the status value of the conditions with type='Ready'
-      fieldPath: "status.conditions[?(@.type='Ready')].status"
+      fieldPath: "status.conditions[?(@.type=='Ready')].status"
     - name: pod-condition-last-transition-time
       # index selector: selects the lastTransitionTime value of the first condition
       fieldPath: "status.conditions[0].lastTransitionTime"
