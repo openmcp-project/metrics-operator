@@ -87,6 +87,14 @@ func TestNestedPrimitiveValue(t *testing.T) {
 			wantError:    false,
 		},
 		{
+			name:         "nested value retrieval with wildcard selector; collection results are not supported",
+			resourceYaml: subaccountCR,
+			path:         "status.conditions[*].status",
+			wantValue:    "",
+			wantFound:    true,
+			wantError:    true,
+		},
+		{
 			name:         "non-existent value",
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels.app",

@@ -26,6 +26,7 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
     - [Managed Metric](#managed-metric)
     - [Federated Metric](#federated-metric)
     - [Federated Managed Metric](#federated-managed-metric)
+    - [Projection Selector Syntax Overview](#projection-selector-syntax-overview)
   - [Remote Cluster Access](#remote-cluster-access)
     - [Remote Cluster Access](#remote-cluster-access-1)
     - [Federated Cluster Access](#federated-cluster-access)
@@ -211,7 +212,7 @@ To get a full list of the supported tasks, you can run the `task` command with n
 ### Metric
 
 Metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
-This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation and supports [JSONPath selectors](https://www.rfc-editor.org/rfc/rfc9535.html#name-selectors) to access nested fields.
+This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation and supports [JSONPath selectors](#projection-selector-syntax-overview) to access nested fields.
 Note that a single projection has to select a primitive value, collection type results are not supported.
 The projections are then translated to dimensions in the metric.
 
@@ -298,6 +299,25 @@ spec:
     namespace: default
 ---
 ```
+
+### Projection Selector Syntax Overview
+
+The following examples demonstrate the usage of different [JSONPath selectors](https://www.rfc-editor.org/rfc/rfc9535.html#name-selectors):
+
+```yaml
+  projections:
+    - name: pod-namespace
+      # name selector: selects the namespace value
+      fieldPath: "metadata.namespace"
+    - name: pod-condition-ready-status
+      # filter selector: selects the status value of the conditions with type='Ready'
+      fieldPath: "status.conditions[?(@.type='Ready')].status"
+    - name: pod-condition-last-transition-time
+      # index selector: selects the lastTransitionTime value of the first condition
+      fieldPath: "status.conditions[0].lastTransitionTime"
+```
+
+Note: Array slice `start:end:step` syntax and wildcard selectors are technically supported but left out in the examples due to the restriction that a projection is expected to result in a single primitive value. It is also important to point out that even though `projections` is an array type, the operator evaluates only the first projection of a metric for now. Support for multiple projections will be added in a future release.
 
 ## Remote Cluster Access
 
