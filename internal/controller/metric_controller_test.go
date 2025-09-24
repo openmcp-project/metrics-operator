@@ -165,6 +165,36 @@ func TestMetricController(t *testing.T) {
 	t.Run("TestReconcileMetricHappyPath", testReconcileMetricHappyPath)
 	t.Run("TestReconcileMetricNotFound", testReconcileMetricNotFound)
 	t.Run("TestReconcileDataSinkNotFound", testReconcileSecretNotFound)
+	t.Run("TestDataSinkRefDefault", testDataSinkRefDefault)
+}
+
+func testDataSinkRefDefault(t *testing.T) {
+	metric := types.NamespacedName{
+		Name:      "data-sink-default",
+		Namespace: "default",
+	}
+	ctx := context.Background()
+
+	// create metric
+	in := &v1alpha1.Metric{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      metric.Name,
+			Namespace: metric.Namespace,
+		},
+		Spec: v1alpha1.MetricSpec{
+			Name: "test",
+		},
+	}
+	err := k8sClient.Create(ctx, in)
+	require.NoError(t, err, "failed to create metric")
+
+	// fetch metric
+	var out v1alpha1.Metric
+	err = k8sClient.Get(ctx, metric, &out)
+	require.NoError(t, err, "failed to fetch metric")
+
+	// verify result
+	require.Equal(t, &v1alpha1.DataSinkReference{Name: "default"}, out.Spec.DataSinkRef)
 }
 
 // testReconcileMetricNotFound tests the behavior when the Metric is not found

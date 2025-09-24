@@ -41,16 +41,16 @@ spec:
             description: FederatedManagedMetricSpec defines the desired state of FederatedManagedMetric
             properties:
               dataSinkRef:
+                default: {}
                 description: |-
                   DataSinkRef specifies the DataSink to be used for this federated managed metric.
                   If not specified, the DataSink named "default" in the operator's
                   namespace will be used.
                 properties:
                   name:
+                    default: default
                     description: Name is the name of the DataSink resource.
                     type: string
-                required:
-                - name
                 type: object
               description:
                 type: string
