@@ -1,6 +1,42 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "git-submodules": {
+    "enabled": true
+  },
+  "minimumReleaseAge": "0 days",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "config:best-practices",
+    "security:openssf-scorecard",
+    "helpers:pinGitHubActionDigests",
+    ":rebaseStalePrs"
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepNames": [
+        "go"
+      ],
+      "matchDepTypes": [
+        "golang"
+      ],
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "Combine crossplane updates in a single PR",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "^github\\.com/crossplane"
+      ],
+      "groupName": "crossplane dependencies",
+      "groupSlug": "crossplane-dependencies"
+    },
   ]
 }
