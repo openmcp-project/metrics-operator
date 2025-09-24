@@ -27,16 +27,5 @@
       ],
       "rangeStrategy": "bump"
     },
-    {
-      "description": "Combine crossplane updates in a single PR",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchPackageNames": [
-        "^github\\.com/crossplane"
-      ],
-      "groupName": "crossplane dependencies",
-      "groupSlug": "crossplane-dependencies"
-    },
   ]
 }
