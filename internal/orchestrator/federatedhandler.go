@@ -130,9 +130,7 @@ func (h *FederatedHandler) extractProjectionGroupsFrom(list *unstructured.Unstru
 
 		if projection.Name != "" && projection.FieldPath != "" {
 			name := projection.Name
-			fieldPath := projection.FieldPath
-			fields := strings.Split(fieldPath, ".")
-			value, found, err := unstructured.NestedString(obj.Object, fields...)
+			value, found, err := nestedPrimitiveValue(obj, projection.FieldPath)
 			collection = append(collection, projectedField{name: name, value: value, found: found, error: err})
 		}
 	}
