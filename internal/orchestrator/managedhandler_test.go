@@ -71,14 +71,14 @@ func TestGetManagedResources(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		filter           schema.GroupVersionKind
+		gvkTarget        schema.GroupVersionKind
 		clusterCRDs      []string
 		clusterResources []string
 		wantResources    []string
 	}{
 		{
-			name:   "fully qualified target spec",
-			filter: k8sObjectGVK,
+			name:      "fully qualified target spec",
+			gvkTarget: k8sObjectGVK,
 			clusterCRDs: []string{
 				managedAndServedCRD(k8sObjectGVK),
 				managedAndServedCRD(k8sObjectCollectionGVK),
@@ -95,7 +95,7 @@ func TestGetManagedResources(t *testing.T) {
 		},
 		{
 			name: "group version target",
-			filter: schema.GroupVersionKind{
+			gvkTarget: schema.GroupVersionKind{
 				Group:   k8sObjectGVK.Group,
 				Version: k8sObjectGVK.Version,
 			},
@@ -118,7 +118,7 @@ func TestGetManagedResources(t *testing.T) {
 		},
 		{
 			name: "version target",
-			filter: schema.GroupVersionKind{
+			gvkTarget: schema.GroupVersionKind{
 				Version: k8sObjectGVK.Version,
 			},
 			clusterCRDs: []string{
@@ -140,8 +140,8 @@ func TestGetManagedResources(t *testing.T) {
 			),
 		},
 		{
-			name:   "unqualified target",
-			filter: schema.GroupVersionKind{},
+			name:      "unqualified target",
+			gvkTarget: schema.GroupVersionKind{},
 			clusterCRDs: []string{
 				managedAndServedCRD(k8sObjectGVK),
 				managedAndServedCRD(k8sObjectCollectionGVK),
@@ -162,8 +162,8 @@ func TestGetManagedResources(t *testing.T) {
 			),
 		},
 		{
-			name:   "unmanaged custom resources get filtered out",
-			filter: schema.GroupVersionKind{},
+			name:      "unmanaged custom resources get filtered out",
+			gvkTarget: schema.GroupVersionKind{},
 			clusterCRDs: []string{
 				unmanagedCRD(k8sObjectGVK),
 				managedAndServedCRD(k8sObjectCollectionGVK),
@@ -182,8 +182,8 @@ func TestGetManagedResources(t *testing.T) {
 			),
 		},
 		{
-			name:   "unserved custom resources are not retrievable",
-			filter: schema.GroupVersionKind{},
+			name:      "unserved custom resources are not retrievable",
+			gvkTarget: schema.GroupVersionKind{},
 			clusterCRDs: []string{
 				unservedCRD(k8sObjectGVK),
 				managedAndServedCRD(k8sObjectCollectionGVK),
@@ -211,9 +211,11 @@ func TestGetManagedResources(t *testing.T) {
 				dCli:   setupFakeDynamicClient(t, tt.clusterResources),
 				metric: v1alpha1.ManagedMetric{
 					Spec: v1alpha1.ManagedMetricSpec{
-						Kind:    tt.filter.Kind,
-						Group:   tt.filter.Group,
-						Version: tt.filter.Version,
+						Target: &v1alpha1.GroupVersionKind{
+							Group:   tt.gvkTarget.Group,
+							Version: tt.gvkTarget.Version,
+							Kind:    tt.gvkTarget.Kind,
+						},
 					},
 				},
 			}
