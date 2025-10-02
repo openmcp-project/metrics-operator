@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -57,18 +58,20 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 	for _, cr := range resources {
 		// Create a new data point for each resource
 		dataPoint := clientoptl.NewDataPoint()
-		dataPoint.AddDimension("kind", cr.MangedResource.Kind)
-		dataPoint.AddDimension("apiversion", cr.MangedResource.APIVersion)
+
+		// Add GVK dimensions from resource
+		gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
+		if err != nil {
+			return "", err
+		}
+		dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
+		dataPoint.AddDimension(GROUP, gv.Group)
+		dataPoint.AddDimension(VERSION, gv.Version)
 
 		// Add cluster dimension if available
 		if h.clusterName != nil {
 			dataPoint.AddDimension(CLUSTER, *h.clusterName)
 		}
-
-		// Add GVK dimensions
-		dataPoint.AddDimension(KIND, h.metric.Spec.Kind)
-		dataPoint.AddDimension(GROUP, h.metric.Spec.Group)
-		dataPoint.AddDimension(VERSION, h.metric.Spec.Version)
 
 		// Add status conditions as dimensions
 		for typ, state := range cr.Status {
@@ -150,31 +153,39 @@ func (h *ManagedHandler) getManagedResources(ctx context.Context) ([]Managed, er
 		return nil, err
 	}
 
-	var resourceCRDs []apiextensionsv1.CustomResourceDefinition
+	resourceCRDs := make([]apiextensionsv1.CustomResourceDefinition, 0, len(crds.Items))
 	for _, crd := range crds.Items {
-		if h.hasCategory("crossplane", crd) && h.hasCategory("managed", crd) { // filter previously acquired crds
-			resourceCRDs = append(resourceCRDs, crd)
+		// drop non-crossplane crds
+		if !h.hasCategory("crossplane", crd) || !h.hasCategory("managed", crd) {
+			continue
 		}
+		// drop crds that don't match the spec gvk
+		if !h.matchesGroupVersionKind(crd) {
+			continue
+		}
+		resourceCRDs = append(resourceCRDs, crd)
 	}
 
 	var resources []unstructured.Unstructured
 	for _, crd := range resourceCRDs {
-
-		// Use the stored versions of the CRD
-		storedVersions := make(map[string]bool)
-		for _, v := range crd.Status.StoredVersions {
-			storedVersions[v] = true
-		}
-
+		versionsToRetrieve := make([]string, 0, len(crd.Spec.Versions))
 		for _, crdv := range crd.Spec.Versions {
-			if !crdv.Served || !storedVersions[crdv.Name] {
+			// only use served versions for retrieval
+			if !crdv.Served {
 				continue
 			}
-
+			// only use the metric target version if provided
+			if h.metric.Spec.Version != "" && crdv.Name != h.metric.Spec.Version {
+				continue
+			}
+			versionsToRetrieve = append(versionsToRetrieve, crdv.Name)
+		}
+		// finally retrieve all matching resources
+		for _, version := range versionsToRetrieve {
 			gvr := schema.GroupVersionResource{
 				Resource: crd.Spec.Names.Plural,
 				Group:    crd.Spec.Group,
-				Version:  crdv.Name,
+				Version:  version,
 			}
 
 			list, err := h.dCli.Resource(gvr).List(ctx, metav1.ListOptions{}) // gets resources from all the available crds
@@ -235,4 +246,21 @@ type Spec struct {
 type ClusterResourceStatus struct {
 	MangedResource Managed
 	Status         map[string]bool
+}
+
+func (h *ManagedHandler) matchesGroupVersionKind(crd apiextensionsv1.CustomResourceDefinition) bool {
+	crdVersions := make([]string, 0, len(crd.Spec.Versions))
+	for _, version := range crd.Spec.Versions {
+		crdVersions = append(crdVersions, version.Name)
+	}
+	if h.metric.Spec.Version != "" && !slices.Contains(crdVersions, h.metric.Spec.Version) {
+		return false
+	}
+	if h.metric.Spec.Group != "" && crd.Spec.Group != h.metric.Spec.Group {
+		return false
+	}
+	if h.metric.Spec.Kind != "" && crd.Spec.Names.Kind != h.metric.Spec.Kind {
+		return false
+	}
+	return true
 }
