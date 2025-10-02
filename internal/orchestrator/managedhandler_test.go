@@ -21,51 +21,51 @@ import (
 
 func TestGetManagedResources(t *testing.T) {
 	// we define a couple of GVKs to generate CRDs and resources for our test cases
-	subaccountGVK := schema.GroupVersionKind{
-		Group:   "account.btp.sap.crossplane.io",
-		Version: "v1alpha1",
-		Kind:    "Subaccount",
-	}
-	entitlementGVK := schema.GroupVersionKind{
-		Group:   "account.btp.sap.crossplane.io",
-		Version: "v1alpha1",
-		Kind:    "Entitlement",
-	}
-	kubernetesGVK := schema.GroupVersionKind{
+	k8sObjectGVK := schema.GroupVersionKind{
 		Group:   "kubernetes.m.crossplane.io",
 		Version: "v1alpha1",
 		Kind:    "Object",
 	}
-	bucketGVK := schema.GroupVersionKind{
-		Group:   "s3.aws.m.upbound.io",
+	k8sObjectCollectionGVK := schema.GroupVersionKind{
+		Group:   "kubernetes.m.crossplane.io",
+		Version: "v1alpha1",
+		Kind:    "ObservedObjectCollection",
+	}
+	nopResourceGVK := schema.GroupVersionKind{
+		Group:   "nop.crossplane.io",
+		Version: "v1alpha1",
+		Kind:    "NopResource",
+	}
+	helmReleaseGVK := schema.GroupVersionKind{
+		Group:   "helm.m.crossplane.io",
 		Version: "v1beta1",
-		Kind:    "Bucket",
+		Kind:    "Release",
 	}
 
 	const (
-		subaccounts  = "subaccounts"
-		entitlements = "entitlements"
-		k8sObjects   = "kubernetes"
-		buckets      = "bucket"
+		k8sObjects           = "k8s-object"
+		k8sObjectCollections = "k8s-object-collection"
+		nopResources         = "nop"
+		helmReleases         = "helm"
 	)
 
 	// and a couple of fixed cluster resources
 	resourceFixture := map[string][]string{
-		subaccounts: {
-			fakeResource(subaccountGVK),
-			fakeResource(subaccountGVK),
-		},
-		entitlements: {
-			fakeResource(entitlementGVK),
-			fakeResource(entitlementGVK),
-		},
 		k8sObjects: {
-			fakeResource(kubernetesGVK),
-			fakeResource(kubernetesGVK),
+			fakeResource(k8sObjectGVK),
+			fakeResource(k8sObjectGVK),
 		},
-		buckets: {
-			fakeResource(bucketGVK),
-			fakeResource(bucketGVK),
+		k8sObjectCollections: {
+			fakeResource(k8sObjectCollectionGVK),
+			fakeResource(k8sObjectCollectionGVK),
+		},
+		nopResources: {
+			fakeResource(nopResourceGVK),
+			fakeResource(nopResourceGVK),
+		},
+		helmReleases: {
+			fakeResource(helmReleaseGVK),
+			fakeResource(helmReleaseGVK),
 		},
 	}
 
@@ -78,127 +78,127 @@ func TestGetManagedResources(t *testing.T) {
 	}{
 		{
 			name:   "fully qualified target spec",
-			filter: subaccountGVK,
+			filter: k8sObjectGVK,
 			clusterCRDs: []string{
-				managedAndServedCRD(subaccountGVK),
-				managedAndServedCRD(entitlementGVK),
-				managedAndServedCRD(kubernetesGVK),
-				managedAndServedCRD(bucketGVK),
+				managedAndServedCRD(k8sObjectGVK),
+				managedAndServedCRD(k8sObjectCollectionGVK),
+				managedAndServedCRD(nopResourceGVK),
+				managedAndServedCRD(helmReleaseGVK),
 			},
 			clusterResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
+				resourceFixture[helmReleases],
 			),
-			wantResources: resourceFixture[subaccounts],
+			wantResources: resourceFixture[k8sObjects],
 		},
 		{
 			name: "group version target",
 			filter: schema.GroupVersionKind{
-				Group:   subaccountGVK.Group,
-				Version: subaccountGVK.Version,
+				Group:   k8sObjectGVK.Group,
+				Version: k8sObjectGVK.Version,
 			},
 			clusterCRDs: []string{
-				managedAndServedCRD(subaccountGVK),
-				managedAndServedCRD(entitlementGVK),
-				managedAndServedCRD(kubernetesGVK),
-				managedAndServedCRD(bucketGVK),
+				managedAndServedCRD(k8sObjectGVK),
+				managedAndServedCRD(k8sObjectCollectionGVK),
+				managedAndServedCRD(nopResourceGVK),
+				managedAndServedCRD(helmReleaseGVK),
 			},
 			clusterResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
+				resourceFixture[helmReleases],
 			),
 			wantResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
+				resourceFixture[k8sObjects],
+				resourceFixture[k8sObjectCollections],
 			),
 		},
 		{
 			name: "version target",
 			filter: schema.GroupVersionKind{
-				Version: subaccountGVK.Version,
+				Version: k8sObjectGVK.Version,
 			},
 			clusterCRDs: []string{
-				managedAndServedCRD(subaccountGVK),
-				managedAndServedCRD(entitlementGVK),
-				managedAndServedCRD(kubernetesGVK),
-				managedAndServedCRD(bucketGVK),
+				managedAndServedCRD(k8sObjectGVK),
+				managedAndServedCRD(k8sObjectCollectionGVK),
+				managedAndServedCRD(nopResourceGVK),
+				managedAndServedCRD(helmReleaseGVK),
 			},
 			clusterResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
+				resourceFixture[helmReleases],
 			),
 			wantResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
 			),
 		},
 		{
 			name:   "unqualified target",
 			filter: schema.GroupVersionKind{},
 			clusterCRDs: []string{
-				managedAndServedCRD(subaccountGVK),
-				managedAndServedCRD(entitlementGVK),
-				managedAndServedCRD(kubernetesGVK),
-				managedAndServedCRD(bucketGVK),
+				managedAndServedCRD(k8sObjectGVK),
+				managedAndServedCRD(k8sObjectCollectionGVK),
+				managedAndServedCRD(nopResourceGVK),
+				managedAndServedCRD(helmReleaseGVK),
 			},
 			clusterResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
+				resourceFixture[helmReleases],
 			),
 			wantResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
+				resourceFixture[helmReleases],
 			),
 		},
 		{
 			name:   "unmanaged custom resources get filtered out",
 			filter: schema.GroupVersionKind{},
 			clusterCRDs: []string{
-				unmanagedCRD(subaccountGVK),
-				managedAndServedCRD(entitlementGVK),
-				unmanagedCRD(kubernetesGVK),
-				managedAndServedCRD(bucketGVK),
+				unmanagedCRD(k8sObjectGVK),
+				managedAndServedCRD(k8sObjectCollectionGVK),
+				unmanagedCRD(nopResourceGVK),
+				managedAndServedCRD(helmReleaseGVK),
 			},
 			clusterResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
+				resourceFixture[helmReleases],
 			),
 			wantResources: slices.Concat(
-				resourceFixture[entitlements],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[helmReleases],
 			),
 		},
 		{
 			name:   "unserved custom resources are not retrievable",
 			filter: schema.GroupVersionKind{},
 			clusterCRDs: []string{
-				unservedCRD(subaccountGVK),
-				managedAndServedCRD(entitlementGVK),
-				managedAndServedCRD(kubernetesGVK),
-				unservedCRD(bucketGVK),
+				unservedCRD(k8sObjectGVK),
+				managedAndServedCRD(k8sObjectCollectionGVK),
+				managedAndServedCRD(nopResourceGVK),
+				unservedCRD(helmReleaseGVK),
 			},
 			clusterResources: slices.Concat(
-				resourceFixture[subaccounts],
-				resourceFixture[entitlements],
 				resourceFixture[k8sObjects],
-				resourceFixture[buckets],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
+				resourceFixture[helmReleases],
 			),
 			wantResources: slices.Concat(
-				resourceFixture[entitlements],
-				resourceFixture[k8sObjects],
+				resourceFixture[k8sObjectCollections],
+				resourceFixture[nopResources],
 			),
 		},
 	}
@@ -340,13 +340,11 @@ func unmanagedCRD(gvk schema.GroupVersionKind) string {
 }
 
 func fakeCRDTemplate(gvk schema.GroupVersionKind, managed bool, served bool) string {
-	categories := `
-    - sap`
+	categories := "[]"
 	if managed {
 		categories = `
     - crossplane
-    - managed
-    - sap`
+    - managed`
 	}
 	return fmt.Sprintf(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition

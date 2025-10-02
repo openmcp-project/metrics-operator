@@ -8,12 +8,12 @@ import (
 )
 
 const subaccountCR = `
-apiVersion: account.btp.sap.crossplane.io/v1alpha1
-kind: Subaccount
+apiVersion: nop.crossplane.io/v1alpha1
+kind: NopResource
 metadata:
   annotations:
-    crossplane.io/external-name: test-subaccount
-  name: test-subaccount
+    crossplane.io/external-name: ext-example
+  name: example
 spec:
   deletionPolicy: Delete
 status:
@@ -42,7 +42,7 @@ func TestNestedPrimitiveValue(t *testing.T) {
 			name:         "top level value retrieval",
 			resourceYaml: subaccountCR,
 			path:         "kind",
-			wantValue:    "Subaccount",
+			wantValue:    "NopResource",
 			wantFound:    true,
 			wantError:    false,
 		},
@@ -58,7 +58,7 @@ func TestNestedPrimitiveValue(t *testing.T) {
 			name:         "nested value retrieval with escaped name selector",
 			resourceYaml: subaccountCR,
 			path:         "metadata.annotations.crossplane\\.io/external-name",
-			wantValue:    "test-subaccount",
+			wantValue:    "ext-example",
 			wantFound:    true,
 			wantError:    false,
 		},
