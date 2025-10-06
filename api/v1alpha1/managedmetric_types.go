@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,12 +28,9 @@ type ManagedMetricSpec struct {
 	// Sets the description that will be used to identify the metric in Dynatrace(or other providers)
 	// +optional
 	Description string `json:"description,omitempty"`
-	// Decide which kind the metric should keep track of (needs to be plural version)
-	Kind string `json:"kind,omitempty"`
-	// Define the group of your object that should be instrumented (without version at the end)
-	Group string `json:"group,omitempty"`
-	// Define version of the object you want to intrsument
-	Version string `json:"version,omitempty"`
+	// Defines which managed resources to observe
+	// +optional
+	Target *GroupVersionKind `json:"target,omitempty"`
 	// Define labels of your object to adapt filters of the query
 	// +optional
 	LabelSelector string `json:"labelSelector,omitempty"`
@@ -92,10 +87,10 @@ type ManagedMetricStatus struct {
 
 // GvkToString returns group, version and kind as a string
 func (r *ManagedMetric) GvkToString() string {
-	if r.Spec.Group == "" {
-		return fmt.Sprintf("/%s, Kind=%s", r.Spec.Version, r.Spec.Kind)
+	if r.Spec.Target != nil {
+		return r.Spec.Target.GVK().String()
 	}
-	return fmt.Sprintf("%s/%s, Kind=%s", r.Spec.Group, r.Spec.Version, r.Spec.Kind)
+	return ""
 }
 
 // SetConditions sets the conditions for the ManagedMetric

@@ -174,8 +174,9 @@ func (h *ManagedHandler) getManagedResources(ctx context.Context) ([]Managed, er
 			if !crdv.Served {
 				continue
 			}
-			// only use the metric target version if provided
-			if h.metric.Spec.Version != "" && crdv.Name != h.metric.Spec.Version {
+			// drop versions that don't match the user provided target
+			target := h.metric.Spec.Target
+			if target != nil && target.Version != "" && target.Version != crdv.Name {
 				continue
 			}
 			versionsToRetrieve = append(versionsToRetrieve, crdv.Name)
@@ -249,17 +250,26 @@ type ClusterResourceStatus struct {
 }
 
 func (h *ManagedHandler) matchesGroupVersionKind(crd apiextensionsv1.CustomResourceDefinition) bool {
+	target := h.metric.Spec.Target
+	// if the user does not specify a GVK target, any managed CRD is considered a match
+	if target == nil {
+		return true
+	}
+	// CRDs may define multi-version APIs
+	// we consider a version to be a match if it exists in a CRD
 	crdVersions := make([]string, 0, len(crd.Spec.Versions))
 	for _, version := range crd.Spec.Versions {
 		crdVersions = append(crdVersions, version.Name)
 	}
-	if h.metric.Spec.Version != "" && !slices.Contains(crdVersions, h.metric.Spec.Version) {
+	// if the user specifies a target, we consider each GVK attribute and check if it matches the user value
+	// if the user does not specify a single GVK part, that part is considered unconditional and always a match
+	if target.Version != "" && !slices.Contains(crdVersions, target.Version) {
 		return false
 	}
-	if h.metric.Spec.Group != "" && crd.Spec.Group != h.metric.Spec.Group {
+	if target.Group != "" && target.Group != crd.Spec.Group {
 		return false
 	}
-	if h.metric.Spec.Kind != "" && crd.Spec.Names.Kind != h.metric.Spec.Kind {
+	if target.Kind != "" && target.Kind != crd.Spec.Names.Kind {
 		return false
 	}
 	return true
