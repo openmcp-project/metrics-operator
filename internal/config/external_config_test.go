@@ -22,6 +22,8 @@ type MockClient struct {
 	SubResourceFunc func(subResource string) client.SubResourceClient
 }
 
+var _ client.Client = &MockClient{}
+
 // ... (other methods remain the same)
 
 func (m *MockClient) SubResource(subResource string) client.SubResourceClient {
@@ -62,6 +64,9 @@ func (m *MockClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 
 // Implement other methods of client.Client interface with empty implementations
 func (m *MockClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	return nil
+}
+func (m *MockClient) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) error {
 	return nil
 }
 func (m *MockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
