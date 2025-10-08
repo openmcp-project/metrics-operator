@@ -1,6 +1,6 @@
 module github.com/openmcp-project/metrics-operator
 
-go 1.25.1
+go 1.25.2
 
 require (
 	github.com/go-logr/logr v1.4.3
