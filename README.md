@@ -247,9 +247,10 @@ metadata:
 spec:
   name: managed-metric
   description: Status metric created by an Operator
-  kind: Release
-  group: helm.crossplane.io
-  version: v1beta1
+  target:
+    kind: Release
+    group: helm.crossplane.io
+    version: v1beta1
   interval: "1m"
 ---
 ```
