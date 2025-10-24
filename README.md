@@ -146,13 +146,13 @@ graph LR
 
 ## Resource Type Descriptions:
 
-- [**Metric**](config/crd/bases/metrics.openmcp.cloud_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
-- [**ManagedMetric**](config/crd/bases/metrics.openmcp.cloud_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
-- [**FederatedMetric**](config/crd/bases/metrics.openmcp.cloud_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
-- [**FederatedManagedMetric**](config/crd/bases/metrics.openmcp.cloud_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
-- [**RemoteClusterAccess**](config/crd/bases/metrics.openmcp.cloud_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
-- [**FederatedClusterAccess**](config/crd/bases/metrics.openmcp.cloud_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
-- [**DataSink**](config/crd/bases/metrics.openmcp.cloud_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
+- [**Metric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- [**ManagedMetric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- [**FederatedMetric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
+- [**FederatedManagedMetric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
+- [**RemoteClusterAccess**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
+- [**FederatedClusterAccess**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
+- [**DataSink**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
 
 ## Installation
 
@@ -166,7 +166,7 @@ graph LR
 Deploy the Metrics Operator using the Helm chart:
 
 ```bash
-helm upgrade --install metrics-operator oci://ghcr.io/openmcp-project/github.com/openmcp-project/metrics-operator/charts/metrics-operator \
+helm upgrade --install metrics-operator oci://ghcr.io/openmcp-project/charts/metrics-operator \
   --namespace <operator-namespace> \
   --create-namespace \
   --version=<version>
