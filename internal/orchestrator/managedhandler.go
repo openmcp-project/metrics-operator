@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,23 +58,25 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 		// Create a new data point for each resource
 		dataPoint := clientoptl.NewDataPoint()
 
-		// Add GVK dimensions from resource
-		gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
+		objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cr.MangedResource)
 		if err != nil {
 			return "", err
 		}
-		dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
-		dataPoint.AddDimension(GROUP, gv.Group)
-		dataPoint.AddDimension(VERSION, gv.Version)
+
+		u := &unstructured.Unstructured{Object: objMap}
+
+		for key, expr := range h.metric.Spec.Dimensions {
+			s, _, err := nestedPrimitiveValue(*u, expr)
+			if err != nil {
+				fmt.Printf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", key, expr, err)
+				continue
+			}
+			dataPoint.AddDimension(key, s)
+		}
 
 		// Add cluster dimension if available
 		if h.clusterName != nil {
 			dataPoint.AddDimension(CLUSTER, *h.clusterName)
-		}
-
-		// Add status conditions as dimensions
-		for typ, state := range cr.Status {
-			dataPoint.AddDimension(strings.ToLower(typ), strconv.FormatBool(state))
 		}
 
 		// Set the value to 1 for each resource

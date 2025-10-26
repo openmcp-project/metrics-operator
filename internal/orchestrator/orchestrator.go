@@ -29,6 +29,9 @@ const (
 
 	// APIVERSION Constant for k8s resource fields
 	APIVERSION string = "apiVersion"
+
+	// NAME Constant for k8s resource fields
+	CR_NAME string = "crName"
 )
 
 // GenericHandler is used to monitor the metric

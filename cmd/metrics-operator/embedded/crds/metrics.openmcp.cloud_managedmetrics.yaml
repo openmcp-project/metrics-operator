@@ -65,6 +65,13 @@ spec:
                 description: Sets the description that will be used to identify the
                   metric in Dynatrace(or other providers)
                 type: string
+              dimensions:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Defines dimensions of the metric. All specified fields must be nested strings. Nested slices are not supported.
+                  If not specified, only status.conditions of the CR will be used as dimension.
+                type: object
               fieldSelector:
                 description: Define fields of your object to adapt filters of the
                   query
