@@ -91,10 +91,9 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 
 	localEnp := os.Getenv("LOCAL_DATASINK")
 	if localEnp != "" {
-		l.Info("Using LOCAL_DATASINK environment variable for DataSink endpoint.", "endpoint", localEnp)
+		l.Info("Overriding DataSink endpoint with LOCAL_ENDPOINT environment variable.", "endpoint", localEnp)
 		dataSink.Spec.Connection.Endpoint = localEnp
 	}
-
 	// Extract endpoint from DataSink
 	endpoint := dataSink.Spec.Connection.Endpoint
 
