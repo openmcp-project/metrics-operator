@@ -103,32 +103,33 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 					recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.name, pField.error))
 				}
 			}
-			
-		dataPoints = append(dataPoints, dataPoint)
-	}
 
-	// Record all collected data points
-	errRecord := h.gaugeMetric.RecordMetrics(ctx, dataPoints...)
-	if errRecord != nil {
-		recordErrors = append(recordErrors, errRecord)
-	}
+			dataPoints = append(dataPoints, dataPoint)
+		}
 
-	// Update result based on errors during projection or recording
-	if len(recordErrors) > 0 {
-		// Combine errors for reporting
-		combinedError := fmt.Errorf("errors during metric recording: %v", recordErrors)
-		result.Error = combinedError
-		result.Phase = v1alpha1.PhaseFailed
-		result.Reason = "RecordMetricFailed"
-		result.Message = fmt.Sprintf("failed to record metric value(s): %s", combinedError.Error())
-	} else {
-		result.Phase = v1alpha1.PhaseActive
-		result.Reason = v1alpha1.ReasonMonitoringActive
-		result.Message = fmt.Sprintf("metric values recorded for resource '%s'", h.metric.GvkToString())
-		// Observation might need adjustment depending on how results should be represented in status
-		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(len(list.Items))} // Report total count for now
+		// Record all collected data points
+		errRecord := h.gaugeMetric.RecordMetrics(ctx, dataPoints...)
+		if errRecord != nil {
+			recordErrors = append(recordErrors, errRecord)
+		}
+
+		// Update result based on errors during projection or recording
+		if len(recordErrors) > 0 {
+			// Combine errors for reporting
+			combinedError := fmt.Errorf("errors during metric recording: %v", recordErrors)
+			result.Error = combinedError
+			result.Phase = v1alpha1.PhaseFailed
+			result.Reason = "RecordMetricFailed"
+			result.Message = fmt.Sprintf("failed to record metric value(s): %s", combinedError.Error())
+		} else {
+			result.Phase = v1alpha1.PhaseActive
+			result.Reason = v1alpha1.ReasonMonitoringActive
+			result.Message = fmt.Sprintf("metric values recorded for resource '%s'", h.metric.GvkToString())
+			// Observation might need adjustment depending on how results should be represented in status
+			result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(len(list.Items))} // Report total count for now
+		}
+		// Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
 	}
-	// Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
 	return result, nil
 }
 
