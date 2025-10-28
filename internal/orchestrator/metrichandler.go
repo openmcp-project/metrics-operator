@@ -160,7 +160,7 @@ func (e *projectedField) GetID() string {
 }
 
 func (h *MetricHandler) extractProjectionGroupsFrom(list *unstructured.UnstructuredList) map[string][][]projectedField {
-	var collection [][]projectedField
+	collection := make([][]projectedField, 0, len(list.Items))
 
 	for _, obj := range list.Items {
 		var fields []projectedField
