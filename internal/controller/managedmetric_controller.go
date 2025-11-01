@@ -314,6 +314,7 @@ func getClusterInfo(config *rest.Config) (string, error) {
 	clusterName := parts[0]
 
 	return clusterName, nil
+
 }
 
 // OrchestratorFactory is a function type for creating orchestrators
