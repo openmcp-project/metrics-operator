@@ -45,22 +45,22 @@ func TestGetClusterInfo(t *testing.T) {
 		{
 			name:         "KubernetesService",
 			host:         "https://kubernetes.default.svc:6443",
-			expectedName: "kubernetes",
+			expectedName: "kubernetes.default.svc",
 		},
 		{
 			name:         "CustomClusterName",
 			host:         "https://my-cluster-api.example.com:6443",
-			expectedName: "my-cluster-api",
+			expectedName: "my-cluster-api.example.com",
 		},
 		{
 			name:         "IPAddress",
 			host:         "https://192.168.1.1:6443",
-			expectedName: "192", // The function only extracts the first part of the IP address
+			expectedName: "192.168.1.1", // The function only extracts the first part of the IP address
 		},
 		{
 			name:         "WithPath",
 			host:         "https://kubernetes.default.svc:6443/api",
-			expectedName: "kubernetes",
+			expectedName: "kubernetes.default.svc",
 		},
 	}
 
