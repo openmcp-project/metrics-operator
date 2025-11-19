@@ -55,7 +55,7 @@ func TestGetClusterInfo(t *testing.T) {
 		{
 			name:         "IPAddress",
 			host:         "https://192.168.1.1:6443",
-			expectedName: "192.168.1.1", // The function only extracts the first part of the IP address
+			expectedName: "192.168.1.1",
 		},
 		{
 			name:         "WithPath",
