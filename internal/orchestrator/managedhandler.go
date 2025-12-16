@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,20 +59,41 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 		// Create a new data point for each resource
 		dataPoint := clientoptl.NewDataPoint()
 
-		objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cr.MangedResource)
-		if err != nil {
-			return "", err
-		}
-
-		u := &unstructured.Unstructured{Object: objMap}
-
-		for key, expr := range h.metric.Spec.Dimensions {
-			s, _, err := nestedPrimitiveValue(*u, expr)
+		// Preserve old logic so that if custom dimensions are not set, we use status.conditions
+		// as default dimensions
+		if h.metric.Spec.Dimensions == nil {
+			gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
 			if err != nil {
-				fmt.Printf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", key, expr, err)
-				continue
+				return "", err
 			}
-			dataPoint.AddDimension(key, s)
+
+			dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
+			dataPoint.AddDimension(GROUP, gv.Group)
+			dataPoint.AddDimension(VERSION, gv.Version)
+
+			for typ, state := range cr.Status {
+				t := strings.ToLower(typ)
+				if t == "ready" || t == "synced" {
+					dataPoint.AddDimension(t, strconv.FormatBool(state))
+				}
+			}
+
+		} else {
+			objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cr.MangedResource)
+			if err != nil {
+				return "", err
+			}
+
+			u := &unstructured.Unstructured{Object: objMap}
+
+			for key, expr := range h.metric.Spec.Dimensions {
+				s, _, err := nestedPrimitiveValue(*u, expr)
+				if err != nil {
+					fmt.Printf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", key, expr, err)
+					continue
+				}
+				dataPoint.AddDimension(key, s)
+			}
 		}
 
 		// Add cluster dimension if available
