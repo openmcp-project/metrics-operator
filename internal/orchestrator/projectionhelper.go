@@ -109,7 +109,7 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, vType ...Type)
 				// Wrap single non-slice item in an array
 				jsonBytes, err := json.Marshal([]interface{}{v})
 				if err != nil {
-					return "", true, fmt.Errorf("failed to marshal slice to JSON: v", err)
+					return "", true, fmt.Errorf("failed to marshal slice to JSON: %v", err)
 				}
 				return string(jsonBytes), true, nil
 			}
