@@ -87,7 +87,7 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 			u := &unstructured.Unstructured{Object: objMap}
 
 			for key, expr := range h.metric.Spec.Dimensions {
-				s, _, err := nestedPrimitiveValue(*u, expr)
+				s, _, err := nestedFieldValue(*u, expr)
 				if err != nil {
 					fmt.Printf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", key, expr, err)
 					continue
