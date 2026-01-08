@@ -18,6 +18,8 @@ const (
 	TypeMap       Type = "map"
 )
 
+//Todo move Type definition to /api/v1alpha1 and import it
+
 // nestedFieldValue extracts a value from an unstructured Kubernetes object using JSONPath.
 //
 // Returns:
