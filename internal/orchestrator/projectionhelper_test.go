@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
@@ -55,7 +56,7 @@ func runTests(t *testing.T, tests []struct {
 	name         string
 	resourceYaml string
 	path         string
-	valueType    Type
+	valueType    v1alpha1.Type
 	wantValue    string
 	wantFound    bool
 	wantError    bool
@@ -72,7 +73,7 @@ func runTests(t *testing.T, tests []struct {
 				t.Errorf("unexpected ok result: got %v, want %v", ok, tt.wantFound)
 			}
 			// For complex types (like maps), parse both JSON strings and compare the objects
-			if tt.valueType == TypeMap && value != "" && tt.wantValue != "" {
+			if tt.valueType == v1alpha1.TypeMap && value != "" && tt.wantValue != "" {
 				var gotObj, wantObj map[string]interface{}
 
 				// Parse the actual value
@@ -114,7 +115,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 		name         string
 		resourceYaml string
 		path         string
-		valueType    Type
+		valueType    v1alpha1.Type
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -123,7 +124,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "top level value retrieval",
 			resourceYaml: subaccountCR,
 			path:         "kind",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "NopResource",
 			wantFound:    true,
 			wantError:    false,
@@ -132,7 +133,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "nested value retrieval with name selector",
 			resourceYaml: subaccountCR,
 			path:         "spec.deletionPolicy",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "Delete",
 			wantFound:    true,
 			wantError:    false,
@@ -141,7 +142,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "nested value retrieval with escaped name selector",
 			resourceYaml: subaccountCR,
 			path:         "metadata.annotations.crossplane\\.io/external-name",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "ext-example",
 			wantFound:    true,
 			wantError:    false,
@@ -150,7 +151,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "nested value retrieval with index selector",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[1].status",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "True",
 			wantFound:    true,
 			wantError:    false,
@@ -159,7 +160,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "nested value retrieval with filter selector",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[?(@.type=='Ready')].status",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "True",
 			wantFound:    true,
 			wantError:    false,
@@ -168,7 +169,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "nested value retrieval with array slice selector",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:1].status",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "True",
 			wantFound:    true,
 			wantError:    false,
@@ -177,7 +178,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "nested value retrieval with wildcard selector; collection results are not supported",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*].status",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -186,7 +187,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "non-existent value",
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels.nonexistent",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -195,7 +196,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "nested non-string value retrieval with default print format",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0].observedGeneration",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "1",
 			wantFound:    true,
 			wantError:    false,
@@ -204,7 +205,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "retrieval of collection types is not supported for primitive",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0]",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -213,7 +214,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "invalid array index returns an error",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[abc].status",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    true,
@@ -222,7 +223,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "invalid path syntax returns an error",
 			resourceYaml: subaccountCR,
 			path:         "$.[status.conditions[0].status]",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    true,
@@ -240,7 +241,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "TypePrimitive handles boolean value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.boolValue",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "true",
 			wantFound:    true,
 			wantError:    false,
@@ -249,7 +250,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "TypePrimitive handles integer value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.intValue",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "42",
 			wantFound:    true,
 			wantError:    false,
@@ -258,7 +259,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "TypePrimitive handles float value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.floatValue",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "3.14",
 			wantFound:    true,
 			wantError:    false,
@@ -267,7 +268,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "TypePrimitive on map field should error",
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -276,7 +277,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "TypePrimitive on array field should error",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -285,16 +286,16 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "TypePrimitive on null value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "null",
 			wantFound:    true,
 			wantError:    false,
 		},
 		{
-			name:         "root path with TypePrimitive should error",
+			name:         "root path withv1alpha1.TypePrimitive should error",
 			resourceYaml: subaccountCR,
 			path:         ".",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -303,7 +304,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "filter returning no results",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[?(@.type=='NonExistent')]",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -312,7 +313,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "TypePrimitive on empty string field",
 			resourceYaml: `{"metadata":{"name":""}}`,
 			path:         "metadata.name",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    false,
@@ -321,7 +322,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			name:         "Deeply nested non-existent path",
 			resourceYaml: subaccountCR,
 			path:         "spec.missing.deeply.nested.path",
-			valueType:    TypePrimitive,
+			valueType:    v1alpha1.TypePrimitive,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -330,13 +331,13 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 	runTests(t, tests)
 }
 
-// TestNestedPrimitiveValue_Map tests the TypeMap functionality
+// tests the TypeMap functionality
 func TestNestedFieldValue_map(t *testing.T) {
 	tests := []struct {
 		name         string
 		resourceYaml string
 		path         string
-		valueType    Type
+		valueType    v1alpha1.Type
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -345,7 +346,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on map field should succeed",
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{"app":"myapp","env":"prod","team":"platform"}`,
 			wantFound:    true,
 			wantError:    false,
@@ -354,7 +355,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on nested map should succeed",
 			resourceYaml: subaccountCR,
 			path:         "spec.forProvider.config",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{"nested":"value"}`,
 			wantFound:    true,
 			wantError:    false,
@@ -363,7 +364,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on empty map should succeed",
 			resourceYaml: `{"metadata":{"labels":{}}}`,
 			path:         "metadata.labels",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{}`,
 			wantFound:    true,
 			wantError:    false,
@@ -372,16 +373,16 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on entire status.atProvider",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{"id": "12345","nullValue": null,"boolValue": true,"intValue": 42,"floatValue": 3.14}`,
 			wantFound:    true,
 			wantError:    false,
 		},
 		{
-			name:         "root path with TypeMap should succeed",
+			name:         "root path withv1alpha1.TypeMap should succeed",
 			resourceYaml: subaccountCR,
 			path:         ".",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{"apiVersion":"nop.crossplane.io/v1alpha1","kind":"NopResource","metadata":{"annotations":{"crossplane.io/external-name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"},"name":"example","labels":{"app":"myapp","env":"prod","team":"platform"}},"spec":{"deletionPolicy":"Delete","forProvider":{"tags":[{"name":"tag1","value":"value1"}],"emptyList":[],"config":{"nested":"value"}}},"status":{"conditions":[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"},{"lastTransitionTime":"2025-09-09T14:33:38Z","reason":"Available","status":"True","type":"Ready"}],"emptyConditions":[],"atProvider":{"id":"12345","nullValue":null,"boolValue":true,"intValue":42,"floatValue":3.14}}}`,
 			wantFound:    true,
 			wantError:    false,
@@ -390,7 +391,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on primitive field should error",
 			resourceYaml: subaccountCR,
 			path:         "kind",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -399,7 +400,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on array field should error",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -408,7 +409,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap with wildcard should error on multiple results",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*]",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -417,7 +418,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap with slice notation should error on multiple results",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:2]",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -426,7 +427,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on null value should error",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -435,7 +436,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on non-existent field",
 			resourceYaml: subaccountCR,
 			path:         "metadata.nonexistent",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -444,7 +445,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			name:         "TypeMap on annotations",
 			resourceYaml: subaccountCR,
 			path:         "metadata.annotations",
-			valueType:    TypeMap,
+			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{"crossplane.io/external-name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"}`,
 			wantFound:    true,
 			wantError:    false,
@@ -460,7 +461,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 		name         string
 		resourceYaml string
 		path         string
-		valueType    Type
+		valueType    v1alpha1.Type
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -469,7 +470,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice on array field should succeed",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"},{"lastTransitionTime":"2025-09-09T14:33:38Z","reason":"Available","status":"True","type":"Ready"}]`,
 			wantFound:    true,
 			wantError:    false,
@@ -478,7 +479,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice on empty array should succeed",
 			resourceYaml: subaccountCR,
 			path:         "status.emptyConditions",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[]`,
 			wantFound:    true,
 			wantError:    false,
@@ -487,7 +488,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice wraps single primitive from filter",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[?(@.type=='Ready')].status",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `["True"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -496,7 +497,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice wraps single map from array index",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0]",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"}]`,
 			wantFound:    true,
 			wantError:    false,
@@ -505,7 +506,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice on direct primitive path wraps in array",
 			resourceYaml: subaccountCR,
 			path:         "kind",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `["NopResource"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -514,7 +515,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice with array slice returns multiple items",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:2].type",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `["Synced","Ready"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -523,7 +524,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice with wildcard returns all items",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*].type",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `["Synced","Ready"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -532,7 +533,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice wraps single integer",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.intValue",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[42]`,
 			wantFound:    true,
 			wantError:    false,
@@ -541,7 +542,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice wraps single boolean",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.boolValue",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[true]`,
 			wantFound:    true,
 			wantError:    false,
@@ -550,7 +551,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice wraps single float",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.floatValue",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[3.14]`,
 			wantFound:    true,
 			wantError:    false,
@@ -559,16 +560,16 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice on map field wraps map in array",
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[{"app":"myapp","env":"prod","team":"platform"}]`,
 			wantFound:    true,
 			wantError:    false,
 		},
 		{
-			name:         "root path with TypeSlice should error",
+			name:         "root path withv1alpha1.TypeSlice should error",
 			resourceYaml: subaccountCR,
 			path:         ".",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -577,7 +578,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice on non-existent field",
 			resourceYaml: subaccountCR,
 			path:         "status.nonexistent",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -586,7 +587,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice wraps null value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `[null]`,
 			wantFound:    true,
 			wantError:    false,
@@ -595,7 +596,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice on filter returning multiple primitives",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*].status",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `["True","True"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -604,7 +605,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			name:         "TypeSlice on a field that is a slice of primitive values",
 			resourceYaml: `{"metadata":{"finalizers":["f1",12]}}`,
 			path:         "metadata.finalizers",
-			valueType:    TypeSlice,
+			valueType:    v1alpha1.TypeSlice,
 			wantValue:    `["f1",12]`,
 			wantFound:    true,
 			wantError:    false,
