@@ -5,20 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/util/jsonpath"
 )
-
-// Type represents the possible types for dimension values
-type Type string
-
-const (
-	TypePrimitive Type = "primitive"
-	TypeSlice     Type = "slice"
-	TypeMap       Type = "map"
-)
-
-//Todo move Type definition to /api/v1alpha1 and import it
 
 // nestedFieldValue extracts a value from an unstructured Kubernetes object using JSONPath.
 //
@@ -38,18 +29,18 @@ const (
 // Path format:
 //   - Use dot-notation without brackets or leading dot (e.g., "metadata.name")
 //   - Use "." to export the entire object as JSON (requires TypeMap)
-func nestedFieldValue(obj unstructured.Unstructured, path string, vType ...Type) (string, bool, error) {
+func nestedFieldValue(obj unstructured.Unstructured, path string, vType ...v1alpha1.Type) (string, bool, error) {
 	// TODO: make valueType not optional
-	valueType := TypePrimitive
+	valueType := v1alpha1.TypePrimitive
 	if len(vType) > 0 {
 		valueType = vType[0]
 	}
 	if valueType == "" {
-		valueType = TypePrimitive
+		valueType = v1alpha1.TypePrimitive
 	}
 
 	if path == "." {
-		if valueType != TypeMap {
+		if valueType != v1alpha1.TypeMap {
 			return "", true, fmt.Errorf("type %s cannot be used with root path '.', only 'map' is supported", valueType)
 		}
 		jsonBytes, err := json.Marshal(obj.UnstructuredContent())
@@ -76,13 +67,13 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, vType ...Type)
 	}
 
 	// Validate single value for non-slice types
-	if valueType != TypeSlice && (len(results) > 1 || len(results[0]) > 1) {
+	if valueType != v1alpha1.TypeSlice && (len(results) > 1 || len(results[0]) > 1) {
 		return "", true, fmt.Errorf("fieldPath matches more than one value, which is not supported for type %s", valueType)
 	}
 
 	// Handle each type
 	switch valueType {
-	case TypeSlice:
+	case v1alpha1.TypeSlice:
 		var values []interface{}
 		for _, result := range results[0] {
 			values = append(values, result.Interface())
@@ -120,7 +111,7 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, vType ...Type)
 		// Empty results
 		return "[]", true, nil
 
-	case TypePrimitive:
+	case v1alpha1.TypePrimitive:
 		value := results[0][0].Interface()
 
 		// Reject collection types
@@ -134,7 +125,7 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, vType ...Type)
 		}
 		return fmt.Sprintf("%v", value), true, nil
 
-	case TypeMap:
+	case v1alpha1.TypeMap:
 		value := results[0][0].Interface()
 
 		if _, ok := value.(map[string]interface{}); !ok {

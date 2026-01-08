@@ -34,7 +34,7 @@ type ManagedMetricSpec struct {
 	// Defines dimensions of the metric. All specified fields must be nested strings. Nested slices are not supported.
 	// If not specified, only status.conditions of the CR will be used as dimension.
 	// +optional
-	Dimensions map[string]string `json:"dimensions,omitempty"`
+	Dimensions []Projection `json:"dimensions,omitempty"`
 	// Define labels of your object to adapt filters of the query
 	// +optional
 	LabelSelector string `json:"labelSelector,omitempty"`
