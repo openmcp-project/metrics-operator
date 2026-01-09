@@ -42,7 +42,7 @@ type Projection struct {
 	// Type specifies the type of the projections's value.
 	// It can be "primitive", "slice", or "map".
 	// If not specified, it will default to "primitive".
-	// +default=primitive
+	// +default="primitive"
 	Type string `json:"type,omitempty"`
 }
 
