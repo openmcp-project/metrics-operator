@@ -59,23 +59,48 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 		// Create a new data point for each resource
 		dataPoint := clientoptl.NewDataPoint()
 
-		// Add GVK dimensions from resource
-		gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
-		if err != nil {
-			return "", err
+		// Preserve old logic so that if custom dimensions are not set, we use status.conditions
+		// as default dimensions
+		if h.metric.Spec.Dimensions == nil {
+			gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
+			if err != nil {
+				return "", err
+			}
+
+			dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
+			dataPoint.AddDimension(GROUP, gv.Group)
+			dataPoint.AddDimension(VERSION, gv.Version)
+
+			for typ, state := range cr.Status {
+				t := strings.ToLower(typ)
+				if t == "ready" || t == "synced" {
+					dataPoint.AddDimension(t, strconv.FormatBool(state))
+				}
+			}
+
+		} else {
+			objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cr.MangedResource)
+			if err != nil {
+				return "", err
+			}
+
+			u := &unstructured.Unstructured{Object: objMap}
+
+			for _, dimension := range h.metric.Spec.Dimensions {
+				if dimension.Name != "" && dimension.FieldPath != "" {
+					value, _, err := nestedFieldValue(*u, dimension.FieldPath, v1alpha1.Type(dimension.Type))
+					if err != nil {
+						fmt.Printf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", dimension.Name, dimension.FieldPath, err)
+						continue
+					}
+					dataPoint.AddDimension(dimension.Name, value)
+				}
+			}
 		}
-		dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
-		dataPoint.AddDimension(GROUP, gv.Group)
-		dataPoint.AddDimension(VERSION, gv.Version)
 
 		// Add cluster dimension if available
 		if h.clusterName != nil {
 			dataPoint.AddDimension(CLUSTER, *h.clusterName)
-		}
-
-		// Add status conditions as dimensions
-		for typ, state := range cr.Status {
-			dataPoint.AddDimension(strings.ToLower(typ), strconv.FormatBool(state))
 		}
 
 		// Set the value to 1 for each resource
