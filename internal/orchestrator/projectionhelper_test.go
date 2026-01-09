@@ -5,9 +5,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
+
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 )
 
 const subaccountCR = `
