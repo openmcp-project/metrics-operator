@@ -29,16 +29,7 @@ import (
 // Path format:
 //   - Use dot-notation without brackets or leading dot (e.g., "metadata.name")
 //   - Use "." to export the entire object as JSON (requires TypeMap)
-func nestedFieldValue(obj unstructured.Unstructured, path string, vType ...v1alpha1.Type) (string, bool, error) {
-	// TODO: make valueType not optional
-	valueType := v1alpha1.TypePrimitive
-	if len(vType) > 0 {
-		valueType = vType[0]
-	}
-	if valueType == "" {
-		valueType = v1alpha1.TypePrimitive
-	}
-
+func nestedFieldValue(obj unstructured.Unstructured, path string, valueType v1alpha1.Type) (string, bool, error) {
 	if path == "." {
 		if valueType != v1alpha1.TypeMap {
 			return "", true, fmt.Errorf("type %s cannot be used with root path '.', only 'map' is supported", valueType)

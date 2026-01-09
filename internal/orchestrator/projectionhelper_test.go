@@ -229,15 +229,6 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "empty type defaults to primitive",
-			resourceYaml: subaccountCR,
-			path:         "kind",
-			valueType:    "",
-			wantValue:    "NopResource",
-			wantFound:    true,
-			wantError:    false,
-		},
-		{
 			name:         "TypePrimitive handles boolean value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.boolValue",
