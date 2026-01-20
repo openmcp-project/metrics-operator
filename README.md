@@ -303,7 +303,8 @@ spec:
 
 ### Configuring Dimensions
 
-**Dimensions** (defined via `projections` in `Metric` or `dimensions` in `ManagedMetric`) are a powerful feature for enriching metrics with key-value attributes from your Kubernetes resources. They enable advanced filtering and analysis in your monitoring backend.
+**Dimensions** (defined via `projections` in `Metric` or `dimensions` in `ManagedMetric`) are a powerful feature for enriching metrics with key-value attributes from your Kubernetes resources. 
+They are defined using JSONPath, as shown in the examples above, enabling advanced filtering and analysis in your monitoring backend. 
 
 Both `Metric` and `ManagedMetric` automatically include a set of **Base Dimensions** (`group`, `version`, `kind`, `cluster`). However, they differ in how they handle custom dimensions:
 
@@ -312,7 +313,7 @@ Both `Metric` and `ManagedMetric` automatically include a set of **Base Dimensio
 
 For a complete guide on how to define dimensions, including advanced types (`map`, `slice`), use cases, and important considerations like metric cardinality, please see the **[Configuring Dimensions Guide](docs/dimensions-configuration.md)**.
 
-Full support of Dimensions/Projections fo all types of metrics will be added in a future release. Currenlty only `Metric`` and ManagedMetric` support this.
+Full support of Dimensions/Projections fo all types of metrics will be added in a future release. Currenlty only `Metric` and `ManagedMetric` support this.
 
 ## Remote Cluster Access
 

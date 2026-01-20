@@ -17,7 +17,7 @@ The Metrics Operator allows you to enrich the metrics you collect with data from
 
 ---
 
-> **Note on Naming:** Throughout this document, we will use the term **Dimension**. In some resource types like `Metric`, this field is currently named `projections`. The functionality is identical, and the naming will be unified to `dimensions` in a future release.
+> **Note on Naming:** Throughout this document, we will use the term **Dimension**. In some resource types like `Metric`, this field is currently named `projections`. The functionality will be consolidated and the naming will be unified to `dimensions` across all metric types in a future release.
 
 ## Dimension Structure
 
