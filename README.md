@@ -26,7 +26,7 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
     - [Managed Metric](#managed-metric)
     - [Federated Metric](#federated-metric)
     - [Federated Managed Metric](#federated-managed-metric)
-    - [Projection Selector Syntax Overview](#projection-selector-syntax-overview)
+    - [Configuring Dimensions](#configuring-dimensions)
   - [Remote Cluster Access](#remote-cluster-access)
     - [Remote Cluster Access](#remote-cluster-access-1)
     - [Federated Cluster Access](#federated-cluster-access)
@@ -212,7 +212,7 @@ To get a full list of the supported tasks, you can run the `task` command with n
 ### Metric
 
 Metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
-This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation and supports [JSONPath selectors](#projection-selector-syntax-overview) to access nested fields.
+This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation and supports [Configuring Dimensions](#configuring-dimensions) to access nested fields.
 Note that a single projection has to select a primitive value, collection type results are not supported.
 The projections are then translated to dimensions in the metric.
 
@@ -237,7 +237,7 @@ spec:
 
 ### Managed Metric
 
-Managed metrics are used to monitor crossplane managed resources. They automatically track resources that have the "crossplane" and "managed" categories in their CRDs.
+Managed metrics are used to monitor Crossplane managed resources. They automatically track resources that have the "crossplane" or "managed" categories in their CRDs. By default, they export dimensions based on `status.conditions`. Custom Dimensions are also supported.
 
 ```yaml
 apiVersion: metrics.openmcp.cloud/v1alpha1
@@ -301,24 +301,18 @@ spec:
 ---
 ```
 
-### Projection Selector Syntax Overview
+### Configuring Dimensions
 
-The following examples demonstrate the usage of different [JSONPath selectors](https://www.rfc-editor.org/rfc/rfc9535.html#name-selectors):
+**Dimensions** (defined via `projections` in `Metric` or `dimensions` in `ManagedMetric`) are a powerful feature for enriching metrics with key-value attributes from your Kubernetes resources. They enable advanced filtering and analysis in your monitoring backend.
 
-```yaml
-  projections:
-    - name: pod-namespace
-      # name selector: selects the namespace value
-      fieldPath: "metadata.namespace"
-    - name: pod-condition-ready-status
-      # filter selector: selects the status value of the conditions with type='Ready'
-      fieldPath: "status.conditions[?(@.type=='Ready')].status"
-    - name: pod-condition-last-transition-time
-      # index selector: selects the lastTransitionTime value of the first condition
-      fieldPath: "status.conditions[0].lastTransitionTime"
-```
+Both `Metric` and `ManagedMetric` automatically include a set of **Base Dimensions** (`group`, `version`, `kind`, `cluster`). However, they differ in how they handle custom dimensions:
 
-Note: Array slice `start:end:step` syntax and wildcard selectors are technically supported but left out in the examples due to the restriction that a projection is expected to result in a single primitive value. It is also important to point out that even though `projections` is an array type, the operator evaluates only the first projection of a metric for now. Support for multiple projections will be added in a future release.
+-   **`Metric`:** Behavior is **additive**. Custom dimensions defined in `projections` are added *in addition to* the base dimensions.
+-   **`ManagedMetric`:** Behavior is **conditional**. If no custom `dimensions` are defined, it adds convenience defaults from `status.conditions`. If you define any custom dimensions, these defaults are disabled, giving you full control.
+
+For a complete guide on how to define dimensions, including advanced types (`map`, `slice`), use cases, and important considerations like metric cardinality, please see the **[Configuring Dimensions Guide](docs/dimensions-configuration.md)**.
+
+Full support of Dimensions/Projections fo all types of metrics will be added in a future release. Currenlty only `Metric`` and ManagedMetric` support this.
 
 ## Remote Cluster Access
 
