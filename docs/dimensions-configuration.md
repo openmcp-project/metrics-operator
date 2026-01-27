@@ -2,18 +2,18 @@
 
 The Metrics Operator allows you to enrich the metrics you collect with data from your Kubernetes resources. This is achieved by defining **Dimensions**. Dimensions are key-value attributes added to your metrics, which enable powerful filtering, aggregation, and analysis in your data/monitoring backend.
 
-> **Key Behavior to Understand**
->
-> Before you start, it's crucial to understand how dimensions are handled. Both `Metric` and `ManagedMetric` resources automatically add a set of **Base Dimensions** to every metric, which typically include `group`, `version`, `kind`, and `cluster`. The key difference lies in how they handle custom dimensions on top of this base.
->
-> -   **`Metric`:** Behavior is **additive**.
->     -   It **always** includes the Base Dimensions (`group`, `version`, `kind`, `cluster`).
->     -   Any custom dimensions you define in the `projections` field are **added** to these base dimensions. There is no "default" mode; you either have only the base dimensions or the base dimensions plus your custom ones.
->
-> -   **`ManagedMetric`:** Behavior is **conditional**.
->     -   It is designed for Crossplane and offers a special set of **Convenience Defaults**.
->     -   **If you do NOT define a `dimensions` block:** The operator exports the Base Dimensions (`cluster`, `group`, `version`, `kind`) **plus** convenience dimensions derived from the resource's status (e.g., `ready: "true"`, `synced: "true"`).
->     -   **If you define ANY custom `dimensions`:** The convenience defaults are **disabled**. The operator exports only the Base Dimension (`cluster`) **plus** your explicitly defined custom dimensions. This allows you to take full control.
+ **Key Behavior to Understand**
+
+ Before you start, it's crucial to understand how dimensions are handled. Both `Metric` and `ManagedMetric` resources automatically add a set of **Base Dimensions** to every metric, which typically include `group`, `version`, `kind`, and `cluster`. The key difference lies in how they handle custom dimensions on top of this base.
+
+ -   **`Metric`:** Behavior is **additive**.
+     -   It **always** includes the Base Dimensions (`group`, `version`, `kind`, `cluster`).
+     -   Any custom dimensions you define in the `projections` field are **added** to these base dimensions. There is no "default" mode; you either have only the base dimensions or the base dimensions plus your custom ones.
+
+ -   **`ManagedMetric`:** Behavior is **conditional**.
+     -   It is designed for Crossplane and offers a special set of **Convenience Defaults**.
+     -   **If you do NOT define a `dimensions` block:** The operator exports the Base Dimensions (`cluster`, `group`, `version`, `kind`) **plus** convenience dimensions derived from the resource's status (e.g., `ready: "true"`, `synced: "true"`).
+     -   **If you define ANY custom `dimensions`:** The convenience defaults are **disabled**. The operator exports only the Base Dimension (`cluster`) **plus** your explicitly defined custom dimensions. This allows you to take full control.
 
 ---
 
