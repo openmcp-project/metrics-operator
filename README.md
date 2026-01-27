@@ -26,7 +26,6 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
     - [Managed Metric](#managed-metric)
     - [Federated Metric](#federated-metric)
     - [Federated Managed Metric](#federated-managed-metric)
-    - [Configuring Dimensions](#configuring-dimensions)
   - [Remote Cluster Access](#remote-cluster-access)
     - [Remote Cluster Access](#remote-cluster-access-1)
     - [Federated Cluster Access](#federated-cluster-access)
@@ -211,10 +210,8 @@ To get a full list of the supported tasks, you can run the `task` command with n
 
 ### Metric
 
-Metrics have additional capabilities, such as projections. Projections allow you to extract specific fields from the target resource and include them in the metric data.
-This can be useful for tracking additional dimensions of the resource, such as fields, labels or annotations. It uses the dot notation and supports [Configuring Dimensions](#configuring-dimensions) to access nested fields.
-Note that a single projection has to select a primitive value, collection type results are not supported.
-The projections are then translated to dimensions in the metric.
+Metrics have additional capabilities, such as dimensions. Dimensions allow you to extract additional data from the target resource, such as fields, labels, or annotations.
+See the [dimensions documentation](docs/dimensions-configuration.md) for a comprehensive usage overview.
 
 ```yaml
 apiVersion: metrics.openmcp.cloud/v1alpha1
@@ -237,7 +234,7 @@ spec:
 
 ### Managed Metric
 
-Managed metrics are used to monitor Crossplane managed resources. They automatically track resources that have the "crossplane" or "managed" categories in their CRDs. By default, they export dimensions based on `status.conditions`. Custom Dimensions are also supported.
+Managed metrics are used to monitor Crossplane managed resources. They automatically track resources that have the "crossplane" and "managed" categories in their CRDs. By default, they export dimensions based on `status.conditions`. Custom Dimensions are also supported. See the [dimensions documentation](docs/dimensions-configuration.md) for a comprehensive usage overview.
 
 ```yaml
 apiVersion: metrics.openmcp.cloud/v1alpha1
@@ -300,20 +297,6 @@ spec:
     namespace: default
 ---
 ```
-
-### Configuring Dimensions
-
-**Dimensions** (defined via `projections` in `Metric` or `dimensions` in `ManagedMetric`) are a powerful feature for enriching metrics with key-value attributes from your Kubernetes resources. 
-They are defined using JSONPath, as shown in the examples above, enabling advanced filtering and analysis in your monitoring backend. 
-
-Both `Metric` and `ManagedMetric` automatically include a set of **Base Dimensions** (`group`, `version`, `kind`, `cluster`). However, they differ in how they handle custom dimensions:
-
--   **`Metric`:** Behavior is **additive**. Custom dimensions defined in `projections` are added *in addition to* the base dimensions.
--   **`ManagedMetric`:** Behavior is **conditional**. If no custom `dimensions` are defined, it adds convenience defaults from `status.conditions`. If you define any custom dimensions, these defaults are disabled, giving you full control.
-
-For a complete guide on how to define dimensions, including advanced types (`map`, `slice`), use cases, and important considerations like metric cardinality, please see the **[Configuring Dimensions Guide](docs/dimensions-configuration.md)**.
-
-Full support of Dimensions/Projections fo all types of metrics will be added in a future release. Currenlty only `Metric` and `ManagedMetric` support this.
 
 ## Remote Cluster Access
 
