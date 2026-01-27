@@ -57,7 +57,7 @@ func runTests(t *testing.T, tests []struct {
 	name         string
 	resourceYaml string
 	path         string
-	valueType    v1alpha1.Type
+	valueType    v1alpha1.DimensionType
 	wantValue    string
 	wantFound    bool
 	wantError    bool
@@ -116,7 +116,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 		name         string
 		resourceYaml string
 		path         string
-		valueType    v1alpha1.Type
+		valueType    v1alpha1.DimensionType
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -329,7 +329,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 		name         string
 		resourceYaml string
 		path         string
-		valueType    v1alpha1.Type
+		valueType    v1alpha1.DimensionType
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -453,7 +453,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 		name         string
 		resourceYaml string
 		path         string
-		valueType    v1alpha1.Type
+		valueType    v1alpha1.DimensionType
 		wantValue    string
 		wantFound    bool
 		wantError    bool

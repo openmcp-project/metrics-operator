@@ -54,12 +54,12 @@ type Dimension struct {
 }
 
 // Type represents the possible types for dimension values
-type Type string
+type DimensionType string
 
 const (
-	TypePrimitive Type = "primitive"
-	TypeSlice     Type = "slice"
-	TypeMap       Type = "map"
+	TypePrimitive DimensionType = "primitive"
+	TypeSlice     DimensionType = "slice"
+	TypeMap       DimensionType = "map"
 )
 
 // MetricObservation represents the latest available observation of an object's state
