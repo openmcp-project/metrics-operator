@@ -649,10 +649,8 @@ func (in *ManagedMetricSpec) DeepCopyInto(out *ManagedMetricSpec) {
 	}
 	if in.Dimensions != nil {
 		in, out := &in.Dimensions, &out.Dimensions
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = make([]Projection, len(*in))
+		copy(*out, *in)
 	}
 	out.Interval = in.Interval
 	if in.DataSinkRef != nil {

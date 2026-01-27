@@ -66,12 +66,27 @@ spec:
                   metric in Dynatrace(or other providers)
                 type: string
               dimensions:
-                additionalProperties:
-                  type: string
                 description: |-
                   Defines dimensions of the metric. All specified fields must be nested strings. Nested slices are not supported.
                   If not specified, only status.conditions of the CR will be used as dimension.
-                type: object
+                items:
+                  description: Projection defines the projection of the metric
+                  properties:
+                    fieldPath:
+                      description: Define the path to the field that should be extracted
+                      type: string
+                    name:
+                      description: Define the name of the field that should be extracted
+                      type: string
+                    type:
+                      default: primitive
+                      description: |-
+                        Type specifies the type of the projections's value.
+                        It can be "primitive", "slice", or "map".
+                        If not specified, it will default to "primitive".
+                      type: string
+                  type: object
+                type: array
               fieldSelector:
                 description: Define fields of your object to adapt filters of the
                   query

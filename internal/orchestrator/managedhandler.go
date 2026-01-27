@@ -87,13 +87,15 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 
 			u := &unstructured.Unstructured{Object: objMap}
 
-			for key, expr := range h.metric.Spec.Dimensions {
-				s, _, err := nestedPrimitiveValue(*u, expr)
-				if err != nil {
-					l.Error(err, fmt.Sprintf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", key, expr, err))
-					continue
+			for _, dimension := range h.metric.Spec.Dimensions {
+				if dimension.Name != "" && dimension.FieldPath != "" {
+					value, _, err := nestedFieldValue(*u, dimension.FieldPath, v1alpha1.DimensionType(dimension.Type))
+					if err != nil {
+						l.Error(err, fmt.Sprintf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", dimension.Name, dimension.FieldPath, err))
+						continue
+					}
+					dataPoint.AddDimension(dimension.Name, value)
 				}
-				dataPoint.AddDimension(key, s)
 			}
 		}
 

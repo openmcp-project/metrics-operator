@@ -38,6 +38,13 @@ type Projection struct {
 
 	// Define the path to the field that should be extracted
 	FieldPath string `json:"fieldPath,omitempty"`
+
+	// Type specifies the type of the projections's value.
+	// It can be "primitive", "slice", or "map".
+	// If not specified, it will default to "primitive".
+	// +optional
+	// +default="primitive"
+	Type string `json:"type,omitempty"`
 }
 
 // Dimension defines the dimension of the metric
@@ -45,6 +52,15 @@ type Dimension struct {
 	Name  string `json:"name,omitempty"`
 	Value string `json:"value,omitempty"`
 }
+
+// Type represents the possible types for dimension values
+type DimensionType string
+
+const (
+	TypePrimitive DimensionType = "primitive"
+	TypeSlice     DimensionType = "slice"
+	TypeMap       DimensionType = "map"
+)
 
 // MetricObservation represents the latest available observation of an object's state
 type MetricObservation struct {
