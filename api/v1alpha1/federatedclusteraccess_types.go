@@ -27,15 +27,37 @@ type FederateClusterAccessRef struct {
 }
 
 // FederatedClusterAccessSpec defines the desired state of FederatedClusterAccess
+// +kubebuilder:validation:XValidation:rule="(has(self.kubeConfigPath) && size(self.kubeConfigPath) > 0) != (has(self.secretRefPath) && size(self.secretRefPath) > 0)",message="exactly one of kubeConfigPath or secretRefPath must be set"
 type FederatedClusterAccessSpec struct {
 	// Define the target resources that should be monitored
 	Target GroupVersionKind `json:"target,omitempty"`
 
+	// Define labels of your object to adapt filters of the query
+	// +optional
+	LabelSelector string `json:"labelSelector,omitempty"`
+
+	// Define fields of your object to adapt filters of the query
+	// +optional
+	FieldSelector string `json:"fieldSelector,omitempty"`
+
+	// Restricts the scope of the target resource to a specific namespace
+	// Only applicable for namespaced resources
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
 	// Field that contains the kubeconfig to access the target cluster. Use dot notation to access nested fields.
+	// The field can be of type string or object.
+	// Either KubeConfigPath or SecretRefPath must be set.
+	// +optional
 	KubeConfigPath string `json:"kubeConfigPath,omitempty"`
 
-	// TODO: add label and field selectors
-
+	// Field that contains the secret reference to access the target cluster. Use dot notation to access nested fields.
+	// The field needs to be of type SecretRef and contain the reference to the secret that holds the kubeconfig (name, namespace, key).
+	// If namespace is omitted, the namespace of target object will be used as default.
+	// If key is omitted, "kubeconfig" will be used as default.
+	// Either KubeConfigPath or SecretRefPath must be set.
+	// +optional
+	SecretRefPath string `json:"secretRefPath,omitempty"`
 }
 
 // FederatedClusterAccessStatus defines the observed state of FederatedClusterAccess
