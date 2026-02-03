@@ -312,7 +312,6 @@ func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1alpha1.FederateC
 	}
 
 	return extractKubeConfigs(kcPath, list)
-
 }
 
 func extractSecretRefs(kcPath string, list *unstructured.UnstructuredList) ([]v1alpha1.KubeConfigSecretRef, error) {
