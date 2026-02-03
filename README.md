@@ -388,7 +388,7 @@ spec:
     kind: AccessRequest
     group: clusters.openmcp.cloud
     version: v1alpha1
-  kubeConfigSecretPath: status.secretRef
+  secretRefPath: status.secretRef
 ---
 apiVersion: clusters.openmcp.cloud/v1alpha1
 kind: AccessRequest
