@@ -447,13 +447,13 @@ func getKubeconfigAsBytes(obj *unstructured.Unstructured, fields ...string) ([]b
 	}
 
 	// check if kubeconfig is string or map
-	switch kubeconfig.(type) {
+	switch v := kubeconfig.(type) {
 	case string:
-		return []byte(kubeconfig.(string)), nil
+		return []byte(v), nil
 	case map[string]any:
 		// marshal to json
-		return json.Marshal(kubeconfig)
+		return json.Marshal(v)
 	default:
-		return nil, fmt.Errorf("unsupported kubeconfig data type")
+		return nil, fmt.Errorf("unsupported kubeconfig data type, got %T, want string or object", v)
 	}
 }
