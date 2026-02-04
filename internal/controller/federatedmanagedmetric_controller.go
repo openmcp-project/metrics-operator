@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -46,7 +46,7 @@ func NewFederatedManagedMetricReconciler(mgr ctrl.Manager) *FederatedManagedMetr
 		inCli:      mgr.GetClient(),
 		RestConfig: mgr.GetConfig(),
 		Scheme:     mgr.GetScheme(),
-		Recorder:   mgr.GetEventRecorderFor("federated-managed-controller"),
+		Recorder:   mgr.GetEventRecorder("federated-managed-controller"),
 	}
 }
 
@@ -57,7 +57,7 @@ type FederatedManagedMetricReconciler struct {
 	inCli      client.Client
 	Scheme     *runtime.Scheme
 	RestConfig *rest.Config
-	Recorder   record.EventRecorder
+	Recorder   events.EventRecorder
 }
 
 func (r *FederatedManagedMetricReconciler) getClient() client.Client {
@@ -196,7 +196,7 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 			metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 			metric.Status.Ready = v1alpha1.StatusStringFalse
 			l.Error(errOrch, "unable to create federate metric orchestrator monitor")
-			r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
+			r.Recorder.Eventf(&metric, nil, "Warning", "OrchestratorCreation", "Reconcile", "unable to create orchestrator")
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
 		}
 

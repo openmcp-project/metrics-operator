@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/tools/events"
 
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"github.com/openmcp-project/metrics-operator/internal/common"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -97,13 +97,13 @@ func (r *TestMetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	switch result.Phase {
 	case v1alpha1.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
-		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Normal", "MetricAvailable", "ReconcileTestMetric", result.Message)
 	case v1alpha1.PhaseFailed:
 		metric.SetConditions(common.Error(result.Message))
-		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Warning", "MetricFailed", "ReconcileTestMetric", result.Message)
 	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
-		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Normal", "MetricPending", "ReconcileTestMetric", result.Message)
 	}
 
 	metric.Status.Ready = v1alpha1.StatusFalse
@@ -207,7 +207,7 @@ func testReconcileMetricNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a recorder for events
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 
 	// Create a test reconciler
 	reconciler := &MetricReconciler{
@@ -267,7 +267,7 @@ func testReconcileSecretNotFound(t *testing.T) {
 	}()
 
 	// Create a recorder for events
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 
 	// Create a test reconciler
 	reconciler := &MetricReconciler{
@@ -341,7 +341,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 	fakeHandler := NewFakeMetricHandler(fakeResult, nil)
 
 	// Create a recorder for events
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 
 	// Create a test reconciler with our fake handler
 	reconciler := &TestMetricReconciler{
