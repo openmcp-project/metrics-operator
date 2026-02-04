@@ -50,6 +50,7 @@ func NewDataSinkCredentialsRetriever(client client.Client, recorder events.Event
 //
 //nolint:gocyclo
 func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Context, dataSinkRef *v1alpha1.DataSinkReference, eventObject client.Object, l logr.Logger) (common.DataSinkCredentials, error) {
+
 	// Determine the namespace where DataSinks are expected to be found.
 	dataSinkLookupNamespace := os.Getenv("OPERATOR_CONFIG_NAMESPACE")
 	if dataSinkLookupNamespace == "" {
@@ -92,7 +93,6 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 	// Extract endpoint from DataSink
 	endpoint := dataSink.Spec.Connection.Endpoint
 	// Construct credentials compatible with clientoptl.NewMetricClient
-	// The NewMetricClient expects: dtAPIHost, dtAPIBasePath, dtAPIToken
 	// For now, we'll use the full endpoint as Host and empty Path
 	// TODO: Parse endpoint to separate host and path if needed based on protocol
 	credentials := common.DataSinkCredentials{
@@ -113,22 +113,13 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 			Name:      secretName,
 		}
 
-		if err := d.client.Get(ctx, secretNamespacedName, secret); err != nil {
-			if apierrors.IsNotFound(err) {
-				l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretName, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretNotFound", "GetDataSinkCredentials", fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretName, dataSinkLookupNamespace))
-			} else {
-				l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretName, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretName, dataSinkLookupNamespace))
-			}
+		if err := fetchSecret(ctx, d.client, secretNamespacedName, secret, l); err != nil {
 			return common.DataSinkCredentials{}, err
 		}
 
 		// Extract token from secret
-		tokenBytes, exists := secret.Data[secretKey]
-		if !exists {
-			err := fmt.Errorf("key '%s' not found in secret '%s'", secretKey, secretName)
-			l.Error(err, fmt.Sprintf("key '%s' not found in secret '%s'", secretKey, secretName))
+		tokenBytes, err := getSecretKeyData(secret, secretKey, secretName, l)
+		if err != nil {
 			d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKey, secretName))
 			return common.DataSinkCredentials{}, err
 		}
@@ -139,6 +130,7 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 		}
 	}
 
+	// Handle certificate-based authentication
 	if dataSink.Spec.Authentication != nil && dataSink.Spec.Authentication.Certificate != nil {
 		secretNameClientCert := dataSink.Spec.Authentication.Certificate.ClientCert.Name
 		secretKeyClientCert := dataSink.Spec.Authentication.Certificate.ClientCert.Key
@@ -152,30 +144,30 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 			Name:      secretNameClientCert,
 		}
 
-		if err := d.client.Get(ctx, secretNamespacedName, secret); err != nil {
-			if apierrors.IsNotFound(err) {
-				l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretNameClientCert, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretNotFound", "GetDataSinkCredentials", fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretNameClientCert, dataSinkLookupNamespace))
-			} else {
-				l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretNameClientCert, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretNameClientCert, dataSinkLookupNamespace))
-			}
+		if err := fetchSecret(ctx, d.client, secretNamespacedName, secret, l); err != nil {
+			return common.DataSinkCredentials{}, err
+		}
+
+		clientCert, err := getSecretKeyData(secret, secretKeyClientCert, secretNameClientCert, l)
+		if err != nil {
+			d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKeyClientCert, secretNameClientCert))
+			return common.DataSinkCredentials{}, err
+		}
+
+		clientKey, err := getSecretKeyData(secret, secretKeyClientKey, secretNameClientKey, l)
+		if err != nil {
+			d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKeyClientKey, secretNameClientKey))
+			return common.DataSinkCredentials{}, err
 		}
 
 		credentials.Certificate = &common.CertificateAuth{
-			ClientCert: secret.Data[secretKeyClientCert],
-			ClientKey:  secret.Data[secretKeyClientKey],
+			ClientCert: clientCert,
+			ClientKey:  clientKey,
 		}
 
 		secretNamespacedName.Name = secretNameClientKey
-		if err := d.client.Get(ctx, secretNamespacedName, secret); err != nil {
-			if apierrors.IsNotFound(err) {
-				l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretNameClientKey, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretNotFound", "GetDataSinkCredentials", fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretNameClientKey, dataSinkLookupNamespace))
-			} else {
-				l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretNameClientKey, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretNameClientKey, dataSinkLookupNamespace))
-			}
+		if err = fetchSecret(ctx, d.client, secretNamespacedName, secret, l); err != nil {
+			return common.DataSinkCredentials{}, err
 		}
 
 		if dataSink.Spec.Authentication.Certificate.CACert != nil {
@@ -184,20 +176,40 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 
 			secretNamespacedName.Name = secretNameCACert
 			if err := d.client.Get(ctx, secretNamespacedName, secret); err != nil {
-				if apierrors.IsNotFound(err) {
-					l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretNameCACert, dataSinkLookupNamespace))
-					d.recorder.Eventf(eventObject, nil, "Error", "SecretNotFound", "GetDataSinkCredentials", fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretNameCACert, dataSinkLookupNamespace))
-				} else {
-					l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretNameCACert, dataSinkLookupNamespace))
-					d.recorder.Eventf(eventObject, nil, "Error", "SecretFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretNameCACert, dataSinkLookupNamespace))
-				}
+				return common.DataSinkCredentials{}, err
 			}
 
-			credentials.Certificate.CACert = secret.Data[secretKeyCACert]
+			credentials.Certificate.CACert, err = getSecretKeyData(secret, secretKeyCACert, secretNameCACert, l)
+			if err != nil {
+				d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKeyCACert, secretNameCACert))
+				return common.DataSinkCredentials{}, err
+			}
 		}
 	}
 
 	l.Info(fmt.Sprintf("Using DataSink '%s' with endpoint '%s'", dataSinkName, endpoint))
 
 	return credentials, nil
+}
+
+func fetchSecret(ctx context.Context, c client.Client, namespacedName types.NamespacedName, secret *corev1.Secret, l logr.Logger) error {
+	if err := c.Get(ctx, namespacedName, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", namespacedName.Name, namespacedName.Namespace))
+		} else {
+			l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", namespacedName.Name, namespacedName.Namespace))
+		}
+		return err
+	}
+	return nil
+}
+
+func getSecretKeyData(secret *corev1.Secret, key string, secretName string, l logr.Logger) ([]byte, error) {
+	value, exists := secret.Data[key]
+	if !exists {
+		err := fmt.Errorf("key '%s' not found in secret '%s'", key, secretName)
+		l.Error(err, fmt.Sprintf("key '%s' not found in secret '%s'", key, secretName))
+		return nil, err
+	}
+	return value, nil
 }
