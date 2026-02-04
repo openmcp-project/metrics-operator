@@ -173,7 +173,10 @@ spec:
                   sink
                 properties:
                   endpoint:
-                    description: Endpoint specifies the target endpoint URL
+                    description: |-
+                      Endpoint specifies the target endpoint URL
+                      Currently supported protocols are "http", "https", "grcp", and "grpcs"
+                    pattern: ^(http|https|grcp|grpcs)://.*$
                     type: string
                 required:
                 - endpoint
