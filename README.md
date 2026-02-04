@@ -473,6 +473,15 @@ The Metrics Operator uses DataSink custom resources to define where and how metr
 ### Creating a DataSink
 
 Define a DataSink resource to specify the connection details and authentication for your metrics destination:
+DataSink currently supports HTTP(s) and gRPC(s) endpoints.
+The supported protocols are:
+
+* `http://` and `https://` for HTTP(S) endpoints
+* `grpc://` and `grpcs://` for gRPC(S) endpoints
+
+#### API Key Authentication
+
+DataSink supports API key authentication using Kubernetes Secrets. Below is an example of a DataSink configuration for sending metrics to Dynatrace:
 
 ```yaml
 apiVersion: metrics.openmcp.cloud/v1alpha1
@@ -490,6 +499,32 @@ spec:
         key: api-token
 ```
 
+#### mTLS Certificate Authentication
+
+DataSink also supports mTLS certificate authentication using Kubernetes Secrets. Below is an example of a DataSink configuration for sending metrics to a gRPC endpoint with mTLS:
+
+```yaml
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: DataSink
+metadata:
+  name: mtls-datasink
+  namespace: metrics-operator-system
+spec:
+  connection:
+    endpoint: "grpcs://your-secure-endpoint.com:443"
+  authentication:
+    certificate:
+      clientCertSecretKeyRef:
+        name: opensearch-tls-creds
+        key: client-cert
+      clientKeySecretKeyRef:
+        name: opensearch-tls-creds
+        key: client-key
+      caCertSecretKeyRef:
+        name: opensearch-tls-creds
+        key: ca-cert
+```
+
 ### DataSink Specification
 
 The `DataSinkSpec` contains the following fields:
@@ -502,6 +537,16 @@ The `DataSinkSpec` contains the following fields:
   - **secretKeyRef**: Reference to a Kubernetes Secret containing the API key
     - **name**: Name of the Secret
     - **key**: Key within the Secret containing the API token
+- **certificate**: mTLS certificate authentication configuration
+  - **clientCertSecretKeyRef**: Reference to a Kubernetes Secret containing the client certificate
+    - **name**: Name of the Secret
+    - **key**: Key within the Secret containing the client certificate
+  - **clientKeySecretKeyRef**: Reference to a Kubernetes Secret containing the client private key
+    - **name**: Name of the Secret
+    - **key**: Key within the Secret containing the client private key
+  - **caCertSecretKeyRef**: Reference to a Kubernetes Secret containing the CA certificate
+    - **name**: Name of the Secret
+    - **key**: Key within the Secret containing the CA certificate
 
 ### Using DataSink in Metrics
 

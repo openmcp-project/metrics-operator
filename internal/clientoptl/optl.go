@@ -109,6 +109,8 @@ func NewMetricClient(ctx context.Context, credentials *common.DataSinkCredential
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gRPC metrics client: %w", err)
 		}
+	} else {
+		return nil, fmt.Errorf("unsupported protocol scheme, got %s, want http|https|grpc|grpcs", parsedURL.Scheme)
 	}
 
 	// manual reader allows us to collect metrics and send them manually
