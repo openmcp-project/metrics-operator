@@ -206,8 +206,46 @@ type clusterData struct {
 	host     string
 }
 
+type getDiscoveryClientFunc func(restConfig *rest.Config) (discovery.DiscoveryInterface, error)
+
+func defaultGetDiscoveryClient(restConfig *rest.Config) (discovery.DiscoveryInterface, error) {
+	discoveryCli, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
+	}
+	return discoveryCli, nil
+}
+
+type getDynamicClientFunc func(restConfig *rest.Config) (dynamic.Interface, error)
+
+func defaultGetDynamicClient(restConfig *rest.Config) (dynamic.Interface, error) {
+	dynamicClient, errCli := dynamic.NewForConfig(restConfig)
+	if errCli != nil {
+		return nil, fmt.Errorf("could not create dynamic client: %w", errCli)
+	}
+	return dynamicClient, nil
+}
+
+type CreateExternalQueryConfigSetOptions struct {
+	GetDiscoveryClient getDiscoveryClientFunc
+	GetDynamicClient   getDynamicClientFunc
+}
+
 // CreateExternalQueryConfigSet creates a set of external query configs from a federated cluster access reference
-func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1alpha1.FederateClusterAccessRef, inClient client.Client, restConfig *rest.Config) ([]orchestrator.QueryConfig, error) {
+func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1alpha1.FederateClusterAccessRef, inClient client.Client, restConfig *rest.Config, opts CreateExternalQueryConfigSetOptions) ([]orchestrator.QueryConfig, error) {
+	// Apply default options
+	options := CreateExternalQueryConfigSetOptions{
+		GetDiscoveryClient: defaultGetDiscoveryClient,
+		GetDynamicClient:   defaultGetDynamicClient,
+	}
+
+	// Apply any provided options
+	if opts.GetDiscoveryClient != nil {
+		options.GetDiscoveryClient = opts.GetDiscoveryClient
+	}
+	if opts.GetDynamicClient != nil {
+		options.GetDynamicClient = opts.GetDynamicClient
+	}
 
 	rcaSetName := fcaRef.Name
 	rcaSetNamespace := fcaRef.Namespace
@@ -221,9 +259,15 @@ func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1alpha1.FederateC
 
 	kcPath := set.Spec.KubeConfigPath
 
-	var options = metav1.ListOptions{}
+	var listOptions = metav1.ListOptions{}
+	if set.Spec.LabelSelector != "" {
+		listOptions.LabelSelector = set.Spec.LabelSelector
+	}
+	if set.Spec.FieldSelector != "" {
+		listOptions.FieldSelector = set.Spec.FieldSelector
+	}
 
-	discoveryCli, err := discovery.NewDiscoveryClientForConfig(restConfig)
+	discoveryCli, err := options.GetDiscoveryClient(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery client: %w", err)
 	}
@@ -232,18 +276,82 @@ func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1alpha1.FederateC
 		return nil, err
 	}
 
-	dynamicClient, errCli := dynamic.NewForConfig(restConfig)
+	dynamicClient, errCli := options.GetDynamicClient(restConfig)
 	if errCli != nil {
 		return nil, fmt.Errorf("could not create dynamic client: %w", errCli)
 	}
 
-	list, err := dynamicClient.Resource(gvr).List(ctx, options)
+	var list *unstructured.UnstructuredList
+	if set.Spec.Namespace != "" {
+		list, err = dynamicClient.Resource(gvr).Namespace(set.Spec.Namespace).List(ctx, listOptions)
+	} else {
+		list, err = dynamicClient.Resource(gvr).List(ctx, listOptions)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", set.Spec.Target.GVK().String(), err)
 	}
 
-	return extractKubeConfigs(kcPath, list)
+	if set.Spec.SecretRefPath != "" {
+		// extract all secret refs from resources
+		kubeConfigSecretRefs, errRefs := extractSecretRefs(set.Spec.SecretRefPath, list)
+		if errRefs != nil {
+			return nil, fmt.Errorf("failed to extract kubeconfig secret refs: %w", errRefs)
+		}
 
+		// get all kubeconfigs from secret refs
+		queryConfigs := make([]orchestrator.QueryConfig, 0, len(kubeConfigSecretRefs))
+		for _, kcRef := range kubeConfigSecretRefs {
+			qc, errQC := queryConfigFromKubeConfig(ctx, &kcRef, inClient, externalScheme)
+			if errQC != nil {
+				return nil, fmt.Errorf("failed to create query config from kubeconfig secret ref: %w", errQC)
+			}
+			queryConfigs = append(queryConfigs, *qc)
+		}
+
+		return queryConfigs, nil
+	}
+
+	return extractKubeConfigs(kcPath, list)
+}
+
+func extractSecretRefs(kcPath string, list *unstructured.UnstructuredList) ([]v1alpha1.KubeConfigSecretRef, error) {
+	kubeConfigSecretRefs := make([]v1alpha1.KubeConfigSecretRef, 0, len(list.Items))
+
+	for _, obj := range list.Items {
+
+		fields := strings.Split(kcPath, ".")
+		unstructuredRef, found, err := unstructured.NestedFieldNoCopy(obj.Object, fields...)
+		if err != nil {
+			return nil, fmt.Errorf("error getting nested field: %w", err)
+		}
+		if !found {
+			return nil, fmt.Errorf("kubeconfig secret ref field not found in resource")
+		}
+
+		// Convert unstructuredRef to KubeConfigSecretRef
+		refBytes, errMarshal := json.Marshal(unstructuredRef)
+		if errMarshal != nil {
+			return nil, fmt.Errorf("failed to marshal unstructured secret ref: %w", errMarshal)
+		}
+
+		var kcRef v1alpha1.KubeConfigSecretRef
+		errUnmarshal := json.Unmarshal(refBytes, &kcRef)
+		if errUnmarshal != nil {
+			return nil, fmt.Errorf("failed to unmarshal to KubeConfigSecretRef: %w", errUnmarshal)
+		}
+
+		if kcRef.Key == "" {
+			kcRef.Key = defaultKubeconfigSecretKey
+		}
+
+		if kcRef.Namespace == "" {
+			kcRef.Namespace = obj.GetNamespace()
+		}
+
+		kubeConfigSecretRefs = append(kubeConfigSecretRefs, kcRef)
+	}
+
+	return kubeConfigSecretRefs, nil
 }
 
 func extractKubeConfigs(kcPath string, list *unstructured.UnstructuredList) ([]orchestrator.QueryConfig, error) {
@@ -275,7 +383,17 @@ func extractKubeConfigs(kcPath string, list *unstructured.UnstructuredList) ([]o
 			return nil, fmt.Errorf("failed to load Config object from kubeconfigData: %w", errKC)
 		}
 
-		clusterName, err := extractHostName(kubeconfig.Clusters[kubeconfig.CurrentContext].Server)
+		currentContext := kubeconfig.CurrentContext
+		if currentContext == "" {
+			return nil, fmt.Errorf("current context is empty in kubeconfig")
+		}
+
+		kubeContext, exists := kubeconfig.Contexts[currentContext]
+		if !exists {
+			return nil, fmt.Errorf("context %s not found in kubeconfig", currentContext)
+		}
+
+		clusterName, err := extractHostName(kubeconfig.Clusters[kubeContext.Cluster].Server)
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract hostname from kubeconfig: %w", err)
 		}
@@ -327,9 +445,15 @@ func getKubeconfigAsBytes(obj *unstructured.Unstructured, fields ...string) ([]b
 	if !found {
 		return nil, fmt.Errorf("kubeconfig field not found")
 	}
-	// if string
-	// return []byte(kubeconfig.(string)), nil
 
-	// if otherting
-	return json.Marshal(kubeconfig)
+	// check if kubeconfig is string or map
+	switch v := kubeconfig.(type) {
+	case string:
+		return []byte(v), nil
+	case map[string]any:
+		// marshal to json
+		return json.Marshal(v)
+	default:
+		return nil, fmt.Errorf("unsupported kubeconfig data type, got %T, want string or object", v)
+	}
 }

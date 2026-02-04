@@ -353,7 +353,10 @@ spec:
 
 ### Federated Cluster Access
 
-To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource:
+To monitor resources across multiple clusters, define a `FederatedClusterAccess` resource.
+The `target` field specifies the type of resource used to discover clusters.
+The `kubeConfigPath` field indicates where to find the kubeconfig for each cluster, relative to the discovered resource.
+The type of field that is selected with `kubeConfigPath` can be a string or object.
 
 ```yaml
 apiVersion: metrics.openmcp.cloud/v1alpha1
@@ -369,6 +372,54 @@ spec:
   kubeConfigPath: spec.target.kubeconfig
 ```
 
+Instead of `kubeConfigPath`, you can also use `kubeConfigSecretPath` to specify the path to a secret reference that contains the kubeconfig.
+The type of field that is selected with `kubeConfigSecretPath` must be an object of type `SecretReference` that contains the name and namespace of the secret as well as the name the key of the kubeconfig.
+If the `namespace` field is omitted, it defaults to the namespace of the discovered resource.
+If the `key` field is omitted, it defaults to `kubeconfig`.
+
+```yaml
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: FederatedClusterAccess
+metadata:
+  name: federate-ar-sample
+  namespace: default
+spec:
+  target:
+    kind: AccessRequest
+    group: clusters.openmcp.cloud
+    version: v1alpha1
+  secretRefPath: status.secretRef
+---
+apiVersion: clusters.openmcp.cloud/v1alpha1
+kind: AccessRequest
+metadata:
+  name: example-access-request
+  namespace: default
+spec: {}
+status:
+  secretRef:
+    name: example-access-request.kubeconfig
+```
+
+The targets in the `FederatedClusterAccess` resource can be further filtered using label selectors and field selectors as well as namespace scoping.
+Namespace scoping can only be applied if the target resource is namespaced.
+
+```yaml
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: FederatedClusterAccess
+metadata:
+    name: federate-ca-filtered
+    namespace: default
+spec:
+    target:
+      kind: ControlPlane
+      group: core.orchestrate.cloud.sap
+      version: v1beta1
+    namespace: co-system
+    labelSelector: "environment=production"
+    fieldSelector: "spec.region=us-west"
+    kubeConfigPath: spec.target.kubeconfig
+```
 
 ## RBAC Configuration
 

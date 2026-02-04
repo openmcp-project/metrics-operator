@@ -155,7 +155,7 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
 	*/
-	queryConfigs, err := config.CreateExternalQueryConfigSet(ctx, metric.Spec.FederatedClusterAccessRef, r.getClient(), r.getRestConfig())
+	queryConfigs, err := config.CreateExternalQueryConfigSet(ctx, metric.Spec.FederatedClusterAccessRef, r.getClient(), r.getRestConfig(), config.CreateExternalQueryConfigSetOptions{})
 	if err != nil {
 		metric.SetConditions(common.ReadyFalse("QueryConfigCreationFailed", err.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse

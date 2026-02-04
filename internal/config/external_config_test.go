@@ -7,8 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -131,24 +139,7 @@ func TestCreateExternalQueryConfig(t *testing.T) {
 				case *corev1.Secret:
 					*obj = corev1.Secret{
 						Data: map[string][]byte{
-							"kubeconfig": []byte(`
-apiVersion: v1
-clusters:
-- cluster:
-    server: https://example.com
-  name: test-cluster
-contexts:
-- context:
-    cluster: test-cluster
-    user: test-user
-  name: test-context
-current-context: test-context
-kind: Config
-users:
-- name: test-user
-  user:
-    token: test-token
-`),
+							"kubeconfig": []byte(createDummyKubeconfigAsString()),
 						},
 					}
 				}
@@ -180,5 +171,637 @@ users:
 				// Add more assertions based on your requirements
 			}
 		})
+	}
+}
+
+func TestCreateExternalQueryConfigSet(t *testing.T) {
+	// Example test structure for when proper mocking is available:
+	tests := []struct {
+		name                   string
+		fcaRef                 insight.FederateClusterAccessRef
+		mockGet                func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
+		fakeDynamicObjects     []runtime.Object
+		fakeDiscoveryResources []*metav1.APIResourceList
+		wantConfigCount        int
+		wantErr                bool
+		wantErrContains        string
+	}{
+		{
+			name: "Successfully create query config set without selectors and a string type target",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "ConfigMap",
+							},
+							KubeConfigPath: "data.kubeconfig",
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "configmaps",
+							Kind:       "ConfigMap",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			wantConfigCount: 1,
+			wantErr:         false,
+		},
+		{
+			name: "Successfully create query config set without selectors and a object type target",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "test",
+								Version: "v1",
+								Kind:    "DataObject",
+							},
+							KubeConfigPath: "data.kubeconfig",
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "test/v1",
+						"kind":       "DataObject",
+						"metadata": map[string]interface{}{
+							"name":      "test",
+							"namespace": "default",
+						},
+						"data": map[string]interface{}{
+							"kubeconfig": createDummyKubeconfigAsObject(),
+						},
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "test/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "dataobjects",
+							Kind:       "DataObject",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			wantConfigCount: 1,
+			wantErr:         false,
+		},
+		{
+			name: "Successfully create query config set without selectors and a secret reference type target (only name set)",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "test",
+								Version: "v1",
+								Kind:    "DataObject",
+							},
+							SecretRefPath: "data.kubeconfigRef",
+						},
+					}
+				case *corev1.Secret:
+					*obj = corev1.Secret{
+						Data: map[string][]byte{
+							"kubeconfig": []byte(createDummyKubeconfigAsString()),
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "test/v1",
+						"kind":       "DataObject",
+						"metadata": map[string]interface{}{
+							"name":      "test",
+							"namespace": "test-system",
+						},
+						"data": map[string]interface{}{
+							"kubeconfigRef": map[string]interface{}{
+								"name": "kube-secret",
+							},
+						},
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "test/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "dataobjects",
+							Kind:       "DataObject",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			wantConfigCount: 1,
+			wantErr:         false,
+		},
+		{
+			name: "Successfully create query config set without selectors and a secret reference type target (only name, namespace set)",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "test",
+								Version: "v1",
+								Kind:    "DataObject",
+							},
+							SecretRefPath: "data.kubeconfigRef",
+						},
+					}
+				case *corev1.Secret:
+					*obj = corev1.Secret{
+						Data: map[string][]byte{
+							"kubeconfig": []byte(createDummyKubeconfigAsString()),
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "test/v1",
+						"kind":       "DataObject",
+						"metadata": map[string]interface{}{
+							"name":      "test",
+							"namespace": "test-system",
+						},
+						"data": map[string]interface{}{
+							"kubeconfigRef": map[string]interface{}{
+								"name":      "kube-secret",
+								"namespace": "custom-namespace",
+							},
+						},
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "test/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "dataobjects",
+							Kind:       "DataObject",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			wantConfigCount: 1,
+			wantErr:         false,
+		},
+		{
+			name: "Successfully create query config set without selectors and a secret reference type target (all set)",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "test",
+								Version: "v1",
+								Kind:    "DataObject",
+							},
+							SecretRefPath: "data.kubeconfigRef",
+						},
+					}
+				case *corev1.Secret:
+					*obj = corev1.Secret{
+						Data: map[string][]byte{
+							"theKubeconfig": []byte(createDummyKubeconfigAsString()),
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "test/v1",
+						"kind":       "DataObject",
+						"metadata": map[string]interface{}{
+							"name":      "test",
+							"namespace": "test-system",
+						},
+						"data": map[string]interface{}{
+							"kubeconfigRef": map[string]interface{}{
+								"name":      "kube-secret",
+								"namespace": "custom-namespace",
+								"key":       "theKubeconfig",
+							},
+						},
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "test/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "dataobjects",
+							Kind:       "DataObject",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			wantConfigCount: 1,
+			wantErr:         false,
+		},
+		{
+			name: "Successfully create query config set with label selector",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "ConfigMap",
+							},
+							KubeConfigPath: "data.kubeconfig",
+							LabelSelector:  "env=testing",
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test1",
+						Namespace: "default",
+						Labels: map[string]string{
+							"env": "testing",
+						},
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test2",
+						Namespace: "default",
+						Labels: map[string]string{
+							"env": "testing",
+						},
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test3",
+						Namespace: "default",
+						Labels: map[string]string{
+							"env": "productive",
+						},
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "configmaps",
+							Kind:       "ConfigMap",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			wantConfigCount: 2,
+			wantErr:         false,
+		},
+		{
+			name: "Successfully create query config set with field selector (fake since field selectors are applied server-side)",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "ConfigMap",
+							},
+							KubeConfigPath: "data.kubeconfig",
+							FieldSelector:  "metadata.name=test1,metadata.name=test2",
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test1",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test2",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test3",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "configmaps",
+							Kind:       "ConfigMap",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			// Attention: In real Kubernetes client-go, field selectors are not applied client-side but server-side.
+			// This test assumes that the fake client applies them, which does not reflect real behavior.
+			// Therefore, all three objects are returned here.
+			// This test just executes the code path and does not validate field selector functionality.
+			wantConfigCount: 3,
+			wantErr:         false,
+		},
+		{
+			name: "Successfully create query config set with label selector and namespace",
+			fcaRef: insight.FederateClusterAccessRef{
+				Name:      "test-fca",
+				Namespace: "default",
+			},
+			mockGet: func(_ context.Context, _ client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				switch obj := obj.(type) {
+				case *insight.FederatedClusterAccess:
+					*obj = insight.FederatedClusterAccess{
+						Spec: insight.FederatedClusterAccessSpec{
+							Target: insight.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "ConfigMap",
+							},
+							KubeConfigPath: "data.kubeconfig",
+							LabelSelector:  "env=testing",
+							Namespace:      "special",
+						},
+					}
+				}
+				return nil
+			},
+			fakeDynamicObjects: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test1",
+						Namespace: "default",
+						Labels: map[string]string{
+							"env": "testing",
+						},
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test2",
+						Namespace: "special",
+						Labels: map[string]string{
+							"env": "testing",
+						},
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test3",
+						Namespace: "special",
+						Labels: map[string]string{
+							"env": "productive",
+						},
+					},
+					Data: map[string]string{
+						"kubeconfig": createDummyKubeconfigAsString(),
+					},
+				},
+			},
+			fakeDiscoveryResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "configmaps",
+							Kind:       "ConfigMap",
+							Namespaced: true,
+						},
+					},
+				},
+			},
+			wantConfigCount: 1,
+			wantErr:         false,
+		},
+	}
+
+	dummyRestConfig := &rest.Config{}
+	scheme := runtime.NewScheme()
+	err := corev1.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &MockClient{
+				GetFunc: tt.mockGet,
+			}
+
+			// Create a fake discovery client
+			fakeDiscovery := &discoveryfake.FakeDiscovery{
+				Fake: &clienttesting.Fake{},
+			}
+			fakeDiscovery.Resources = tt.fakeDiscoveryResources
+
+			// Create a scheme and register the types we'll be using
+			fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(scheme, tt.fakeDynamicObjects...)
+
+			// Create option functions to inject the fake clients
+			getFakeDiscoveryClientFunc := func(restConfig *rest.Config) (discovery.DiscoveryInterface, error) {
+				return fakeDiscovery, nil
+			}
+
+			getFakeDynamicClientFunc := func(restConfig *rest.Config) (dynamic.Interface, error) {
+				return fakeDynamicClient, nil
+			}
+
+			opts := CreateExternalQueryConfigSetOptions{
+				GetDynamicClient:   getFakeDynamicClientFunc,
+				GetDiscoveryClient: getFakeDiscoveryClientFunc,
+			}
+
+			// Use functional options pattern
+			got, err := CreateExternalQueryConfigSet(
+				context.Background(),
+				tt.fcaRef,
+				mockClient,
+				dummyRestConfig,
+				opts,
+			)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.wantErrContains != "" {
+					require.Contains(t, err.Error(), tt.wantErrContains)
+				}
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, got)
+				require.Equal(t, tt.wantConfigCount, len(got))
+			}
+		})
+	}
+}
+
+func createDummyKubeconfigAsString() string {
+	return `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://example.com
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+users:
+- name: test-user
+  user:
+    token: test-token
+`
+}
+
+func createDummyKubeconfigAsObject() map[string]interface{} {
+	return map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Config",
+		"clusters": []interface{}{
+			map[string]interface{}{
+				"cluster": map[string]interface{}{
+					"server": "https://example.com",
+				},
+				"name": "test-cluster",
+			},
+		},
+		"contexts": []interface{}{
+			map[string]interface{}{
+				"context": map[string]interface{}{
+					"cluster": "test-cluster",
+					"user":    "test-user",
+				},
+				"name": "test-context",
+			},
+		},
+		"current-context": "test-context",
+		"users": []interface{}{
+			map[string]interface{}{
+				"name": "test-user",
+				"user": map[string]interface{}{
+					"token": "test-token",
+				},
+			},
+		},
 	}
 }
