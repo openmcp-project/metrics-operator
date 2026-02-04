@@ -80,7 +80,94 @@ spec:
                     required:
                     - secretKeyRef
                     type: object
+                  certificate:
+                    description: Certificate specifies certificate-based authentication
+                      configuration use by mutual TLS
+                    properties:
+                      caCertSecretKeyRef:
+                        description: CACert references a key in a Kubernetes Secret
+                          containing the CA certificate (optional)
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      clientCertSecretKeyRef:
+                        description: ClientCert references a key in a Kubernetes Secret
+                          containing the client certificate
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      clientKeySecretKeyRef:
+                        description: ClientKey references a key in a Kubernetes Secret
+                          containing the client private key
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                    required:
+                    - clientCertSecretKeyRef
+                    - clientKeySecretKeyRef
+                    type: object
                 type: object
+                x-kubernetes-validations:
+                - message: must specify either apiKey or certificate, but not both
+                  rule: (has(self.apiKey) && !has(self.certificate)) || (!has(self.apiKey)
+                    && has(self.certificate))
               connection:
                 description: Connection specifies the connection details for the data
                   sink

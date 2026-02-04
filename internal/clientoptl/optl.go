@@ -2,6 +2,8 @@ package clientoptl
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/url"
 
@@ -11,6 +13,8 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	"github.com/openmcp-project/metrics-operator/internal/common"
 )
 
 // MetricClient represents a metric client
@@ -53,8 +57,7 @@ func (dp *DataPoint) SetValue(value int64) *DataPoint {
 }
 
 // NewMetricClient creates a new metric client
-func NewMetricClient(ctx context.Context, dtAPIHost, dtAPIToken string) (*MetricClient, error) {
-	authHeader := map[string]string{"Authorization": "Api-Token " + dtAPIToken}
+func NewMetricClient(ctx context.Context, credentials *common.DataSinkCredentials) (*MetricClient, error) {
 
 	deltaTemporalitySelector := func(sdkmetric.InstrumentKind) metricdata.Temporality {
 		return metricdata.DeltaTemporality
@@ -62,7 +65,7 @@ func NewMetricClient(ctx context.Context, dtAPIHost, dtAPIToken string) (*Metric
 
 	// Parse the dtAPIHost URL to extract host and path components
 	// dtAPIHost is the full endpoint from DataSink, e.g., "https://.../otlp/v1/metrics"
-	parsedURL, err := url.Parse(dtAPIHost)
+	parsedURL, err := url.Parse(credentials.Host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse endpoint URL: %w", err)
 	}
@@ -71,8 +74,24 @@ func NewMetricClient(ctx context.Context, dtAPIHost, dtAPIToken string) (*Metric
 	opts := []otlpmetrichttp.Option{
 		otlpmetrichttp.WithEndpoint(parsedURL.Host),
 		otlpmetrichttp.WithURLPath(parsedURL.Path), // Use the path directly from the DataSink endpoint
-		otlpmetrichttp.WithHeaders(authHeader),
 		otlpmetrichttp.WithTemporalitySelector(deltaTemporalitySelector),
+	}
+
+	if credentials.APIKey != nil {
+		authHeader := map[string]string{"Authorization": "Api-Token " + credentials.APIKey.Token}
+		opts = append(opts, otlpmetrichttp.WithHeaders(authHeader))
+	}
+
+	if credentials.Certificate != nil {
+		tlsConfig, err := createTLSConfig(
+			credentials.Certificate.ClientCert,
+			credentials.Certificate.ClientKey,
+			credentials.Certificate.CACert,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TLS config: %w", err)
+		}
+		opts = append(opts, otlpmetrichttp.WithTLSClientConfig(tlsConfig))
 	}
 
 	// Add insecure option if scheme is http
@@ -154,4 +173,27 @@ func (mc *MetricClient) ExportMetrics(ctx context.Context) error {
 // Close shuts down the metric client
 func (mc *MetricClient) Close(ctx context.Context) error {
 	return mc.metricsExporter.Shutdown(ctx)
+}
+
+func createTLSConfig(clientCert, clientKey, caCert []byte) (*tls.Config, error) {
+	// Load client certificate and key
+	cert, err := tls.X509KeyPair(clientCert, clientKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load client certificate: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	// Add CA certificate if provided
+	if len(caCert) > 0 {
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to append CA certificate")
+		}
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	return tlsConfig, nil
 }

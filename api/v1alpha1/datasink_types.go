@@ -33,11 +33,24 @@ type APIKeyAuthentication struct {
 	SecretKeyRef corev1.SecretKeySelector `json:"secretKeyRef"`
 }
 
+// CertificateAuthentication defines certificate-based authentication configuration use by mutual TLS
+type CertificateAuthentication struct {
+	// ClientCert references a key in a Kubernetes Secret containing the client certificate
+	ClientCert corev1.SecretKeySelector `json:"clientCertSecretKeyRef"`
+	// ClientKey references a key in a Kubernetes Secret containing the client private key
+	ClientKey corev1.SecretKeySelector `json:"clientKeySecretKeyRef"`
+	// CACert references a key in a Kubernetes Secret containing the CA certificate (optional)
+	CACert *corev1.SecretKeySelector `json:"caCertSecretKeyRef,omitempty"`
+}
+
 // Authentication defines authentication mechanisms for the DataSink
+// +kubebuilder:validation:XValidation:rule="(has(self.apiKey) && !has(self.certificate)) || (!has(self.apiKey) && has(self.certificate))",message="must specify either apiKey or certificate, but not both"
 type Authentication struct {
 	// APIKey specifies API key authentication configuration
 	// +optional
 	APIKey *APIKeyAuthentication `json:"apiKey,omitempty"`
+	// Certificate specifies certificate-based authentication configuration use by mutual TLS
+	Certificate *CertificateAuthentication `json:"certificate,omitempty"`
 }
 
 // DataSinkSpec defines the desired state of DataSink
