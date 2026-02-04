@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -49,7 +49,7 @@ func NewManagedMetricReconciler(mgr ctrl.Manager) *ManagedMetricReconciler {
 		inClient:     mgr.GetClient(),
 		inRestConfig: mgr.GetConfig(),
 		Scheme:       mgr.GetScheme(),
-		Recorder:     mgr.GetEventRecorderFor("managedmetrics-controller"),
+		Recorder:     mgr.GetEventRecorder("managedmetrics-controller"),
 	}
 }
 
@@ -82,7 +82,7 @@ type ManagedMetricReconciler struct {
 	inRestConfig *rest.Config
 	Scheme       *runtime.Scheme
 
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 // getDataSinkCredentials fetches DataSink configuration and credentials
@@ -196,7 +196,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errOrch, "unable to create managed metric orchestrator monitor")
-		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
+		r.Recorder.Eventf(&metric, nil, "Warning", "OrchestratorCreation", "ManagedMetricReconcile", "unable to create orchestrator")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
 	}
 
@@ -220,14 +220,14 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	switch result.Phase {
 	case v1alpha1.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
-		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Normal", "MetricAvailable", "ManagedMetricReconcile", result.Message)
 	case v1alpha1.PhaseFailed:
 		l.Error(result.Error, result.Message, "reason", result.Reason)
 		metric.SetConditions(common.Error(result.Message))
-		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Warning", "MetricFailed", "ManagedMetricReconcile", result.Message)
 	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
-		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Normal", "MetricPending", "ManagedMetricReconcile", result.Message)
 	}
 
 	// Set Ready condition based on export result

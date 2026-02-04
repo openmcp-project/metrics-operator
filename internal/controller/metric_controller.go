@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -51,7 +51,7 @@ func NewMetricReconciler(mgr ctrl.Manager) *MetricReconciler {
 		inCli:      mgr.GetClient(),
 		RestConfig: mgr.GetConfig(),
 		Scheme:     mgr.GetScheme(),
-		Recorder:   mgr.GetEventRecorderFor("Metric-controller"),
+		Recorder:   mgr.GetEventRecorder("Metric-controller"),
 	}
 }
 
@@ -62,7 +62,7 @@ type MetricReconciler struct {
 	inCli      client.Client
 	Scheme     *runtime.Scheme
 	RestConfig *rest.Config
-	Recorder   record.EventRecorder
+	Recorder   events.EventRecorder
 }
 
 // GetClient returns the client
@@ -199,7 +199,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errOrch, "unable to create metric orchestrator monitor")
-		r.Recorder.Event(&metric, "Warning", "OrchestratorCreation", "unable to create orchestrator")
+		r.Recorder.Eventf(&metric, nil, "Warning", "OrchestratorCreation", "ReconcileMetric", "unable to create orchestrator")
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
 	}
 
@@ -220,14 +220,14 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	switch result.Phase {
 	case v1alpha1.PhaseActive:
 		metric.SetConditions(common.Available(result.Message))
-		r.Recorder.Event(&metric, "Normal", "MetricAvailable", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Normal", "MetricAvailable", "ReconcileMetric", result.Message)
 	case v1alpha1.PhaseFailed:
 		l.Error(result.Error, result.Message, "reason", result.Reason)
 		metric.SetConditions(common.Error(result.Message))
-		r.Recorder.Event(&metric, "Warning", "MetricFailed", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Warning", "MetricFailed", "ReconcileMetric", result.Message)
 	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
-		r.Recorder.Event(&metric, "Normal", "MetricPending", result.Message)
+		r.Recorder.Eventf(&metric, nil, "Normal", "MetricPending", "ReconcileMetric", result.Message)
 	}
 
 	cObs := result.Observation.(*v1alpha1.MetricObservation)

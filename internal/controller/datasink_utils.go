@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
@@ -35,11 +35,11 @@ import (
 // DataSinkCredentialsRetriever provides common functionality for retrieving DataSink credentials
 type DataSinkCredentialsRetriever struct {
 	client   client.Client
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 // NewDataSinkCredentialsRetriever creates a new DataSinkCredentialsRetriever
-func NewDataSinkCredentialsRetriever(client client.Client, recorder record.EventRecorder) *DataSinkCredentialsRetriever {
+func NewDataSinkCredentialsRetriever(client client.Client, recorder events.EventRecorder) *DataSinkCredentialsRetriever {
 	return &DataSinkCredentialsRetriever{
 		client:   client,
 		recorder: recorder,
@@ -81,10 +81,10 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 	if err := d.client.Get(ctx, dataSinkKey, dataSink); err != nil {
 		if apierrors.IsNotFound(err) {
 			l.Error(err, fmt.Sprintf("DataSink '%s' not found in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
-			d.recorder.Event(eventObject, "Error", "DataSinkNotFound", fmt.Sprintf("DataSink '%s' not found in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
+			d.recorder.Eventf(eventObject, nil, "Error", "DataSinkNotFound", "GetDataSinkCredentials", fmt.Sprintf("DataSink '%s' not found in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
 		} else {
 			l.Error(err, fmt.Sprintf("unable to fetch DataSink '%s' in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
-			d.recorder.Event(eventObject, "Error", "DataSinkFetchError", fmt.Sprintf("unable to fetch DataSink '%s' in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
+			d.recorder.Eventf(eventObject, nil, "Error", "DataSinkFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch DataSink '%s' in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
 		}
 		return common.DataSinkCredentials{}, err
 	}
@@ -108,10 +108,10 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 		if err := d.client.Get(ctx, secretNamespacedName, secret); err != nil {
 			if apierrors.IsNotFound(err) {
 				l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretName, dataSinkLookupNamespace))
-				d.recorder.Event(eventObject, "Error", "SecretNotFound", fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretName, dataSinkLookupNamespace))
+				d.recorder.Eventf(eventObject, nil, "Error", "SecretNotFound", "GetDataSinkCredentials", fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretName, dataSinkLookupNamespace))
 			} else {
 				l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretName, dataSinkLookupNamespace))
-				d.recorder.Event(eventObject, "Error", "SecretFetchError", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretName, dataSinkLookupNamespace))
+				d.recorder.Eventf(eventObject, nil, "Error", "SecretFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretName, dataSinkLookupNamespace))
 			}
 			return common.DataSinkCredentials{}, err
 		}
@@ -121,7 +121,7 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 		if !exists {
 			err := fmt.Errorf("key '%s' not found in secret '%s'", secretKey, secretName)
 			l.Error(err, fmt.Sprintf("key '%s' not found in secret '%s'", secretKey, secretName))
-			d.recorder.Event(eventObject, "Error", "SecretKeyNotFound", fmt.Sprintf("key '%s' not found in secret '%s'", secretKey, secretName))
+			d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKey, secretName))
 			return common.DataSinkCredentials{}, err
 		}
 		token = string(tokenBytes)

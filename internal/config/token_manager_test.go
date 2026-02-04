@@ -56,6 +56,10 @@ func (f *fakeSubResourceClient) Patch(ctx context.Context, obj client.Object, pa
 	return nil
 }
 
+func (f *fakeSubResourceClient) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error {
+	return nil
+}
+
 func TestGetTokenManager(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)

@@ -78,17 +78,35 @@ func runInit(setupClient client.Client) {
 			os.Exit(1)
 		}
 
+		webhookTypes := []webhooks.APITypes{
+			{
+				Obj:       &metricsv1alpha1.Metric{},
+				Validator: true,
+				Defaulter: true,
+			},
+			{
+				Obj:       &metricsv1alpha1.ManagedMetric{},
+				Validator: true,
+				Defaulter: true,
+			},
+			{
+				Obj:       &metricsv1alpha1.RemoteClusterAccess{},
+				Validator: true,
+				Defaulter: false,
+			},
+			{
+				Obj:       &metricsv1alpha1.FederatedMetric{},
+				Validator: true,
+				Defaulter: true,
+			},
+		}
+
 		// Install webhooks
 		err := webhooks.Install(
 			initContext,
 			setupClient,
 			scheme,
-			[]client.Object{
-				&metricsv1alpha1.Metric{},
-				&metricsv1alpha1.ManagedMetric{},
-				&metricsv1alpha1.RemoteClusterAccess{},
-				&metricsv1alpha1.FederatedMetric{},
-			},
+			webhookTypes,
 			webhooksFlags.InstallOptions...,
 		)
 		if err != nil {
