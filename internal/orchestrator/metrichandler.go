@@ -177,7 +177,7 @@ func (h *MetricHandler) extractProjectionGroupsFrom(list *unstructured.Unstructu
 	// Group by the combination of all projected values
 	groups := make(map[string][][]projectedField)
 	for _, fields := range collection {
-		var keyParts []string
+		keyParts := make([]string, 0, len(fields))
 		for _, f := range fields {
 			keyParts = append(keyParts, fmt.Sprintf("%s: %s", f.name, f.value))
 		}
