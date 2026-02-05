@@ -50,7 +50,6 @@ func NewDataSinkCredentialsRetriever(client client.Client, recorder events.Event
 //
 //nolint:gocyclo
 func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Context, dataSinkRef *v1alpha1.DataSinkReference, eventObject client.Object, l logr.Logger) (common.DataSinkCredentials, error) {
-
 	// Determine the namespace where DataSinks are expected to be found.
 	dataSinkLookupNamespace := os.Getenv("OPERATOR_CONFIG_NAMESPACE")
 	if dataSinkLookupNamespace == "" {
