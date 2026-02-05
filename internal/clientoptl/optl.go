@@ -124,7 +124,7 @@ func (mc *MetricClient) NewMetric(name string) (*Metric, error) {
 func (mc *Metric) RecordMetrics(ctx context.Context, series ...*DataPoint) error {
 
 	for _, s := range series {
-		var attrs []attribute.KeyValue
+		attrs := make([]attribute.KeyValue, 0, len(s.Dimensions))
 		for k, v := range s.Dimensions {
 			attrs = append(attrs, attribute.String(k, v))
 		}
