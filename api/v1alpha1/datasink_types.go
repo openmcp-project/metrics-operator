@@ -42,6 +42,7 @@ type CertificateAuthentication struct {
 	// ClientKey references a key in a Kubernetes Secret containing the client private key
 	ClientKey corev1.SecretKeySelector `json:"clientKeySecretKeyRef"`
 	// CACert references a key in a Kubernetes Secret containing the CA certificate (optional)
+	// +optional
 	CACert *corev1.SecretKeySelector `json:"caCertSecretKeyRef,omitempty"`
 }
 
