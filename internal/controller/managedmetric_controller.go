@@ -163,7 +163,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.3 Create OTel metric client and gauge metric
 	*/
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, &credentials)
 	if errCli != nil {
 		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse

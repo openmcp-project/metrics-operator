@@ -24,6 +24,8 @@ import (
 // Connection defines the connection details for the DataSink
 type Connection struct {
 	// Endpoint specifies the target endpoint URL
+	// Currently supported protocols are "http", "https", "grcp", and "grpcs"
+	// +kubebuilder:validation:Pattern=`^(http|https|grcp|grpcs)://.*$`
 	Endpoint string `json:"endpoint"`
 }
 
@@ -33,11 +35,26 @@ type APIKeyAuthentication struct {
 	SecretKeyRef corev1.SecretKeySelector `json:"secretKeyRef"`
 }
 
+// CertificateAuthentication defines certificate-based authentication configuration use by mutual TLS
+type CertificateAuthentication struct {
+	// ClientCert references a key in a Kubernetes Secret containing the client certificate
+	ClientCert corev1.SecretKeySelector `json:"clientCertSecretKeyRef"`
+	// ClientKey references a key in a Kubernetes Secret containing the client private key
+	ClientKey corev1.SecretKeySelector `json:"clientKeySecretKeyRef"`
+	// CACert references a key in a Kubernetes Secret containing the CA certificate (optional)
+	// +optional
+	CACert *corev1.SecretKeySelector `json:"caCertSecretKeyRef,omitempty"`
+}
+
 // Authentication defines authentication mechanisms for the DataSink
+// +kubebuilder:validation:XValidation:rule="(has(self.apiKey) && !has(self.certificate)) || (!has(self.apiKey) && has(self.certificate))",message="must specify either apiKey or certificate, but not both"
 type Authentication struct {
 	// APIKey specifies API key authentication configuration
 	// +optional
 	APIKey *APIKeyAuthentication `json:"apiKey,omitempty"`
+	// Certificate specifies certificate-based authentication configuration use by mutual TLS
+	// +optional
+	Certificate *CertificateAuthentication `json:"certificate,omitempty"`
 }
 
 // DataSinkSpec defines the desired state of DataSink
