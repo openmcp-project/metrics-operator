@@ -53,6 +53,7 @@ type Authentication struct {
 	// +optional
 	APIKey *APIKeyAuthentication `json:"apiKey,omitempty"`
 	// Certificate specifies certificate-based authentication configuration use by mutual TLS
+	// +optional
 	Certificate *CertificateAuthentication `json:"certificate,omitempty"`
 }
 
