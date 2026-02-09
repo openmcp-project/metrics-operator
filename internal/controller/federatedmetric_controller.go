@@ -165,7 +165,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials.Host, credentials.Token)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, &credentials)
 
 	if errCli != nil {
 		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))

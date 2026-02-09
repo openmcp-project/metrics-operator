@@ -91,8 +91,15 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 
 	// Extract endpoint from DataSink
 	endpoint := dataSink.Spec.Connection.Endpoint
+	// Construct credentials compatible with clientoptl.NewMetricClient
+	// For now, we'll use the full endpoint as Host and empty Path
+	// TODO: Parse endpoint to separate host and path if needed based on protocol
+	credentials := common.DataSinkCredentials{
+		Host: endpoint, // Full endpoint URL (e.g., https://example.dynatrace.com)
+		Path: "",       // Base path for API (will be combined with /otlp/v1/metrics in clientoptl)
+	}
 
-	// Handle authentication
+	// Handle token authentication
 	var token string
 	if dataSink.Spec.Authentication != nil && dataSink.Spec.Authentication.APIKey != nil {
 		// Fetch credentials secret
@@ -105,39 +112,103 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 			Name:      secretName,
 		}
 
-		if err := d.client.Get(ctx, secretNamespacedName, secret); err != nil {
-			if apierrors.IsNotFound(err) {
-				l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretName, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretNotFound", "GetDataSinkCredentials", fmt.Sprintf("Secret '%s' not found in namespace '%s'", secretName, dataSinkLookupNamespace))
-			} else {
-				l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretName, dataSinkLookupNamespace))
-				d.recorder.Eventf(eventObject, nil, "Error", "SecretFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", secretName, dataSinkLookupNamespace))
-			}
+		if err := fetchSecret(ctx, d.client, secretNamespacedName, secret, l); err != nil {
 			return common.DataSinkCredentials{}, err
 		}
 
 		// Extract token from secret
-		tokenBytes, exists := secret.Data[secretKey]
-		if !exists {
-			err := fmt.Errorf("key '%s' not found in secret '%s'", secretKey, secretName)
-			l.Error(err, fmt.Sprintf("key '%s' not found in secret '%s'", secretKey, secretName))
+		tokenBytes, err := getSecretKeyData(secret, secretKey, secretName, l)
+		if err != nil {
 			d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKey, secretName))
 			return common.DataSinkCredentials{}, err
 		}
 		token = string(tokenBytes)
+
+		credentials.APIKey = &common.APIKeyAuth{
+			Token: token,
+		}
 	}
 
-	// Construct credentials compatible with clientoptl.NewMetricClient
-	// The NewMetricClient expects: dtAPIHost, dtAPIBasePath, dtAPIToken
-	// For now, we'll use the full endpoint as Host and empty Path
-	// TODO: Parse endpoint to separate host and path if needed based on protocol
-	credentials := common.DataSinkCredentials{
-		Host:  endpoint, // Full endpoint URL (e.g., https://example.dynatrace.com)
-		Path:  "",       // Base path for API (will be combined with /otlp/v1/metrics in clientoptl)
-		Token: token,
+	// Handle certificate-based authentication
+	if dataSink.Spec.Authentication != nil && dataSink.Spec.Authentication.Certificate != nil {
+		secretNameClientCert := dataSink.Spec.Authentication.Certificate.ClientCert.Name
+		secretKeyClientCert := dataSink.Spec.Authentication.Certificate.ClientCert.Key
+
+		secretNameClientKey := dataSink.Spec.Authentication.Certificate.ClientKey.Name
+		secretKeyClientKey := dataSink.Spec.Authentication.Certificate.ClientKey.Key
+
+		secret := &corev1.Secret{}
+		secretNamespacedName := types.NamespacedName{
+			Namespace: dataSinkLookupNamespace,
+			Name:      secretNameClientCert,
+		}
+
+		if err := fetchSecret(ctx, d.client, secretNamespacedName, secret, l); err != nil {
+			return common.DataSinkCredentials{}, err
+		}
+
+		clientCert, err := getSecretKeyData(secret, secretKeyClientCert, secretNameClientCert, l)
+		if err != nil {
+			d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKeyClientCert, secretNameClientCert))
+			return common.DataSinkCredentials{}, err
+		}
+
+		clientKey, err := getSecretKeyData(secret, secretKeyClientKey, secretNameClientKey, l)
+		if err != nil {
+			d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKeyClientKey, secretNameClientKey))
+			return common.DataSinkCredentials{}, err
+		}
+
+		credentials.Certificate = &common.CertificateAuth{
+			ClientCert: clientCert,
+			ClientKey:  clientKey,
+		}
+
+		secretNamespacedName.Name = secretNameClientKey
+		if err = fetchSecret(ctx, d.client, secretNamespacedName, secret, l); err != nil {
+			return common.DataSinkCredentials{}, err
+		}
+
+		if dataSink.Spec.Authentication.Certificate.CACert != nil {
+			secretNameCACert := dataSink.Spec.Authentication.Certificate.CACert.Name
+			secretKeyCACert := dataSink.Spec.Authentication.Certificate.CACert.Key
+
+			secretNamespacedName.Name = secretNameCACert
+			if err := d.client.Get(ctx, secretNamespacedName, secret); err != nil {
+				return common.DataSinkCredentials{}, err
+			}
+
+			credentials.Certificate.CACert, err = getSecretKeyData(secret, secretKeyCACert, secretNameCACert, l)
+			if err != nil {
+				d.recorder.Eventf(eventObject, nil, "Error", "SecretKeyNotFound", "GetDataSinkCredentials", fmt.Sprintf("key '%s' not found in secret '%s'", secretKeyCACert, secretNameCACert))
+				return common.DataSinkCredentials{}, err
+			}
+		}
 	}
 
 	l.Info(fmt.Sprintf("Using DataSink '%s' with endpoint '%s'", dataSinkName, endpoint))
 
 	return credentials, nil
+}
+
+func fetchSecret(ctx context.Context, c client.Client, namespacedName types.NamespacedName, secret *corev1.Secret, l logr.Logger) error {
+	if err := c.Get(ctx, namespacedName, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			l.Error(err, fmt.Sprintf("Secret '%s' not found in namespace '%s'", namespacedName.Name, namespacedName.Namespace))
+		} else {
+			l.Error(err, fmt.Sprintf("unable to fetch Secret '%s' in namespace '%s'", namespacedName.Name, namespacedName.Namespace))
+		}
+		return err
+	}
+	return nil
+}
+
+func getSecretKeyData(secret *corev1.Secret, key string, secretName string, l logr.Logger) ([]byte, error) {
+	value, exists := secret.Data[key]
+	if !exists {
+		err := fmt.Errorf("key '%s' not found in secret '%s'", key, secretName)
+		l.Error(err, fmt.Sprintf("key '%s' not found in secret '%s'", key, secretName))
+		return nil, err
+	}
+	return value, nil
 }
