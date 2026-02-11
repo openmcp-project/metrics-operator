@@ -129,7 +129,14 @@ rbac:
         verbs: [ "get", "list", "watch" ]
 
   role:
-    rules: []
+    rules:
+      - apiGroups:
+          - events.k8s.io
+        resources:
+          - events
+        verbs:
+          - create
+          - patch
 
 nodeSelector: {}
 
