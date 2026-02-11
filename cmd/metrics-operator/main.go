@@ -81,23 +81,23 @@ func runInit(setupClient client.Client) {
 		webhookTypes := []webhooks.APITypes{
 			{
 				Obj:       &metricsv1alpha1.Metric{},
-				Validator: true,
-				Defaulter: true,
+				Validator: false,
+				Defaulter: false,
 			},
 			{
 				Obj:       &metricsv1alpha1.ManagedMetric{},
-				Validator: true,
-				Defaulter: true,
+				Validator: false,
+				Defaulter: false,
 			},
 			{
 				Obj:       &metricsv1alpha1.RemoteClusterAccess{},
-				Validator: true,
+				Validator: false,
 				Defaulter: false,
 			},
 			{
 				Obj:       &metricsv1alpha1.FederatedMetric{},
-				Validator: true,
-				Defaulter: true,
+				Validator: false,
+				Defaulter: false,
 			},
 		}
 
