@@ -127,6 +127,13 @@ rbac:
       - apiGroups: [ "*" ]
         resources: [ "*" ]
         verbs: [ "get", "list", "watch" ]
+      - apiGroups:
+          - events.k8s.io
+        resources:
+          - events
+        verbs:
+          - create
+          - patch
 
   role:
     rules: []
