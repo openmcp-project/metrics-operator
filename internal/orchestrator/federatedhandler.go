@@ -72,29 +72,36 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		return MonitorResult{}, fmt.Errorf("could not retrieve target resource(s) %w", err)
 	}
 
-	groups := h.extractProjectionGroupsFrom(list)
+	groups := ExtractProjectionGroupsFrom(list, h.metric.Spec.Projections)
 
-	var dimensions []v1alpha1.Dimension
+	//var dimensions []v1alpha1.Dimension
+	dimensions := make(map[string]int)
 
-	for _, group := range groups {
+	for _, fieldGroups := range groups {
+		// Calculate count as the number of resource instances with this combination
+		count := len(fieldGroups)
+
 		dp := clientoptl.NewDataPoint().
 			AddDimension(CLUSTER, *h.clusterName).
 			AddDimension(RESOURCE, h.metric.Spec.Target.Kind).
 			AddDimension(GROUP, h.metric.Spec.Target.Group).
 			AddDimension(VERSION, h.metric.Spec.Target.Version).
-			SetValue(int64(len(group)))
+			SetValue(int64(count))
 
-		for _, pField := range group {
-			if pField.error == nil {
-
-				// empty values will be ignored and rejected by the opentelemetry collector, need to give it some value to avoid this
-				if pField.value == "" {
-					pField.value = "n/a"
+		if len(fieldGroups) > 0 {
+			for _, pField := range fieldGroups[0] {
+				if pField.Error == nil {
+					// empty values will be ignored and rejected by the opentelemetry collector, need to give it some Value to avoid this
+					value := pField.Value
+					if value == "" {
+						value = "n/a"
+					}
+					dp.AddDimension(pField.Name, value)
+					dimensions[pField.Name] = dimensions[pField.Name] + count
 				}
-				dp.AddDimension(pField.name, pField.value)
-				dimensions = append(dimensions, v1alpha1.Dimension{Name: pField.name, Value: pField.value})
 			}
 		}
+
 		err = h.gauge.RecordMetrics(ctx, dp)
 		if err != nil {
 			return MonitorResult{}, fmt.Errorf("could not record metric: %w", err)
@@ -108,7 +115,17 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.Spec.Target.GVK().String())
 
 	if dimensions != nil {
-		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1alpha1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(list.Items))}}}
+		observation := &v1alpha1.MetricObservation{
+			Timestamp:  metav1.Now(),
+			Dimensions: make([]v1alpha1.Dimension, 0, len(dimensions)),
+		}
+		for name, count := range dimensions {
+			observation.Dimensions = append(observation.Dimensions, v1alpha1.Dimension{
+				Name:  name,
+				Value: strconv.Itoa(count),
+			})
+		}
+		result.Observation = observation
 	} else {
 		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now()}
 	}
@@ -116,28 +133,46 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	return result, nil
 }
 
-func (h *FederatedHandler) extractProjectionGroupsFrom(list *unstructured.UnstructuredList) map[string][]projectedField {
+type projectionGroups map[string][][]projectedField
 
-	// note: for now we only allow one projection, so we can use the first one
-	// the reason for this is that if we have multiple projections, we need to create a cartesian product of all projections
-	// this is to be done at a later time
-
-	var collection []projectedField
+// extractProjectionGroupsFrom takes a list of unstructured objects and a list of projections,
+// It returns a map where the key is a unique combination of projected values and the value is a list of groups of projected fields that share that combination.
+func extractProjectionGroupsFrom(list *unstructured.UnstructuredList, projections []v1alpha1.Projection) projectionGroups {
+	collection := make([][]projectedField, 0, len(list.Items))
 
 	for _, obj := range list.Items {
-
-		projection := lo.FirstOr(h.metric.Spec.Projections, v1alpha1.Projection{})
-
-		if projection.Name != "" && projection.FieldPath != "" {
-			name := projection.Name
-			value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type), projection.Default)
-			collection = append(collection, projectedField{name: name, value: value, found: found, error: err})
+		var fields []projectedField
+		for _, projection := range projections {
+			if projection.Name != "" && projection.FieldPath != "" {
+				name := projection.Name
+				value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type))
+				fields = append(fields, projectedField{name: name, value: value, found: found, error: err})
+			}
+		}
+		if fields != nil {
+			collection = append(collection, fields)
 		}
 	}
 
-	// group by the extracted values for the dimension .e.g. device: iPhone, device: Android and count them later
-	groups := lo.GroupBy(collection, func(field projectedField) string {
-		return field.GetID()
+	// Group by the combination of all projected values (cartesian product)
+	groups := lo.GroupBy(collection, func(fields []projectedField) string {
+		keyParts := make([]string, 0, len(fields))
+		for _, f := range fields {
+			keyParts = append(keyParts, f.GetID())
+		}
+		return strings.Join(keyParts, ",")
+	})
+
+	return groups
+}
+
+	// Group by the combination of all projected values (cartesian product)
+	groups := lo.GroupBy(collection, func(fields []ProjectedField) string {
+		keyParts := make([]string, 0, len(fields))
+		for _, f := range fields {
+			keyParts = append(keyParts, f.GetID())
+		}
+		return strings.Join(keyParts, ",")
 	})
 
 	return groups
@@ -170,9 +205,9 @@ func (h *FederatedHandler) getResources(ctx context.Context) (*unstructured.Unst
 		return nil, false, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", gvr.String(), err)
 	}
 
-	// Group resources by name
+	// Group resources by namespace/Name
 	groupedResources := lo.GroupBy(list.Items, func(item unstructured.Unstructured) string {
-		return item.GetName()
+		return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
 	})
 
 	// Get the latest generation for each group
@@ -212,6 +247,6 @@ func isDNSLookupError(err error) bool {
 		return dnsError.IsNotFound
 	}
 
-	// Fallback to string matching if error type assertion fails
+	// Fallback to string matching if Error type assertion fails
 	return strings.Contains(err.Error(), "no such host")
 }

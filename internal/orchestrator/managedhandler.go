@@ -104,7 +104,7 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 			dataPoint.AddDimension(CLUSTER, *h.clusterName)
 		}
 
-		// Set the value to 1 for each resource
+		// Set the Value to 1 for each resource
 		dataPoint.SetValue(1)
 
 		// Record the metric
@@ -129,7 +129,7 @@ func (h *ManagedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		result.Error = err
 		result.Phase = v1alpha1.PhaseFailed
 		result.Reason = "SendMetricFailed"
-		result.Message = fmt.Sprintf("failed to send metric value to data sink. %s", err.Error())
+		result.Message = fmt.Sprintf("failed to send metric Value to data sink. %s", err.Error())
 	} else {
 		result.Phase = v1alpha1.PhaseActive
 		result.Observation = &v1alpha1.ManagedObservation{Timestamp: metav1.Now(), Resources: resources}
@@ -287,7 +287,7 @@ func (h *ManagedHandler) matchesGroupVersionKind(crd apiextensionsv1.CustomResou
 	for _, version := range crd.Spec.Versions {
 		crdVersions = append(crdVersions, version.Name)
 	}
-	// if the user specifies a target, we consider each GVK attribute and check if it matches the user value
+	// if the user specifies a target, we consider each GVK attribute and check if it matches the user Value
 	// if the user does not specify a single GVK part, that part is considered unconditional and always a match
 	if target.Version != "" && !slices.Contains(crdVersions, target.Version) {
 		return false
