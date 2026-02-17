@@ -138,7 +138,20 @@ func queryConfigFromKubeConfig(ctx context.Context, kcRef *v1alpha1.KubeConfigSe
 		return nil, fmt.Errorf("failed to load Config object from kubeconfigData: %w", errKC)
 	}
 
-	clusterName := kubeconfig.Contexts[kubeconfig.CurrentContext].Cluster
+	currentContext := kubeconfig.CurrentContext
+	if currentContext == "" {
+		return nil, fmt.Errorf("current context is empty in kubeconfig")
+	}
+
+	kubeContext, exists := kubeconfig.Contexts[currentContext]
+	if !exists {
+		return nil, fmt.Errorf("context %s not found in kubeconfig", currentContext)
+	}
+
+	clusterName, err := extractHostName(kubeconfig.Clusters[kubeContext.Cluster].Server)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract hostname from kubeconfig: %w", err)
+	}
 
 	// Create the client
 	externalClient, err := client.New(config, client.Options{Scheme: externalScheme})
@@ -422,19 +435,7 @@ func extractHostName(server string) (string, error) {
 	// Extract the hostname
 	hostname := parsedURL.Hostname()
 
-	// Remove the top-level domain if present
-	parts := strings.Split(hostname, ".")
-	if len(parts) > 1 && !isIP(hostname) {
-		hostname = strings.Join(parts[:len(parts)-1], ".")
-	}
-
 	return hostname, nil
-}
-
-func isIP(host string) bool {
-	return strings.Count(host, ".") == 3 && strings.IndexFunc(host, func(r rune) bool {
-		return r != '.' && (r < '0' || r > '9')
-	}) == -1
 }
 
 func getKubeconfigAsBytes(obj *unstructured.Unstructured, fields ...string) ([]byte, error) {
