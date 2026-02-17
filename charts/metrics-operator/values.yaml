@@ -108,12 +108,16 @@ rbac:
   clusterRole:
     rules:
       - apiGroups:
-          - metrics.openmcp.cloud
+        - metrics.openmcp.cloud
         resources:
-          - managedmetrics
           - metrics
           - metrics/status
+          - managedmetrics
           - managedmetrics/status
+          - federatedmetrics
+          - federatedmetrics/status
+          - federatedmanagedmetrics
+          - federatedmanagedmetrics/status
         verbs:
           - "*"
       - apiGroups:
@@ -124,10 +128,16 @@ rbac:
           - get
           - list
           - watch
+      - apiGroups:
+          - events.k8s.io
+        resources:
+          - events
+        verbs:
+          - create
+          - patch
       - apiGroups: [ "*" ]
         resources: [ "*" ]
         verbs: [ "get", "list", "watch" ]
-
   role:
     rules: []
 
