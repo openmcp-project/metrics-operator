@@ -42,7 +42,7 @@ func (h *MetricHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		result.Phase = v1alpha1.PhaseFailed
 		result.Reason = "GetResourcesFailed"
 		result.Message = fmt.Sprintf("failed to retrieve target resource(s): %s", errGet.Error())
-		return result, nil // Return Error state, but not the Error itself to controller
+		return result, nil // Return error state, but not the error itself to controller
 	}
 
 	if len(h.metric.Spec.Projections) == 0 {
@@ -62,20 +62,20 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 	}
 
 	if err := h.gaugeMetric.RecordMetrics(ctx, dataPoint); err != nil {
-		// TODO: we should really return the Error to the controller and handle it there.
+		// TODO: we should really return the error to the controller and handle it there.
 		return MonitorResult{
 			Observation: metricObservation,
 			Error:       err,
 			Phase:       v1alpha1.PhaseFailed,
 			Reason:      "RecordMetricFailed",
-			Message:     fmt.Sprintf("failed to record metric Value: %s", err.Error()),
-		}, nil // Return the result, Error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
+			Message:     fmt.Sprintf("failed to record metric value: %s", err.Error()),
+		}, nil // Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
 	}
 	return MonitorResult{
 		Observation: metricObservation,
 		Phase:       v1alpha1.PhaseActive,
 		Reason:      "MonitoringActive",
-		Message:     fmt.Sprintf("metric Value recorded for resource '%s'", h.metric.GvkToString()),
+		Message:     fmt.Sprintf("metric value recorded for resource '%s'", h.metric.GvkToString()),
 	}, nil
 }
 
@@ -90,17 +90,17 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 		groupCount := len(group)
 		dataPoint := clientoptl.NewDataPoint().SetValue(int64(groupCount))
 
-		// Add base dimensions only if they have a non-empty Value
+		// Add base dimensions only if they have a non-empty value
 		h.setDataPointBaseDimensions(dataPoint)
 
 		for _, inGroup := range group {
 			for _, pField := range inGroup {
-				// Add projected dimension only if the Value is non-empty and no Error occurred
+				// Add projected dimension only if the value is non-empty and no error occurred
 				if pField.Error == nil && pField.Value != "" {
 					dataPoint.AddDimension(pField.Name, pField.Value)
 				} else {
 					// Optionally log or handle projection errors
-					recordErrors = append(recordErrors, fmt.Errorf("projection Error for %s: %w", pField.Name, pField.Error))
+					recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.Name, pField.Error))
 				}
 			}
 
@@ -120,7 +120,7 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 			result.Error = combinedError
 			result.Phase = v1alpha1.PhaseFailed
 			result.Reason = "RecordMetricFailed"
-			result.Message = fmt.Sprintf("failed to record metric Value(s): %s", combinedError.Error())
+			result.Message = fmt.Sprintf("failed to record metric value(s): %s", combinedError.Error())
 		} else {
 			result.Phase = v1alpha1.PhaseActive
 			result.Reason = v1alpha1.ReasonMonitoringActive
@@ -128,7 +128,7 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 			// Observation might need adjustment depending on how results should be represented in status
 			result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(len(list.Items))} // Report total count for now
 		}
-		// Return the result, Error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
+		// Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
 	}
 	return result, nil
 }

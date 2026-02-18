@@ -73,8 +73,6 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	}
 
 	groups := ExtractProjectionGroupsFrom(list, h.metric.Spec.Projections)
-
-	//var dimensions []v1alpha1.Dimension
 	dimensions := make(map[string]int)
 
 	for _, fieldGroups := range groups {
@@ -114,7 +112,7 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	result.Reason = v1alpha1.ReasonMonitoringActive
 	result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.Spec.Target.GVK().String())
 
-	if dimensions != nil {
+	if len(dimensions) > 0 {
 		observation := &v1alpha1.MetricObservation{
 			Timestamp:  metav1.Now(),
 			Dimensions: make([]v1alpha1.Dimension, 0, len(dimensions)),

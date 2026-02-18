@@ -16,9 +16,9 @@ apiVersion: nop.crossplane.io/v1alpha1
 kind: NopResource
 metadata:
   annotations:
-    crossplane.io/external-Name: ext-example
+    crossplane.io/external-name: ext-example
     crossplane.io/external-create-succeeded: "2025-11-19T09:26:05Z"
-  Name: example
+  name: example
   labels:
     app: myapp
     env: prod
@@ -27,11 +27,11 @@ spec:
   deletionPolicy: Delete
   forProvider:
     tags:
-      - Name: tag1
-        Value: value1
+      - name: tag1
+        value: value1
     emptyList: []
     config:
-      nested: Value
+      nested: value
 status:
   conditions:
   - lastTransitionTime: "2025-09-12T15:57:41Z"
@@ -69,7 +69,7 @@ func runTests(t *testing.T, tests []struct {
 			value, ok, err := nestedFieldValue(obj, tt.path, tt.valueType, tt.defaultValue)
 
 			if (err != nil) != tt.wantError {
-				t.Errorf("unexpected Error: got %v, wantErr %v", err, tt.wantError)
+				t.Errorf("unexpected error: got %v, wantErr %v", err, tt.wantError)
 			}
 			if ok != tt.wantFound {
 				t.Errorf("unexpected ok result: got %v, want %v", ok, tt.wantFound)
@@ -78,24 +78,24 @@ func runTests(t *testing.T, tests []struct {
 			if tt.valueType == v1alpha1.TypeMap && value != "" && tt.wantValue != "" {
 				var gotObj, wantObj map[string]interface{}
 
-				// Parse the actual Value
+				// Parse the actual value
 				if err := json.Unmarshal([]byte(value), &gotObj); err != nil {
-					t.Fatalf("failed to parse got Value as JSON: %v", err)
+					t.Fatalf("failed to parse got value as JSON: %v", err)
 				}
 
-				// Parse the expected Value
+				// Parse the expected value
 				if err := json.Unmarshal([]byte(tt.wantValue), &wantObj); err != nil {
-					t.Fatalf("failed to parse want Value as JSON: %v", err)
+					t.Fatalf("failed to parse want value as JSON: %v", err)
 				}
 
 				// Compare the objects
 				if !reflect.DeepEqual(gotObj, wantObj) {
-					t.Errorf("unexpected Value:\ngot:  %v\nwant: %v", value, tt.wantValue)
+					t.Errorf("unexpected value:\ngot:  %v\nwant: %v", value, tt.wantValue)
 				}
 				return
 			} else {
 				if value != tt.wantValue {
-					t.Errorf("unexpected Value: got %v, want %v", value, tt.wantValue)
+					t.Errorf("unexpected value: got %v, want %v", value, tt.wantValue)
 				}
 			}
 		})
@@ -124,7 +124,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 		wantError    bool
 	}{
 		{
-			name:         "top level Value retrieval",
+			name:         "top level value retrieval",
 			resourceYaml: subaccountCR,
 			path:         "kind",
 			valueType:    v1alpha1.TypePrimitive,
@@ -134,7 +134,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "nested Value retrieval with Name selector",
+			name:         "nested value retrieval with name selector",
 			resourceYaml: subaccountCR,
 			path:         "spec.deletionPolicy",
 			valueType:    v1alpha1.TypePrimitive,
@@ -144,9 +144,9 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "nested Value retrieval with escaped Name selector",
+			name:         "nested value retrieval with escaped name selector",
 			resourceYaml: subaccountCR,
-			path:         "metadata.annotations.crossplane\\.io/external-Name",
+			path:         "metadata.annotations.crossplane\\.io/external-name",
 			valueType:    v1alpha1.TypePrimitive,
 			defaultValue: nil,
 			wantValue:    "ext-example",
@@ -154,7 +154,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "nested Value retrieval with index selector",
+			name:         "nested value retrieval with index selector",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[1].status",
 			valueType:    v1alpha1.TypePrimitive,
@@ -164,7 +164,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "nested Value retrieval with filter selector",
+			name:         "nested value retrieval with filter selector",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[?(@.type=='Ready')].status",
 			valueType:    v1alpha1.TypePrimitive,
@@ -174,7 +174,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "nested Value retrieval with array slice selector",
+			name:         "nested value retrieval with array slice selector",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:1].status",
 			valueType:    v1alpha1.TypePrimitive,
@@ -184,7 +184,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "nested Value retrieval with wildcard selector; collection results are not supported",
+			name:         "nested value retrieval with wildcard selector; collection results are not supported",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*].status",
 			valueType:    v1alpha1.TypePrimitive,
@@ -194,7 +194,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "non-existent Value",
+			name:         "non-existent value",
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels.nonexistent",
 			valueType:    v1alpha1.TypePrimitive,
@@ -204,7 +204,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "nested non-string Value retrieval with default print format",
+			name:         "nested non-string value retrieval with default print format",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0].observedGeneration",
 			valueType:    v1alpha1.TypePrimitive,
@@ -224,7 +224,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "invalid array index returns an Error",
+			name:         "invalid array index returns an error",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[abc].status",
 			valueType:    v1alpha1.TypePrimitive,
@@ -234,7 +234,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "invalid path syntax returns an Error",
+			name:         "invalid path syntax returns an error",
 			resourceYaml: subaccountCR,
 			path:         "$.[status.conditions[0].status]",
 			valueType:    v1alpha1.TypePrimitive,
@@ -244,7 +244,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "TypePrimitive handles boolean Value",
+			name:         "TypePrimitive handles boolean value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.boolValue",
 			valueType:    v1alpha1.TypePrimitive,
@@ -254,7 +254,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "TypePrimitive handles integer Value",
+			name:         "TypePrimitive handles integer value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.intValue",
 			valueType:    v1alpha1.TypePrimitive,
@@ -264,7 +264,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "TypePrimitive handles float Value",
+			name:         "TypePrimitive handles float value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.floatValue",
 			valueType:    v1alpha1.TypePrimitive,
@@ -274,7 +274,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "TypePrimitive on map field should Error",
+			name:         "TypePrimitive on map field should error",
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels",
 			valueType:    v1alpha1.TypePrimitive,
@@ -284,7 +284,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "TypePrimitive on array field should Error",
+			name:         "TypePrimitive on array field should error",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
 			valueType:    v1alpha1.TypePrimitive,
@@ -294,7 +294,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "TypePrimitive on null Value",
+			name:         "TypePrimitive on null value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
 			valueType:    v1alpha1.TypePrimitive,
@@ -304,7 +304,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "root path withv1alpha1.TypePrimitive should Error",
+			name:         "root path withv1alpha1.TypePrimitive should error",
 			resourceYaml: subaccountCR,
 			path:         ".",
 			valueType:    v1alpha1.TypePrimitive,
@@ -325,8 +325,8 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 		},
 		{
 			name:         "TypePrimitive on empty string field",
-			resourceYaml: `{"metadata":{"Name":""}}`,
-			path:         "metadata.Name",
+			resourceYaml: `{"metadata":{"name":""}}`,
+			path:         "metadata.name",
 			valueType:    v1alpha1.TypePrimitive,
 			defaultValue: nil,
 			wantValue:    "",
@@ -385,11 +385,15 @@ func TestNestedFieldValue_map(t *testing.T) {
 			path:         "spec.forProvider.config",
 			valueType:    v1alpha1.TypeMap,
 <<<<<<< HEAD
+<<<<<<< HEAD
 			wantValue:    `{"nested":"value"}`,
 			defaultValue: nil,
 =======
 			wantValue:    `{"nested":"Value"}`,
 >>>>>>> 57aa523 (feat: add support for multiple projections)
+=======
+			wantValue:    `{"nested":"value"}`,
+>>>>>>> e801e50 (update)
 			wantFound:    true,
 			wantError:    false,
 		},
@@ -419,16 +423,20 @@ func TestNestedFieldValue_map(t *testing.T) {
 			path:         ".",
 			valueType:    v1alpha1.TypeMap,
 <<<<<<< HEAD
+<<<<<<< HEAD
 			defaultValue: nil,
 			wantValue:    `{"apiVersion":"nop.crossplane.io/v1alpha1","kind":"NopResource","metadata":{"annotations":{"crossplane.io/external-name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"},"name":"example","labels":{"app":"myapp","env":"prod","team":"platform"}},"spec":{"deletionPolicy":"Delete","forProvider":{"tags":[{"name":"tag1","value":"value1"}],"emptyList":[],"config":{"nested":"value"}}},"status":{"conditions":[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"},{"lastTransitionTime":"2025-09-09T14:33:38Z","reason":"Available","status":"True","type":"Ready"}],"emptyConditions":[],"atProvider":{"id":"12345","nullValue":null,"boolValue":true,"intValue":42,"floatValue":3.14}}}`,
 =======
 			wantValue:    `{"apiVersion":"nop.crossplane.io/v1alpha1","kind":"NopResource","metadata":{"annotations":{"crossplane.io/external-Name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"},"Name":"example","labels":{"app":"myapp","env":"prod","team":"platform"}},"spec":{"deletionPolicy":"Delete","forProvider":{"tags":[{"Name":"tag1","Value":"value1"}],"emptyList":[],"config":{"nested":"Value"}}},"status":{"conditions":[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"},{"lastTransitionTime":"2025-09-09T14:33:38Z","reason":"Available","status":"True","type":"Ready"}],"emptyConditions":[],"atProvider":{"id":"12345","nullValue":null,"boolValue":true,"intValue":42,"floatValue":3.14}}}`,
 >>>>>>> 57aa523 (feat: add support for multiple projections)
+=======
+			wantValue:    `{"apiVersion":"nop.crossplane.io/v1alpha1","kind":"NopResource","metadata":{"annotations":{"crossplane.io/external-name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"},"name":"example","labels":{"app":"myapp","env":"prod","team":"platform"}},"spec":{"deletionPolicy":"Delete","forProvider":{"tags":[{"name":"tag1","value":"value1"}],"emptyList":[],"config":{"nested":"value"}}},"status":{"conditions":[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"},{"lastTransitionTime":"2025-09-09T14:33:38Z","reason":"Available","status":"True","type":"Ready"}],"emptyConditions":[],"atProvider":{"id":"12345","nullValue":null,"boolValue":true,"intValue":42,"floatValue":3.14}}}`,
+>>>>>>> e801e50 (update)
 			wantFound:    true,
 			wantError:    false,
 		},
 		{
-			name:         "TypeMap on primitive field should Error",
+			name:         "TypeMap on primitive field should error",
 			resourceYaml: subaccountCR,
 			path:         "kind",
 			valueType:    v1alpha1.TypeMap,
@@ -438,7 +446,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "TypeMap on array field should Error",
+			name:         "TypeMap on array field should error",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
 			valueType:    v1alpha1.TypeMap,
@@ -448,7 +456,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "TypeMap with wildcard should Error on multiple results",
+			name:         "TypeMap with wildcard should error on multiple results",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*]",
 			valueType:    v1alpha1.TypeMap,
@@ -458,7 +466,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "TypeMap with slice notation should Error on multiple results",
+			name:         "TypeMap with slice notation should error on multiple results",
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:2]",
 			valueType:    v1alpha1.TypeMap,
@@ -468,7 +476,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			wantError:    true,
 		},
 		{
-			name:         "TypeMap on null Value should Error",
+			name:         "TypeMap on null value should error",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
 			valueType:    v1alpha1.TypeMap,
@@ -492,12 +500,8 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "metadata.annotations",
 			valueType:    v1alpha1.TypeMap,
-<<<<<<< HEAD
 			defaultValue: nil,
 			wantValue:    `{"crossplane.io/external-name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"}`,
-=======
-			wantValue:    `{"crossplane.io/external-Name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"}`,
->>>>>>> 57aa523 (feat: add support for multiple projections)
 			wantFound:    true,
 			wantError:    false,
 		},
@@ -639,7 +643,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "root path withv1alpha1.TypeSlice should Error",
+			name:         "root path withv1alpha1.TypeSlice should error",
 			resourceYaml: subaccountCR,
 			path:         ".",
 			valueType:    v1alpha1.TypeSlice,
@@ -659,7 +663,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			wantError:    false,
 		},
 		{
-			name:         "TypeSlice wraps null Value",
+			name:         "TypeSlice wraps null value",
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
 			valueType:    v1alpha1.TypeSlice,

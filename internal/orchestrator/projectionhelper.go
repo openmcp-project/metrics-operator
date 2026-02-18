@@ -11,23 +11,23 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 )
 
-// nestedFieldValue extracts a Value from an unstructured Kubernetes object using JSONPath.
+// nestedFieldValue extracts a value from an unstructured Kubernetes object using JSONPath.
 //
 // Returns:
-//   - string: the extracted Value (JSON serialized for complex types)
-//   - bool: true if Value was Found, false if not Found
-//   - Error: any Error encountered during extraction or type validation
+//   - string: the extracted value (JSON serialized for complex types)
+//   - bool: true if value was found, false if not found
+//   - error: any error encountered during extraction or type validation
 //
 // The valueType parameter enforces type expectations:
 //   - TypePrimitive: only accepts primitive values (string, number, bool)
 //   - TypeSlice: indendet for slices/arrays, wraps single values in [].
 //   - TypeMap: only accepts a single map object
 
-// For primitive types, string conversion relies on the default format when printing the Value.
-// For complex types (maps and slices), the Value is serialized to JSON String.
+// For primitive types, string conversion relies on the default format when printing the value.
+// For complex types (maps and slices), the value is serialized to JSON String.
 //
 // Path format:
-//   - Use dot-notation without brackets or leading dot (e.g., "metadata.Name")
+//   - Use dot-notation without brackets or leading dot (e.g., "metadata.name")
 //   - Use "." to export the entire object as JSON (requires TypeMap)
 func nestedFieldValue(obj unstructured.Unstructured, path string, valueType v1alpha1.DimensionType, defaultValue *v1alpha1.ProjectionDefaultValue) (string, bool, error) {
 	if path == "." {
@@ -52,7 +52,7 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, valueType v1al
 		return "", false, fmt.Errorf("failed to find results: %v", err)
 	}
 
-	// Value not Found
+	// Value not found
 	if len(results) == 0 || len(results[0]) == 0 {
 		if defaultValue != nil {
 			defaultAsString, err := defaultValue.AsString(valueType)
@@ -64,9 +64,9 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, valueType v1al
 		return "", false, nil
 	}
 
-	// Validate single Value for non-slice types
+	// Validate single value for non-slice types
 	if valueType != v1alpha1.TypeSlice && (len(results) > 1 || len(results[0]) > 1) {
-		return "", true, fmt.Errorf("fieldPath matches more than one Value, which is not supported for type %s", valueType)
+		return "", true, fmt.Errorf("fieldPath matches more than one value, which is not supported for type %s", valueType)
 	}
 
 	// Handle each type

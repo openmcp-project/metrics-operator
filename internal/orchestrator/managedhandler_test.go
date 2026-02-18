@@ -307,9 +307,9 @@ func yamlNameGVK(t *testing.T, yaml string) string {
 
 func fakeResource(gvk schema.GroupVersionKind) string {
 	return fmt.Sprintf(`apiVersion: %v
-kind: %v
+kind: %v 
 metadata:
-  Name: %v
+  name: %v
 spec:
   deletionPolicy: Delete
 status:
@@ -351,7 +351,7 @@ func fakeCRDTemplate(gvk schema.GroupVersionKind, managed bool, served bool) str
 	return fmt.Sprintf(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  Name: %vs.%v
+  name: %vs.%v
 spec:
   group: %v
   names:
@@ -362,7 +362,7 @@ spec:
     singular: %v
   scope: Cluster
   versions:
-  - Name: %v
+  - name: %v
     served: %v
 `,
 		strings.ToLower(gvk.Kind),
