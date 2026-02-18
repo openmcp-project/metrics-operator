@@ -146,7 +146,7 @@ func TestCreateExternalQueryConfig(t *testing.T) {
 				return nil
 			},
 			want: &orc.QueryConfig{
-				ClusterName: ptr.To("test-cluster"),
+				ClusterName: ptr.To("example.com"),
 			},
 			wantErr: false,
 		},
