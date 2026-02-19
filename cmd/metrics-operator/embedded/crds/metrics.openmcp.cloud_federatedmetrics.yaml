@@ -79,6 +79,15 @@ spec:
                 items:
                   description: Projection defines the projection of the metric
                   properties:
+                    default:
+                      description: |-
+                        Default specifies a default value for the projection.
+                        The default value is used when the specified field is not found or is null in the observed object.
+                        The type is determined by the Type field.
+                        If Type is "primitive", Default should be a JSON-encoded string.
+                        If Type is "slice", Default should be a JSON-encoded array.
+                        If Type is "map", Default should be a JSON-encoded object.
+                      x-kubernetes-preserve-unknown-fields: true
                     fieldPath:
                       description: Define the path to the field that should be extracted
                       type: string

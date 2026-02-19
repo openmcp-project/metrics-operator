@@ -167,7 +167,7 @@ func (h *MetricHandler) extractProjectionGroupsFrom(list *unstructured.Unstructu
 		for _, projection := range h.metric.Spec.Projections {
 			if projection.Name != "" && projection.FieldPath != "" {
 				name := projection.Name
-				value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type))
+				value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type), projection.Default)
 				fields = append(fields, projectedField{name: name, value: value, found: found, error: err})
 			}
 		}

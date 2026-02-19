@@ -1,6 +1,9 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -45,6 +48,47 @@ type Projection struct {
 	// +optional
 	// +default="primitive"
 	Type string `json:"type,omitempty"`
+
+	// Default specifies a default value for the projection.
+	// The default value is used when the specified field is not found or is null in the observed object.
+	// The type is determined by the Type field.
+	// If Type is "primitive", Default should be a JSON-encoded string.
+	// If Type is "slice", Default should be a JSON-encoded array.
+	// If Type is "map", Default should be a JSON-encoded object.
+	// +optional
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Default *ProjectionDefaultValue `json:"default,omitempty"`
+}
+
+// ProjectionDefaultValue is a wrapper around json.RawMessage to allow flexible default values for projections.
+type ProjectionDefaultValue struct {
+	json.RawMessage
+}
+
+func NewProjectionDefaultValue(value interface{}) *ProjectionDefaultValue {
+	pdv := &ProjectionDefaultValue{}
+	jsonBytes, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	pdv.RawMessage = jsonBytes
+	return pdv
+}
+
+func (pdv *ProjectionDefaultValue) AsString(valueType DimensionType) (string, error) {
+	switch valueType {
+	case TypePrimitive:
+		var strValue string
+		if err := json.Unmarshal(pdv.RawMessage, &strValue); err != nil {
+			return "", err
+		}
+		return strValue, nil
+	case TypeSlice, TypeMap:
+		return string(pdv.RawMessage), nil
+	default:
+		return "", fmt.Errorf("unsupported dimension type: %s", valueType)
+	}
 }
 
 // Dimension defines the dimension of the metric
