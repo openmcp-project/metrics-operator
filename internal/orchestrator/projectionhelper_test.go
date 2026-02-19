@@ -58,6 +58,7 @@ func runTests(t *testing.T, tests []struct {
 	resourceYaml string
 	path         string
 	valueType    v1alpha1.DimensionType
+	defaultValue *v1alpha1.ProjectionDefaultValue
 	wantValue    string
 	wantFound    bool
 	wantError    bool
@@ -65,7 +66,7 @@ func runTests(t *testing.T, tests []struct {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obj := toUnstructured(t, tt.resourceYaml)
-			value, ok, err := nestedFieldValue(obj, tt.path, tt.valueType)
+			value, ok, err := nestedFieldValue(obj, tt.path, tt.valueType, tt.defaultValue)
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("unexpected error: got %v, wantErr %v", err, tt.wantError)
@@ -117,6 +118,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 		resourceYaml string
 		path         string
 		valueType    v1alpha1.DimensionType
+		defaultValue *v1alpha1.ProjectionDefaultValue
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -126,6 +128,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "kind",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "NopResource",
 			wantFound:    true,
 			wantError:    false,
@@ -135,6 +138,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "spec.deletionPolicy",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "Delete",
 			wantFound:    true,
 			wantError:    false,
@@ -144,6 +148,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "metadata.annotations.crossplane\\.io/external-name",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "ext-example",
 			wantFound:    true,
 			wantError:    false,
@@ -153,6 +158,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[1].status",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "True",
 			wantFound:    true,
 			wantError:    false,
@@ -162,6 +168,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[?(@.type=='Ready')].status",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "True",
 			wantFound:    true,
 			wantError:    false,
@@ -171,6 +178,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:1].status",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "True",
 			wantFound:    true,
 			wantError:    false,
@@ -180,6 +188,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*].status",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -189,6 +198,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels.nonexistent",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -198,6 +208,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0].observedGeneration",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "1",
 			wantFound:    true,
 			wantError:    false,
@@ -207,6 +218,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0]",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -216,6 +228,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[abc].status",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    true,
@@ -225,6 +238,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "$.[status.conditions[0].status]",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    true,
@@ -234,6 +248,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.boolValue",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "true",
 			wantFound:    true,
 			wantError:    false,
@@ -243,6 +258,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.intValue",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "42",
 			wantFound:    true,
 			wantError:    false,
@@ -252,6 +268,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.floatValue",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "3.14",
 			wantFound:    true,
 			wantError:    false,
@@ -261,6 +278,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -270,6 +288,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -279,6 +298,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "null",
 			wantFound:    true,
 			wantError:    false,
@@ -288,6 +308,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         ".",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -297,6 +318,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[?(@.type=='NonExistent')]",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -306,6 +328,7 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: `{"metadata":{"name":""}}`,
 			path:         "metadata.name",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    false,
@@ -315,8 +338,19 @@ func TestNestedFieldValue_primitive(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "spec.missing.deeply.nested.path",
 			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    false,
+			wantError:    false,
+		},
+		{
+			name:         "TypePrimitive with default value on non-existent field",
+			resourceYaml: subaccountCR,
+			path:         "metadata.nonexistent",
+			valueType:    v1alpha1.TypePrimitive,
+			defaultValue: v1alpha1.NewProjectionDefaultValue("default"),
+			wantValue:    "default",
+			wantFound:    true,
 			wantError:    false,
 		},
 	}
@@ -330,6 +364,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 		resourceYaml string
 		path         string
 		valueType    v1alpha1.DimensionType
+		defaultValue *v1alpha1.ProjectionDefaultValue
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -340,6 +375,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			path:         "metadata.labels",
 			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{"app":"myapp","env":"prod","team":"platform"}`,
+			defaultValue: nil,
 			wantFound:    true,
 			wantError:    false,
 		},
@@ -349,6 +385,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			path:         "spec.forProvider.config",
 			valueType:    v1alpha1.TypeMap,
 			wantValue:    `{"nested":"value"}`,
+			defaultValue: nil,
 			wantFound:    true,
 			wantError:    false,
 		},
@@ -357,6 +394,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: `{"metadata":{"labels":{}}}`,
 			path:         "metadata.labels",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    `{}`,
 			wantFound:    true,
 			wantError:    false,
@@ -366,6 +404,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    `{"id": "12345","nullValue": null,"boolValue": true,"intValue": 42,"floatValue": 3.14}`,
 			wantFound:    true,
 			wantError:    false,
@@ -375,6 +414,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         ".",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    `{"apiVersion":"nop.crossplane.io/v1alpha1","kind":"NopResource","metadata":{"annotations":{"crossplane.io/external-name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"},"name":"example","labels":{"app":"myapp","env":"prod","team":"platform"}},"spec":{"deletionPolicy":"Delete","forProvider":{"tags":[{"name":"tag1","value":"value1"}],"emptyList":[],"config":{"nested":"value"}}},"status":{"conditions":[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"},{"lastTransitionTime":"2025-09-09T14:33:38Z","reason":"Available","status":"True","type":"Ready"}],"emptyConditions":[],"atProvider":{"id":"12345","nullValue":null,"boolValue":true,"intValue":42,"floatValue":3.14}}}`,
 			wantFound:    true,
 			wantError:    false,
@@ -384,6 +424,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "kind",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -393,6 +434,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -402,6 +444,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*]",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -411,6 +454,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:2]",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -420,6 +464,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -429,6 +474,7 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "metadata.nonexistent",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -438,7 +484,18 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "metadata.annotations",
 			valueType:    v1alpha1.TypeMap,
+			defaultValue: nil,
 			wantValue:    `{"crossplane.io/external-name":"ext-example","crossplane.io/external-create-succeeded":"2025-11-19T09:26:05Z"}`,
+			wantFound:    true,
+			wantError:    false,
+		},
+		{
+			name:         "TypeMap with default value on non-existent field",
+			resourceYaml: subaccountCR,
+			path:         "metadata.nonexistent",
+			valueType:    v1alpha1.TypeMap,
+			defaultValue: v1alpha1.NewProjectionDefaultValue(map[string]string{"defaultKey": "defaultValue"}),
+			wantValue:    `{"defaultKey":"defaultValue"}`,
 			wantFound:    true,
 			wantError:    false,
 		},
@@ -454,6 +511,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 		resourceYaml string
 		path         string
 		valueType    v1alpha1.DimensionType
+		defaultValue *v1alpha1.ProjectionDefaultValue
 		wantValue    string
 		wantFound    bool
 		wantError    bool
@@ -463,6 +521,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"},{"lastTransitionTime":"2025-09-09T14:33:38Z","reason":"Available","status":"True","type":"Ready"}]`,
 			wantFound:    true,
 			wantError:    false,
@@ -472,6 +531,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.emptyConditions",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[]`,
 			wantFound:    true,
 			wantError:    false,
@@ -481,6 +541,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[?(@.type=='Ready')].status",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `["True"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -490,6 +551,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0]",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[{"lastTransitionTime":"2025-09-12T15:57:41Z","observedGeneration":1,"reason":"ReconcileSuccess","status":"True","type":"Synced"}]`,
 			wantFound:    true,
 			wantError:    false,
@@ -499,6 +561,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "kind",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `["NopResource"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -508,6 +571,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[0:2].type",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `["Synced","Ready"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -517,6 +581,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*].type",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `["Synced","Ready"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -526,6 +591,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.intValue",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[42]`,
 			wantFound:    true,
 			wantError:    false,
@@ -535,6 +601,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.boolValue",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[true]`,
 			wantFound:    true,
 			wantError:    false,
@@ -544,6 +611,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.floatValue",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[3.14]`,
 			wantFound:    true,
 			wantError:    false,
@@ -553,6 +621,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "metadata.labels",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[{"app":"myapp","env":"prod","team":"platform"}]`,
 			wantFound:    true,
 			wantError:    false,
@@ -562,6 +631,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         ".",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    true,
 			wantError:    true,
@@ -571,6 +641,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.nonexistent",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    "",
 			wantFound:    false,
 			wantError:    false,
@@ -580,6 +651,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.atProvider.nullValue",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `[null]`,
 			wantFound:    true,
 			wantError:    false,
@@ -589,6 +661,7 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "status.conditions[*].status",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `["True","True"]`,
 			wantFound:    true,
 			wantError:    false,
@@ -598,7 +671,18 @@ func TestNestedFieldValue_slice(t *testing.T) {
 			resourceYaml: `{"metadata":{"finalizers":["f1",12]}}`,
 			path:         "metadata.finalizers",
 			valueType:    v1alpha1.TypeSlice,
+			defaultValue: nil,
 			wantValue:    `["f1",12]`,
+			wantFound:    true,
+			wantError:    false,
+		},
+		{
+			name:         "TypeSlice with default value on non-existent field",
+			resourceYaml: subaccountCR,
+			path:         "metadata.nonexistent",
+			valueType:    v1alpha1.TypeSlice,
+			defaultValue: v1alpha1.NewProjectionDefaultValue([]string{"defaultValue1", "defaultValue2"}),
+			wantValue:    `["defaultValue1","defaultValue2"]`,
 			wantFound:    true,
 			wantError:    false,
 		},

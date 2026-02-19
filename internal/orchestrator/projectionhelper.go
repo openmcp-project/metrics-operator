@@ -55,7 +55,11 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, valueType v1al
 	// Value not found
 	if len(results) == 0 || len(results[0]) == 0 {
 		if defaultValue != nil {
-			return string(defaultValue.RawMessage), true, nil
+			defaultAsString, err := defaultValue.AsString(valueType)
+			if err != nil {
+				return "", false, fmt.Errorf("failed to parse default value: %v", err)
+			}
+			return defaultAsString, true, nil
 		}
 		return "", false, nil
 	}

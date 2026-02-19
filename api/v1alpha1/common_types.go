@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -64,6 +65,31 @@ type Projection struct {
 // ProjectionDefaultValue is a wrapper around json.RawMessage to allow flexible default values for projections.
 type ProjectionDefaultValue struct {
 	json.RawMessage
+}
+
+func NewProjectionDefaultValue(value interface{}) *ProjectionDefaultValue {
+	pdv := &ProjectionDefaultValue{}
+	jsonBytes, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	pdv.RawMessage = jsonBytes
+	return pdv
+}
+
+func (pdv *ProjectionDefaultValue) AsString(valueType DimensionType) (string, error) {
+	switch valueType {
+	case TypePrimitive:
+		var strValue string
+		if err := json.Unmarshal(pdv.RawMessage, &strValue); err != nil {
+			return "", err
+		}
+		return strValue, nil
+	case TypeSlice, TypeMap:
+		return string(pdv.RawMessage), nil
+	default:
+		return "", fmt.Errorf("unsupported dimension type: %s", valueType)
+	}
 }
 
 // Dimension defines the dimension of the metric

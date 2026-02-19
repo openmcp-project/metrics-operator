@@ -298,6 +298,35 @@ spec:
 ---
 ```
 
+### Default Values
+
+Projections are supporting default values. This means that if the field specified in the `fieldPath` is not present in the target resource, the projection will use the provided `defaultValue` instead. 
+This ensures that your metrics can still be generated even if some resources are missing certain fields.
+The type of the `defaultValue` must match the type of the field specified in the `fieldPath`.
+Attention, if `fieldType` is not specified, the default type is `primitive` and the `defaultValue` will be treated as a string. 
+This can lead to issues if the field specified in the `fieldPath` is of a different type (map or slice). Therefore, it is recommended to always specify the `fieldType` when using default values.
+
+```yaml
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: Metric
+metadata:
+  name: metric-condition-healthy
+spec:
+  name: metric-condition-healthy
+  description: Healthy Kustomizations
+  target:
+    kind: TypeWithConditions
+    group: example.group
+    version: v1
+  interval: "1m"
+  projections:
+    - name: pod-namespace
+      fieldPath: "status.conditions[?(@.type=='Healthy')].status"
+      fieldType: "primitive"
+      defaultValue: "unknown"
+---
+```
+
 ## Remote Cluster Access
 
 
