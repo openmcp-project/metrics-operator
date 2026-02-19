@@ -385,16 +385,8 @@ func TestNestedFieldValue_map(t *testing.T) {
 			resourceYaml: subaccountCR,
 			path:         "spec.forProvider.config",
 			valueType:    v1alpha1.TypeMap,
-<<<<<<< HEAD
-<<<<<<< HEAD
 			wantValue:    `{"nested":"value"}`,
 			defaultValue: nil,
-=======
-			wantValue:    `{"nested":"Value"}`,
->>>>>>> 57aa523 (feat: add support for multiple projections)
-=======
-			wantValue:    `{"nested":"value"}`,
->>>>>>> e801e50 (update)
 			wantFound:    true,
 			wantError:    false,
 		},

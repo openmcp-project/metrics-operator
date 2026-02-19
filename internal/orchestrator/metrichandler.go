@@ -155,8 +155,8 @@ type projectedField struct {
 	error error
 }
 
-func (e *ProjectedField) GetID() string {
-	return fmt.Sprintf("%s: %s", e.Name, e.Value)
+func (e *projectedField) GetID() string {
+	return fmt.Sprintf("%s: %s", e.name, e.value)
 }
 
 func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {
