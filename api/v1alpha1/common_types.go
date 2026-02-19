@@ -57,7 +57,6 @@ type Projection struct {
 	// If Type is "map", Default should be a JSON-encoded object.
 	// +optional
 	// +kubebuilder:validation:Schemaless
-	// +kubebuilder:validation:Type=object
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Default *ProjectionDefaultValue `json:"default,omitempty"`
 }

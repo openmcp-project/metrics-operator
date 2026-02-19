@@ -87,7 +87,6 @@ spec:
                         If Type is "primitive", Default should be a JSON-encoded string.
                         If Type is "slice", Default should be a JSON-encoded array.
                         If Type is "map", Default should be a JSON-encoded object.
-                      type: object
                       x-kubernetes-preserve-unknown-fields: true
                     fieldPath:
                       description: Define the path to the field that should be extracted

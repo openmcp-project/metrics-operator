@@ -300,9 +300,9 @@ spec:
 
 ### Default Values
 
-Projections are supporting default values. This means that if the field specified in the `fieldPath` is not present in the target resource, the projection will use the provided `defaultValue` instead. 
+Projections are supporting default values. This means that if the field specified in the `fieldPath` is not present in the target resource, the projection will use the provided `default` instead. 
 This ensures that your metrics can still be generated even if some resources are missing certain fields.
-The type of the `defaultValue` must match the type of the field specified in the `fieldPath`.
+The type of the `default` must match the type of the field specified in the `fieldPath`.
 Attention, if `fieldType` is not specified, the default type is `primitive` and the `defaultValue` will be treated as a string. 
 This can lead to issues if the field specified in the `fieldPath` is of a different type (map or slice). Therefore, it is recommended to always specify the `fieldType` when using default values.
 
@@ -323,7 +323,7 @@ spec:
     - name: pod-namespace
       fieldPath: "status.conditions[?(@.type=='Healthy')].status"
       fieldType: "primitive"
-      defaultValue: "unknown"
+      default: "unknown"
 ---
 ```
 
