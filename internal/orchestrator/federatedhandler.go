@@ -72,29 +72,34 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		return MonitorResult{}, fmt.Errorf("could not retrieve target resource(s) %w", err)
 	}
 
-	groups := h.extractProjectionGroupsFrom(list)
+	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
+	dimensions := make(map[string]int)
 
-	var dimensions []v1alpha1.Dimension
+	for _, fieldGroups := range groups {
+		// Calculate count as the number of resource instances with this combination
+		count := len(fieldGroups)
 
-	for _, group := range groups {
 		dp := clientoptl.NewDataPoint().
 			AddDimension(CLUSTER, *h.clusterName).
 			AddDimension(RESOURCE, h.metric.Spec.Target.Kind).
 			AddDimension(GROUP, h.metric.Spec.Target.Group).
 			AddDimension(VERSION, h.metric.Spec.Target.Version).
-			SetValue(int64(len(group)))
+			SetValue(int64(count))
 
-		for _, pField := range group {
-			if pField.error == nil {
-
-				// empty values will be ignored and rejected by the opentelemetry collector, need to give it some value to avoid this
-				if pField.value == "" {
-					pField.value = "n/a"
+		if len(fieldGroups) > 0 {
+			for _, pField := range fieldGroups[0] {
+				if pField.error == nil {
+					// empty values will be ignored and rejected by the opentelemetry collector, need to give it some Value to avoid this
+					value := pField.value
+					if value == "" {
+						value = "n/a"
+					}
+					dp.AddDimension(pField.name, value)
+					dimensions[pField.name] = dimensions[pField.name] + count
 				}
-				dp.AddDimension(pField.name, pField.value)
-				dimensions = append(dimensions, v1alpha1.Dimension{Name: pField.name, Value: pField.value})
 			}
 		}
+
 		err = h.gauge.RecordMetrics(ctx, dp)
 		if err != nil {
 			return MonitorResult{}, fmt.Errorf("could not record metric: %w", err)
@@ -107,40 +112,23 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	result.Reason = v1alpha1.ReasonMonitoringActive
 	result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.Spec.Target.GVK().String())
 
-	if dimensions != nil {
-		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1alpha1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(list.Items))}}}
+	if len(dimensions) > 0 {
+		observation := &v1alpha1.MetricObservation{
+			Timestamp:  metav1.Now(),
+			Dimensions: make([]v1alpha1.Dimension, 0, len(dimensions)),
+		}
+		for name, count := range dimensions {
+			observation.Dimensions = append(observation.Dimensions, v1alpha1.Dimension{
+				Name:  name,
+				Value: strconv.Itoa(count),
+			})
+		}
+		result.Observation = observation
 	} else {
 		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now()}
 	}
 
 	return result, nil
-}
-
-func (h *FederatedHandler) extractProjectionGroupsFrom(list *unstructured.UnstructuredList) map[string][]projectedField {
-
-	// note: for now we only allow one projection, so we can use the first one
-	// the reason for this is that if we have multiple projections, we need to create a cartesian product of all projections
-	// this is to be done at a later time
-
-	var collection []projectedField
-
-	for _, obj := range list.Items {
-
-		projection := lo.FirstOr(h.metric.Spec.Projections, v1alpha1.Projection{})
-
-		if projection.Name != "" && projection.FieldPath != "" {
-			name := projection.Name
-			value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type), projection.Default)
-			collection = append(collection, projectedField{name: name, value: value, found: found, error: err})
-		}
-	}
-
-	// group by the extracted values for the dimension .e.g. device: iPhone, device: Android and count them later
-	groups := lo.GroupBy(collection, func(field projectedField) string {
-		return field.GetID()
-	})
-
-	return groups
 }
 
 func (h *FederatedHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, bool, error) {
@@ -170,8 +158,11 @@ func (h *FederatedHandler) getResources(ctx context.Context) (*unstructured.Unst
 		return nil, false, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", gvr.String(), err)
 	}
 
-	// Group resources by name
+	// Group resources by namespace/Name
 	groupedResources := lo.GroupBy(list.Items, func(item unstructured.Unstructured) string {
+		if len(item.GetNamespace()) > 0 {
+			return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
+		}
 		return item.GetName()
 	})
 
@@ -212,6 +203,6 @@ func isDNSLookupError(err error) bool {
 		return dnsError.IsNotFound
 	}
 
-	// Fallback to string matching if error type assertion fails
+	// Fallback to string matching if Error type assertion fails
 	return strings.Contains(err.Error(), "no such host")
 }

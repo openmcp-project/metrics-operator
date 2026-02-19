@@ -80,7 +80,7 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 }
 
 func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructured.UnstructuredList) (MonitorResult, error) {
-	groups := h.extractProjectionGroupsFrom(list)
+	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
 	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
 	dataPoints := make([]*clientoptl.DataPoint, 0, len(groups))
@@ -157,35 +157,6 @@ type projectedField struct {
 
 func (e *projectedField) GetID() string {
 	return fmt.Sprintf("%s: %s", e.name, e.value)
-}
-
-func (h *MetricHandler) extractProjectionGroupsFrom(list *unstructured.UnstructuredList) map[string][][]projectedField {
-	collection := make([][]projectedField, 0, len(list.Items))
-
-	for _, obj := range list.Items {
-		var fields []projectedField
-		for _, projection := range h.metric.Spec.Projections {
-			if projection.Name != "" && projection.FieldPath != "" {
-				name := projection.Name
-				value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type), projection.Default)
-				fields = append(fields, projectedField{name: name, value: value, found: found, error: err})
-			}
-		}
-		collection = append(collection, fields)
-	}
-
-	// Group by the combination of all projected values
-	groups := make(map[string][][]projectedField)
-	for _, fields := range collection {
-		keyParts := make([]string, 0, len(fields))
-		for _, f := range fields {
-			keyParts = append(keyParts, fmt.Sprintf("%s: %s", f.name, f.value))
-		}
-		key := strings.Join(keyParts, ", ")
-		groups[key] = append(groups[key], fields)
-	}
-
-	return groups
 }
 
 func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {
