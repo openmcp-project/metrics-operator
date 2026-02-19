@@ -160,7 +160,10 @@ func (h *FederatedHandler) getResources(ctx context.Context) (*unstructured.Unst
 
 	// Group resources by namespace/Name
 	groupedResources := lo.GroupBy(list.Items, func(item unstructured.Unstructured) string {
-		return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
+		if len(item.GetNamespace()) > 0 {
+			return fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName())
+		}
+		return item.GetName()
 	})
 
 	// Get the latest generation for each group
