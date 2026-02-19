@@ -178,13 +178,13 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	defer func() {
 		if err := metricClient.Close(ctx); err != nil {
-			l.Error(err, "Failed to close metric client during metric reconciliation", "metric", metric.Name)
+			l.Error(err, "Failed to close metric client during metric reconciliation", "metric", metric.Spec.Name)
 		}
 	}() // Ensure exporter is shut down
 
 	metricClient.SetMeter("metric")
 
-	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
+	gaugeMetric, errGauge := metricClient.NewMetric(metric.Spec.Name)
 	if errGauge != nil {
 		metric.SetConditions(common.ReadyFalse("MetricCreationFailed", errGauge.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
