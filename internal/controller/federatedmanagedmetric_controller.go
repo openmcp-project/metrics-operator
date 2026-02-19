@@ -174,14 +174,14 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 
 	defer func() {
 		if err := metricClient.Close(ctx); err != nil {
-			l.Error(err, "Failed to close metric client during federated managed metric reconciliation", "metric", metric.Name)
+			l.Error(err, "Failed to close metric client during federated managed metric reconciliation", "metric", metric.Spec.Name)
 		}
 	}()
 
 	// should this be the group fo the gvr?
 	metricClient.SetMeter("managed")
 
-	gaugeMetric, errGauge := metricClient.NewMetric(metric.Name)
+	gaugeMetric, errGauge := metricClient.NewMetric(metric.Spec.Name)
 	if errGauge != nil {
 		metric.SetConditions(common.ReadyFalse("MetricCreationFailed", errGauge.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
