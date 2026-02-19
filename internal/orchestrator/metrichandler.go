@@ -80,7 +80,7 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 }
 
 func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructured.UnstructuredList) (MonitorResult, error) {
-	groups := h.extractProjectionGroupsFrom(list)
+	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
 	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
 	dataPoints := make([]*clientoptl.DataPoint, 0, len(groups))
@@ -96,11 +96,11 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 		for _, inGroup := range group {
 			for _, pField := range inGroup {
 				// Add projected dimension only if the value is non-empty and no error occurred
-				if pField.Error == nil && pField.Value != "" {
-					dataPoint.AddDimension(pField.Name, pField.Value)
+				if pField.error == nil && pField.value != "" {
+					dataPoint.AddDimension(pField.name, pField.value)
 				} else {
 					// Optionally log or handle projection errors
-					recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.Name, pField.Error))
+					recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.name, pField.error))
 				}
 			}
 
@@ -148,44 +148,15 @@ func (h *MetricHandler) setDataPointBaseDimensions(dataPoint *clientoptl.DataPoi
 	}
 }
 
-type ProjectedField struct {
-	Name  string
-	Value string
-	Found bool
-	Error error
+type projectedField struct {
+	name  string
+	value string
+	found bool
+	error error
 }
 
 func (e *ProjectedField) GetID() string {
 	return fmt.Sprintf("%s: %s", e.Name, e.Value)
-}
-
-func (h *MetricHandler) extractProjectionGroupsFrom(list *unstructured.UnstructuredList) map[string][][]ProjectedField {
-	collection := make([][]ProjectedField, 0, len(list.Items))
-
-	for _, obj := range list.Items {
-		var fields []ProjectedField
-		for _, projection := range h.metric.Spec.Projections {
-			if projection.Name != "" && projection.FieldPath != "" {
-				name := projection.Name
-				value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type), projection.Default)
-				fields = append(fields, projectedField{name: name, value: value, found: found, error: err})
-			}
-		}
-		collection = append(collection, fields)
-	}
-
-	// Group by the combination of all projected values
-	groups := make(map[string][][]ProjectedField)
-	for _, fields := range collection {
-		keyParts := make([]string, 0, len(fields))
-		for _, f := range fields {
-			keyParts = append(keyParts, fmt.Sprintf("%s: %s", f.Name, f.Value))
-		}
-		key := strings.Join(keyParts, ", ")
-		groups[key] = append(groups[key], fields)
-	}
-
-	return groups
 }
 
 func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {

@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 
@@ -139,4 +142,37 @@ func nestedFieldValue(obj unstructured.Unstructured, path string, valueType v1al
 	default:
 		return "", false, fmt.Errorf("unsupported type: %s", valueType)
 	}
+}
+
+type projectionGroups map[string][][]projectedField
+
+// extractProjectionGroupsFrom takes a list of unstructured objects and a list of projections,
+// It returns a map where the key is a unique combination of projected values and the value is a list of groups of projected fields that share that combination.
+func extractProjectionGroupsFrom(list *unstructured.UnstructuredList, projections []v1alpha1.Projection) projectionGroups {
+	collection := make([][]projectedField, 0, len(list.Items))
+
+	for _, obj := range list.Items {
+		var fields []projectedField
+		for _, projection := range projections {
+			if projection.Name != "" && projection.FieldPath != "" {
+				name := projection.Name
+				value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type))
+				fields = append(fields, projectedField{name: name, value: value, found: found, error: err})
+			}
+		}
+		if fields != nil {
+			collection = append(collection, fields)
+		}
+	}
+
+	// Group by the combination of all projected values (cartesian product)
+	groups := lo.GroupBy(collection, func(fields []projectedField) string {
+		keyParts := make([]string, 0, len(fields))
+		for _, f := range fields {
+			keyParts = append(keyParts, f.GetID())
+		}
+		return strings.Join(keyParts, ",")
+	})
+
+	return groups
 }

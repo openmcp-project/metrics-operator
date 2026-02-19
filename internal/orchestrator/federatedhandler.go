@@ -72,7 +72,7 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		return MonitorResult{}, fmt.Errorf("could not retrieve target resource(s) %w", err)
 	}
 
-	groups := ExtractProjectionGroupsFrom(list, h.metric.Spec.Projections)
+	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
 	dimensions := make(map[string]int)
 
 	for _, fieldGroups := range groups {
@@ -88,14 +88,14 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 		if len(fieldGroups) > 0 {
 			for _, pField := range fieldGroups[0] {
-				if pField.Error == nil {
+				if pField.error == nil {
 					// empty values will be ignored and rejected by the opentelemetry collector, need to give it some Value to avoid this
-					value := pField.Value
+					value := pField.value
 					if value == "" {
 						value = "n/a"
 					}
-					dp.AddDimension(pField.Name, value)
-					dimensions[pField.Name] = dimensions[pField.Name] + count
+					dp.AddDimension(pField.name, value)
+					dimensions[pField.name] = dimensions[pField.name] + count
 				}
 			}
 		}
@@ -129,51 +129,6 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	}
 
 	return result, nil
-}
-
-type projectionGroups map[string][][]projectedField
-
-// extractProjectionGroupsFrom takes a list of unstructured objects and a list of projections,
-// It returns a map where the key is a unique combination of projected values and the value is a list of groups of projected fields that share that combination.
-func extractProjectionGroupsFrom(list *unstructured.UnstructuredList, projections []v1alpha1.Projection) projectionGroups {
-	collection := make([][]projectedField, 0, len(list.Items))
-
-	for _, obj := range list.Items {
-		var fields []projectedField
-		for _, projection := range projections {
-			if projection.Name != "" && projection.FieldPath != "" {
-				name := projection.Name
-				value, found, err := nestedFieldValue(obj, projection.FieldPath, v1alpha1.DimensionType(projection.Type))
-				fields = append(fields, projectedField{name: name, value: value, found: found, error: err})
-			}
-		}
-		if fields != nil {
-			collection = append(collection, fields)
-		}
-	}
-
-	// Group by the combination of all projected values (cartesian product)
-	groups := lo.GroupBy(collection, func(fields []projectedField) string {
-		keyParts := make([]string, 0, len(fields))
-		for _, f := range fields {
-			keyParts = append(keyParts, f.GetID())
-		}
-		return strings.Join(keyParts, ",")
-	})
-
-	return groups
-}
-
-	// Group by the combination of all projected values (cartesian product)
-	groups := lo.GroupBy(collection, func(fields []ProjectedField) string {
-		keyParts := make([]string, 0, len(fields))
-		for _, f := range fields {
-			keyParts = append(keyParts, f.GetID())
-		}
-		return strings.Join(keyParts, ",")
-	})
-
-	return groups
 }
 
 func (h *FederatedHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, bool, error) {
