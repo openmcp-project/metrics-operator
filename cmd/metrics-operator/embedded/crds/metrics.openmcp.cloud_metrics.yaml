@@ -104,8 +104,14 @@ spec:
                       default: primitive
                       description: |-
                         Type specifies the type of the projections's value.
-                        It can be "primitive", "slice", or "map".
+                        It can be "primitive", "slice", "map", or "timestamp".
+                        Use "timestamp" for RFC3339 time fields — the value is converted to Unix seconds.
                         If not specified, it will default to "primitive".
+                      enum:
+                      - primitive
+                      - slice
+                      - map
+                      - timestamp
                       type: string
                   type: object
                 type: array
@@ -130,6 +136,43 @@ spec:
                     type: string
                   version:
                     description: Define version of the object you want to be instrumented
+                    type: string
+                type: object
+              valueFrom:
+                description: |-
+                  ValueFrom specifies a field whose value is used as the gauge metric value
+                  instead of the default resource count.
+                properties:
+                  aggregation:
+                    default: sum
+                    description: |-
+                      Aggregation specifies how values are combined when multiple objects share the same
+                      label dimensions. It can be "sum", "max", "min", or "mean". Defaults to "sum".
+                    enum:
+                    - sum
+                    - max
+                    - min
+                    - mean
+                    type: string
+                  default:
+                    description: |-
+                      Default specifies a fallback value used when the field specified by fieldPath is
+                      not found or null on a resource. Must be parseable according to Type:
+                      an integer string for "integer", or an RFC3339 timestamp for "timestamp".
+                    x-kubernetes-preserve-unknown-fields: true
+                  fieldPath:
+                    description: Define the path to the field that should be extracted
+                    type: string
+                  type:
+                    default: integer
+                    description: |-
+                      Type specifies the type of the field's value.
+                      Use "integer" for numeric fields — the value is used directly as the gauge value.
+                      Use "timestamp" for RFC3339 time fields — the value is converted to Unix seconds.
+                      If not specified, it will default to "integer".
+                    enum:
+                    - integer
+                    - timestamp
                     type: string
                 type: object
             required:

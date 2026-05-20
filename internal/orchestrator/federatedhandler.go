@@ -73,6 +73,7 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	}
 
 	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
+	valueByUID := resolveValueFrom(list, h.metric.Spec.ValueFrom)
 	dimensions := make(map[string]int)
 
 	for _, fieldGroups := range groups {
@@ -87,6 +88,16 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 			SetValue(int64(count))
 
 		if len(fieldGroups) > 0 {
+			// Use aggregated valueFrom across all objects in the group if available
+			uids := make([]string, 0, len(fieldGroups))
+			for _, inGroup := range fieldGroups {
+				if len(inGroup) > 0 {
+					uids = append(uids, inGroup[0].uid)
+				}
+			}
+			if v, ok := aggregateGroupValue(uids, valueByUID, h.metric.Spec.ValueFrom); ok {
+				dp.SetValue(v)
+			}
 			for _, pField := range fieldGroups[0] {
 				if pField.error == nil {
 					// empty values will be ignored and rejected by the opentelemetry collector, need to give it some Value to avoid this

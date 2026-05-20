@@ -83,6 +83,9 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
 	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
+	// Pre-resolve valueFrom per object UID
+	valueByUID := resolveValueFrom(list, h.metric.Spec.ValueFrom)
+
 	dataPoints := make([]*clientoptl.DataPoint, 0, len(groups))
 	var recordErrors []error
 
@@ -93,19 +96,28 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 		// Add base dimensions only if they have a non-empty value
 		h.setDataPointBaseDimensions(dataPoint)
 
-		for _, inGroup := range group {
-			for _, pField := range inGroup {
+		// Collect all UIDs in the group for aggregation, and use the first object's fields as dimensions
+		if len(group) > 0 {
+			uids := make([]string, 0, len(group))
+			for _, inGroup := range group {
+				if len(inGroup) > 0 {
+					uids = append(uids, inGroup[0].uid)
+				}
+			}
+			if v, ok := aggregateGroupValue(uids, valueByUID, h.metric.Spec.ValueFrom); ok {
+				dataPoint.SetValue(v)
+			}
+			for _, pField := range group[0] {
 				// Add projected dimension only if the value is non-empty and no error occurred
 				if pField.error == nil && pField.value != "" {
 					dataPoint.AddDimension(pField.name, pField.value)
 				} else {
-					// Optionally log or handle projection errors
 					recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.name, pField.error))
 				}
 			}
-
-			dataPoints = append(dataPoints, dataPoint)
 		}
+
+		dataPoints = append(dataPoints, dataPoint)
 
 		// Record all collected data points
 		errRecord := h.gaugeMetric.RecordMetrics(ctx, dataPoints...)
@@ -149,6 +161,7 @@ func (h *MetricHandler) setDataPointBaseDimensions(dataPoint *clientoptl.DataPoi
 }
 
 type projectedField struct {
+	uid   string
 	name  string
 	value string
 	found bool

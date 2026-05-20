@@ -26,6 +26,7 @@ The Metrics Operator is a powerful tool designed to monitor and provide insights
     - [Managed Metric](#managed-metric)
     - [Federated Metric](#federated-metric)
     - [Federated Managed Metric](#federated-managed-metric)
+    - [Setting the Gauge Value from a Field](#setting-the-gauge-value-from-a-field)
   - [Remote Cluster Access](#remote-cluster-access)
     - [Remote Cluster Access](#remote-cluster-access-1)
     - [Federated Cluster Access](#federated-cluster-access)
@@ -297,6 +298,35 @@ spec:
     namespace: default
 ---
 ```
+
+### Setting the Gauge Value from a Field
+
+By default the gauge value equals the number of resources sharing a given dimension combination. Use `valueFrom` to instead set the gauge value from a field in the resource itself — for example a creation timestamp or a replica count.
+
+```yaml
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: Metric
+metadata:
+  name: deployment-age
+spec:
+  name: deployment_age_seconds
+  target:
+    kind: Deployment
+    group: apps
+    version: v1
+  interval: "1m"
+  valueFrom:
+    fieldPath: "metadata.creationTimestamp"
+    type: timestamp       # "integer" or "timestamp" (RFC3339 → Unix seconds)
+    aggregation: max      # "sum" (default), "max", or "min"
+  projections:
+    - name: namespace
+      fieldPath: "metadata.namespace"
+    - name: name
+      fieldPath: "metadata.name"
+```
+
+See the [dimensions documentation](docs/dimensions-configuration.md#setting-the-gauge-value-from-a-resource-field-valuefrom) for full details and examples.
 
 ### Default Values
 
