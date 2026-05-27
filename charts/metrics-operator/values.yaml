@@ -8,7 +8,7 @@ image:
   repository: ghcr.io/openmcp-project/images/metrics-operator
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: v0.10.0
+  tag: v0.10.0@sha256:65d976ef4bc142d5ea5562b9f4c8f71f4f30d9b27b15c969f1fb479f95d30949
 
 imagePullSecrets: []
 nameOverride: ""
