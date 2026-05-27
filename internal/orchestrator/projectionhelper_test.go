@@ -705,7 +705,7 @@ func TestExtractProjectionGroupsFrom(t *testing.T) {
 				{
 					Name:      "namespace",
 					FieldPath: "metadata.namespace",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 			},
 			objects: []unstructured.Unstructured{
@@ -738,12 +738,12 @@ func TestExtractProjectionGroupsFrom(t *testing.T) {
 				{
 					Name:      "namespace",
 					FieldPath: "metadata.namespace",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 				{
 					Name:      "name",
 					FieldPath: "metadata.name",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 			},
 			objects: []unstructured.Unstructured{
@@ -805,12 +805,12 @@ func TestExtractProjectionGroupsFrom(t *testing.T) {
 				{
 					Name:      "namespace",
 					FieldPath: "metadata.namespace",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 				{
 					Name:      "label",
 					FieldPath: "metadata.labels.app",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 			},
 			objects: []unstructured.Unstructured{
@@ -876,12 +876,12 @@ func TestExtractProjectionGroupsFrom(t *testing.T) {
 				{
 					Name:      "namespace",
 					FieldPath: "metadata.namespace",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 				{
 					Name:      "label",
 					FieldPath: "metadata.labels.app",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 			},
 			objects: []unstructured.Unstructured{
@@ -946,7 +946,7 @@ func TestExtractProjectionGroupsFrom(t *testing.T) {
 				{
 					Name:      "invalid",
 					FieldPath: "metadata.nonexistent",
-					Type:      string(v1alpha1.TypePrimitive),
+					Type:      v1alpha1.TypePrimitive,
 				},
 			},
 			objects: []unstructured.Unstructured{
@@ -1004,4 +1004,288 @@ func TestExtractProjectionGroupsFrom(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNestedFieldValue_integer(t *testing.T) {
+	runTests(t, []struct {
+		name         string
+		resourceYaml string
+		path         string
+		valueType    v1alpha1.DimensionType
+		defaultValue *v1alpha1.ProjectionDefaultValue
+		wantValue    string
+		wantFound    bool
+		wantError    bool
+	}{
+		{
+			name:         "integer field",
+			resourceYaml: subaccountCR,
+			path:         "status.atProvider.intValue",
+			valueType:    v1alpha1.TypeInteger,
+			wantValue:    "42",
+			wantFound:    true,
+			wantError:    false,
+		},
+		{
+			name:         "float with no fractional part is accepted",
+			resourceYaml: `{"status":{"atProvider":{"val":100.0}}}`,
+			path:         "status.atProvider.val",
+			valueType:    v1alpha1.TypeInteger,
+			wantValue:    "100",
+			wantFound:    true,
+			wantError:    false,
+		},
+		{
+			name:         "float with fractional part returns error",
+			resourceYaml: subaccountCR,
+			path:         "status.atProvider.floatValue",
+			valueType:    v1alpha1.TypeInteger,
+			wantValue:    "",
+			wantFound:    true,
+			wantError:    true,
+		},
+		{
+			name:         "string field returns error",
+			resourceYaml: subaccountCR,
+			path:         "metadata.name",
+			valueType:    v1alpha1.TypeInteger,
+			wantValue:    "",
+			wantFound:    true,
+			wantError:    true,
+		},
+	})
+}
+
+func TestNestedFieldValue_timestamp(t *testing.T) {
+	runTests(t, []struct {
+		name         string
+		resourceYaml string
+		path         string
+		valueType    v1alpha1.DimensionType
+		defaultValue *v1alpha1.ProjectionDefaultValue
+		wantValue    string
+		wantFound    bool
+		wantError    bool
+	}{
+		{
+			name:         "valid RFC3339 timestamp",
+			resourceYaml: subaccountCR,
+			path:         "status.conditions[?(@.type=='Synced')].lastTransitionTime",
+			valueType:    v1alpha1.TypeTimestamp,
+			wantValue:    "1757692661",
+			wantFound:    true,
+			wantError:    false,
+		},
+		{
+			name:         "non-string field returns error",
+			resourceYaml: subaccountCR,
+			path:         "status.atProvider.intValue",
+			valueType:    v1alpha1.TypeTimestamp,
+			wantValue:    "",
+			wantFound:    true,
+			wantError:    true,
+		},
+		{
+			name:         "non-timestamp string returns error",
+			resourceYaml: subaccountCR,
+			path:         "metadata.name",
+			valueType:    v1alpha1.TypeTimestamp,
+			wantValue:    "",
+			wantFound:    true,
+			wantError:    true,
+		},
+	})
+}
+
+func TestParseProjectionValue(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantValue int64
+		wantError bool
+	}{
+		{
+			name:      "plain integer",
+			input:     "42",
+			wantValue: 42,
+		},
+		{
+			name:      "negative integer",
+			input:     "-1",
+			wantValue: -1,
+		},
+		{
+			name:      "RFC3339 timestamp",
+			input:     "2025-09-12T15:57:41Z",
+			wantValue: 1757692661,
+		},
+		{
+			name:      "invalid string",
+			input:     "not-a-number",
+			wantError: true,
+		},
+		{
+			name:      "empty string",
+			input:     "",
+			wantError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseProjectionValue(tt.input)
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.wantValue, got)
+			}
+		})
+	}
+}
+
+func TestAggregateGroupValue(t *testing.T) {
+	valueByUID := map[string]int64{
+		"uid-a": 10,
+		"uid-b": 30,
+		"uid-c": 20,
+	}
+
+	tests := []struct {
+		name      string
+		uids      []string
+		vf        *v1alpha1.ValueFromProjection
+		wantValue int64
+		wantOK    bool
+	}{
+		{
+			name:      "sum (default)",
+			uids:      []string{"uid-a", "uid-b", "uid-c"},
+			vf:        &v1alpha1.ValueFromProjection{Aggregation: ""},
+			wantValue: 60,
+			wantOK:    true,
+		},
+		{
+			name:      "explicit sum",
+			uids:      []string{"uid-a", "uid-b", "uid-c"},
+			vf:        &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationSum},
+			wantValue: 60,
+			wantOK:    true,
+		},
+		{
+			name:      "max",
+			uids:      []string{"uid-a", "uid-b", "uid-c"},
+			vf:        &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationMax},
+			wantValue: 30,
+			wantOK:    true,
+		},
+		{
+			name:      "min",
+			uids:      []string{"uid-a", "uid-b", "uid-c"},
+			vf:        &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationMin},
+			wantValue: 10,
+			wantOK:    true,
+		},
+		{
+			name:      "mean",
+			uids:      []string{"uid-a", "uid-b", "uid-c"}, // 10+30+20=60, 60/3=20
+			vf:        &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationMean},
+			wantValue: 20,
+			wantOK:    true,
+		},
+		{
+			name:      "mean floor division",
+			uids:      []string{"uid-a", "uid-b"}, // 10+30=40, 40/2=20
+			vf:        &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationMean},
+			wantValue: 20,
+			wantOK:    true,
+		},
+		{
+			name:      "single uid",
+			uids:      []string{"uid-b"},
+			vf:        &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationMax},
+			wantValue: 30,
+			wantOK:    true,
+		},
+		{
+			name:   "no matching uids",
+			uids:   []string{"uid-missing"},
+			vf:     &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationSum},
+			wantOK: false,
+		},
+		{
+			name:   "nil vf",
+			uids:   []string{"uid-a"},
+			vf:     nil,
+			wantOK: false,
+		},
+		{
+			name:   "empty uids",
+			uids:   []string{},
+			vf:     &v1alpha1.ValueFromProjection{Aggregation: v1alpha1.AggregationSum},
+			wantOK: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := aggregateGroupValue(tt.uids, valueByUID, tt.vf)
+			require.Equal(t, tt.wantOK, ok)
+			if tt.wantOK {
+				require.Equal(t, tt.wantValue, got)
+			}
+		})
+	}
+}
+
+func TestResolveValueFrom(t *testing.T) {
+	objYaml := `
+apiVersion: test/v1
+kind: TestResource
+metadata:
+  name: run-123
+  uid: "test-uid-abc"
+  creationTimestamp: "2025-09-12T15:57:41Z"
+`
+	var object map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(objYaml), &object))
+	obj := unstructured.Unstructured{Object: object}
+	list := &unstructured.UnstructuredList{Items: []unstructured.Unstructured{obj}}
+
+	vf := &v1alpha1.ValueFromProjection{
+		FieldPath: "metadata.creationTimestamp",
+		Type:      v1alpha1.ValueTypeTimestamp,
+	}
+
+	result := resolveValueFrom(list, vf)
+	require.Len(t, result, 1)
+	require.Equal(t, int64(1757692661), result["test-uid-abc"])
+}
+
+func TestResolveValueFrom_nil(t *testing.T) {
+	list := &unstructured.UnstructuredList{}
+	result := resolveValueFrom(list, nil)
+	require.Empty(t, result)
+}
+
+func TestResolveValueFrom_default(t *testing.T) {
+	var object map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(`
+apiVersion: test/v1
+kind: TestResource
+metadata:
+  name: run-no-ts
+  uid: "uid-no-ts"
+`), &object))
+	list := &unstructured.UnstructuredList{
+		Items: []unstructured.Unstructured{{Object: object}},
+	}
+
+	vf := &v1alpha1.ValueFromProjection{
+		FieldPath: "metadata.creationTimestamp",
+		Type:      v1alpha1.ValueTypeInteger,
+		Default:   v1alpha1.NewProjectionDefaultValue("99"),
+	}
+
+	result := resolveValueFrom(list, vf)
+	require.Len(t, result, 1)
+	require.Equal(t, int64(99), result["uid-no-ts"])
 }

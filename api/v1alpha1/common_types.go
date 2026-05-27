@@ -43,11 +43,13 @@ type Projection struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 
 	// Type specifies the type of the projections's value.
-	// It can be "primitive", "slice", or "map".
+	// It can be "primitive", "slice", "map", or "timestamp".
+	// Use "timestamp" for RFC3339 time fields — the value is converted to Unix seconds.
 	// If not specified, it will default to "primitive".
 	// +optional
 	// +default="primitive"
-	Type string `json:"type,omitempty"`
+	// +kubebuilder:validation:Enum=primitive;slice;map;timestamp
+	Type DimensionType `json:"type,omitempty"`
 
 	// Default specifies a default value for the projection.
 	// The default value is used when the specified field is not found or is null in the observed object.
@@ -55,6 +57,61 @@ type Projection struct {
 	// If Type is "primitive", Default should be a JSON-encoded string.
 	// If Type is "slice", Default should be a JSON-encoded array.
 	// If Type is "map", Default should be a JSON-encoded object.
+	// +optional
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Default *ProjectionDefaultValue `json:"default,omitempty"`
+}
+
+// ValueType represents the type of a gauge metric value extracted from a resource field.
+type ValueType string
+
+const (
+	// ValueTypeInteger interprets the field as an integer.
+	ValueTypeInteger ValueType = "integer"
+	// ValueTypeTimestamp interprets the field as an RFC3339 timestamp, converting it to Unix seconds.
+	ValueTypeTimestamp ValueType = "timestamp"
+)
+
+// AggregationType represents the aggregation function applied to valueFrom when multiple
+// objects share the same label dimensions.
+type AggregationType string
+
+const (
+	// AggregationSum sums all values in the group. This is the default.
+	AggregationSum AggregationType = "sum"
+	// AggregationMax takes the maximum value in the group.
+	AggregationMax AggregationType = "max"
+	// AggregationMin takes the minimum value in the group.
+	AggregationMin AggregationType = "min"
+	// AggregationMean takes the arithmetic mean (floor division) of all values in the group.
+	AggregationMean AggregationType = "mean"
+)
+
+// ValueFromProjection defines a field whose value is used as the gauge metric value.
+type ValueFromProjection struct {
+	// Define the path to the field that should be extracted
+	FieldPath string `json:"fieldPath,omitempty"`
+
+	// Type specifies the type of the field's value.
+	// Use "integer" for numeric fields — the value is used directly as the gauge value.
+	// Use "timestamp" for RFC3339 time fields — the value is converted to Unix seconds.
+	// If not specified, it will default to "integer".
+	// +optional
+	// +default="integer"
+	// +kubebuilder:validation:Enum=integer;timestamp
+	Type ValueType `json:"type,omitempty"`
+
+	// Aggregation specifies how values are combined when multiple objects share the same
+	// label dimensions. It can be "sum", "max", "min", or "mean". Defaults to "sum".
+	// +optional
+	// +default="sum"
+	// +kubebuilder:validation:Enum=sum;max;min;mean
+	Aggregation AggregationType `json:"aggregation,omitempty"`
+
+	// Default specifies a fallback value used when the field specified by fieldPath is
+	// not found or null on a resource. Must be parseable according to Type:
+	// an integer string for "integer", or an RFC3339 timestamp for "timestamp".
 	// +optional
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -78,7 +135,7 @@ func NewProjectionDefaultValue(value interface{}) *ProjectionDefaultValue {
 
 func (pdv *ProjectionDefaultValue) AsString(valueType DimensionType) (string, error) {
 	switch valueType {
-	case TypePrimitive:
+	case TypePrimitive, TypeTimestamp, TypeInteger:
 		var strValue string
 		if err := json.Unmarshal(pdv.RawMessage, &strValue); err != nil {
 			return "", err
@@ -104,6 +161,8 @@ const (
 	TypePrimitive DimensionType = "primitive"
 	TypeSlice     DimensionType = "slice"
 	TypeMap       DimensionType = "map"
+	TypeTimestamp DimensionType = "timestamp"
+	TypeInteger   DimensionType = "integer"
 )
 
 // MetricObservation represents the latest available observation of an object's state

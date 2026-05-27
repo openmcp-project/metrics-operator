@@ -74,6 +74,11 @@ type MetricSpec struct {
 	RemoteClusterAccessRef *RemoteClusterAccessRef `json:"remoteClusterAccessRef,omitempty"`
 
 	Projections []Projection `json:"projections,omitempty"`
+
+	// ValueFrom specifies a field whose value is used as the gauge metric value
+	// instead of the default resource count.
+	// +optional
+	ValueFrom *ValueFromProjection `json:"valueFrom,omitempty"`
 }
 
 // MetricStatus defines the observed state of ManagedMetric

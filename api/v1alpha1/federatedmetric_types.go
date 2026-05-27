@@ -40,6 +40,11 @@ type FederatedMetricSpec struct {
 
 	Projections []Projection `json:"projections,omitempty"`
 
+	// ValueFrom specifies a field whose value is used as the gauge metric value
+	// instead of the default resource count.
+	// +optional
+	ValueFrom *ValueFromProjection `json:"valueFrom,omitempty"`
+
 	// Define in what interval the query should be recorded
 	// +kubebuilder:default:="10m"
 	Interval metav1.Duration `json:"interval,omitempty"`

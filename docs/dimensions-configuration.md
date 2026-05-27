@@ -29,6 +29,7 @@ A Dimension is defined with the following fields:
     - `primitive` (Default): For single values like strings, numbers, or booleans.
     - `map`: For key-value objects like `metadata.labels`. The entire map is exported as a single JSON string.
     - `slice`: For arrays like `status.conditions`. The entire slice is exported as a single JSON string.
+    - `timestamp`: For RFC3339 time fields like `metadata.creationTimestamp`. The value is converted to Unix seconds and exported as a numeric string.
 
 If `type` is not specified, it defaults to `primitive`. To export a map or a slice, you **must** explicitly set `type` to `map` or `slice`, respectively.
 
@@ -129,6 +130,92 @@ dimensions:
 Exporting complex `map` and `slice` types is a powerful feature primarily intended for use with a downstream processing agent, such as an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/).
 
 These agents can receive the metric, parse the JSON string from the dimension, and perform advanced filtering, routing, modification, or aggregation before sending the data to the final data/monitoring backend. This approach allows you to keep metric definitions in the operator simple while handling complex logic externally. Without a downstream processor, a JSON string in a dimension has limited use within most monitoring platforms.
+
+## Setting the Gauge Value from a Resource Field (`valueFrom`)
+
+By default, the gauge value of a metric equals the number of resources that share a given combination of dimension values. For some use cases you need the gauge to carry a meaningful numeric value extracted directly from the resource — for example a creation timestamp, a replica count, or a numeric status field.
+
+Use the `valueFrom` field on the metric spec to specify a field whose value becomes the gauge value instead of the resource count.
+
+### `valueFrom` fields
+
+| Field | Required | Description |
+|---|---|---|
+| `fieldPath` | yes | JSONPath expression pointing to the field whose value should be used. |
+| `type` | no | How to interpret the field. `integer` (default) reads the value as a whole number. `timestamp` parses an RFC3339 string and converts it to Unix seconds. |
+| `aggregation` | no | How to combine values when multiple resources share the same dimension combination. `sum` (default), `max`, `min`, or `mean`. |
+| `default` | no | Fallback value used when the field specified by `fieldPath` is not found or null. Must be a JSON-encoded string matching the `type`: a quoted integer string for `integer` (e.g. `"0"`), or a quoted RFC3339 timestamp for `timestamp`. |
+
+### Example: creation timestamp as gauge value
+
+The following metric emits the Unix creation timestamp of each `Deployment` as the gauge value, with the namespace and name as dimensions:
+
+```yaml
+apiVersion: metrics.openmcp.cloud/v1alpha1
+kind: Metric
+metadata:
+  name: deployment-age
+spec:
+  name: deployment_age_seconds
+  target:
+    kind: Deployment
+    group: apps
+    version: v1
+  interval: "1m"
+  valueFrom:
+    fieldPath: "metadata.creationTimestamp"
+    type: timestamp
+  projections:
+    - name: namespace
+      fieldPath: "metadata.namespace"
+    - name: name
+      fieldPath: "metadata.name"
+```
+
+This allows a PromQL expression to select only the most recently created deployment per namespace:
+
+```promql
+deployment_age_seconds and on(namespace, name)
+  topk by(namespace) (1, max by(namespace, name) (deployment_age_seconds))
+```
+
+### Example: integer field with aggregation
+
+When resources are grouped by shared dimensions, `aggregation` controls how their values are combined. For example, to sum a numeric field across all resources in a group:
+
+```yaml
+valueFrom:
+  fieldPath: "status.readyReplicas"
+  type: integer
+  aggregation: sum
+```
+
+Or to track the most recent update across a group of resources:
+
+```yaml
+valueFrom:
+  fieldPath: "status.lastUpdateTime"
+  type: timestamp
+  aggregation: max
+```
+
+### Supported types
+
+| Type | Description |
+|---|---|
+| `integer` | Reads the field as a whole number. Accepts numeric fields and whole-number floats. Fractional floats are rejected. |
+| `timestamp` | Parses an RFC3339 string (e.g. `2025-09-12T15:57:41Z`) and returns Unix seconds as an integer. |
+
+### Supported aggregations
+
+| Aggregation | Description |
+|---|---|
+| `sum` | Sums all values in the group. Default when `aggregation` is omitted. |
+| `max` | Takes the maximum value in the group. |
+| `min` | Takes the minimum value in the group. |
+| `mean` | Takes the arithmetic mean (integer floor division) of all values in the group. |
+
+> **Note:** `valueFrom` is supported on `Metric` and `FederatedMetric` resource types.
 
 ## Warning: Be Mindful of Metric Cardinality
 
