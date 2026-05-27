@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Connection defines the connection details for the DataSink
@@ -95,5 +96,8 @@ type DataSinkList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&DataSink{}, &DataSinkList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &DataSink{}, &DataSinkList{})
+		return nil
+	})
 }
