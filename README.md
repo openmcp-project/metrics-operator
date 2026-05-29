@@ -682,7 +682,7 @@ For specific instructions on using your data sink's features, refer to its docum
 
 ## Support, Feedback, Contributing
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/openmcp-project/metrics-operator/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/openmcp-project/metrics-operator/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](https://github.com/openmcp-project/.github/blob/main/CONTRIBUTING.md).
 
 ## Security / Disclosure
 If you find any bug that may be a security problem, please follow our instructions at [in our security policy](https://github.com/openmcp-project/metrics-operator/security/policy) on how to report it. Please do not create GitHub issues for security-related doubts or problems.
