@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // ManagedMetricSpec defines the desired state of ManagedMetric
@@ -127,5 +128,8 @@ type ManagedMetricList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&ManagedMetric{}, &ManagedMetricList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &ManagedMetric{}, &ManagedMetricList{})
+		return nil
+	})
 }

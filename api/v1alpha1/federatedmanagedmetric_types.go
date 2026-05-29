@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // FederatedManagedMetricSpec defines the desired state of FederatedManagedMetric
@@ -92,5 +93,8 @@ type FederatedManagedMetricList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&FederatedManagedMetric{}, &FederatedManagedMetricList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &FederatedManagedMetric{}, &FederatedManagedMetricList{})
+		return nil
+	})
 }

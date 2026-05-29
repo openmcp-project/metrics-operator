@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RemoteClusterAccessRef is to be used by other types to reference a RemoteClusterAccess type
@@ -89,5 +90,8 @@ type RemoteClusterAccessList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&RemoteClusterAccess{}, &RemoteClusterAccessList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &RemoteClusterAccess{}, &RemoteClusterAccessList{})
+		return nil
+	})
 }

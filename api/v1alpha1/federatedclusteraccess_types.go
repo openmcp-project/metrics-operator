@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // FederateClusterAccessRef is a reference to a FederateCA
@@ -86,5 +87,8 @@ type FederatedClusterAccessList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&FederatedClusterAccess{}, &FederatedClusterAccessList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &FederatedClusterAccess{}, &FederatedClusterAccessList{})
+		return nil
+	})
 }
