@@ -105,6 +105,7 @@ webhooks:
     annotations: {}
 
 rbac:
+  create: true
   clusterRole:
     rules:
       - apiGroups:

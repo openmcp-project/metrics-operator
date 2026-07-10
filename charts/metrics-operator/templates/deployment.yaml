@@ -39,6 +39,9 @@ spec:
             - init
             {{- if .Values.crds.manage }}
             - "--install-crds"
+            {{- if .Values.webhooks.listen }}
+            - "--crd-conversion-without-ca"
+            {{- end }}
             {{- end }}
             {{- if .Values.webhooks.manage }}
             - "--install-webhooks"
