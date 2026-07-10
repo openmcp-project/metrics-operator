@@ -36,6 +36,7 @@ import (
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 	"github.com/openmcp-project/metrics-operator/internal/common"
 	"github.com/openmcp-project/metrics-operator/internal/config"
+	internalmetrics "github.com/openmcp-project/metrics-operator/internal/metrics"
 	"github.com/openmcp-project/metrics-operator/internal/orchestrator"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -86,7 +87,7 @@ type ManagedMetricReconciler struct {
 }
 
 // getDataSinkCredentials fetches DataSink configuration and credentials
-func (r *ManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, managedMetric *v1alpha1.ManagedMetric, l logr.Logger) (common.DataSinkCredentials, error) {
+func (r *ManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, managedMetric *v1alpha1.ManagedMetric, l logr.Logger) (common.DataSinkCredentials, bool, error) {
 	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
 	return retriever.GetDataSinkCredentials(ctx, managedMetric.Spec.DataSinkRef, managedMetric, l)
 }
@@ -143,11 +144,14 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.1 Get DataSink configuration and credentials
 	*/
-	credentials, err := r.getDataSinkCredentials(ctx, &metric, l)
+	credentials, dataSinkNotFound, err := r.getDataSinkCredentials(ctx, &metric, l)
 	if err != nil {
 		metric.SetConditions(common.ReadyFalse("DataSinkUnavailable", err.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	}
+	if dataSinkNotFound {
+		l.Info("DataSink not found; metrics will only be available via /metrics endpoint", "metric", metric.Spec.Name)
 	}
 
 	/*
@@ -163,12 +167,18 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		1.3 Create OTel metric client and gauge metric
 	*/
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, &credentials)
-	if errCli != nil {
-		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
-		metric.Status.Ready = v1alpha1.StatusStringFalse
-		l.Error(errCli, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+	var metricClient *clientoptl.MetricClient
+	if dataSinkNotFound {
+		metricClient = clientoptl.NewNoOpMetricClient()
+	} else {
+		var errCli error
+		metricClient, errCli = clientoptl.NewMetricClient(ctx, &credentials)
+		if errCli != nil {
+			metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
+			l.Error(errCli, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+			return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+		}
 	}
 
 	defer func() {
@@ -187,6 +197,11 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		l.Error(errGauge, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
+	metricName := metric.Spec.Name
+	metricNamespace := metric.Namespace
+	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) {
+		internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
+	})
 
 	/*
 		2. Create a new orchestrator

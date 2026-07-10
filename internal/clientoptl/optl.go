@@ -39,6 +39,29 @@ type MetricsExporter interface {
 	Shutdown(ctx context.Context) error
 }
 
+// noOpExporter is a MetricsExporter that discards all data.
+type noOpExporter struct{}
+
+func (n *noOpExporter) Export(_ context.Context, _ *metricdata.ResourceMetrics) error { return nil }
+func (n *noOpExporter) Shutdown(_ context.Context) error                               { return nil }
+
+// NewNoOpMetricClient creates a MetricClient that does not export to OTLP.
+// Use this when no DataSink is available but Prometheus recording is still desired.
+func NewNoOpMetricClient() *MetricClient {
+	manualReader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(manualReader),
+	)
+	otel.SetMeterProvider(mp)
+	return &MetricClient{
+		manualReader:    manualReader,
+		metricsExporter: &noOpExporter{},
+	}
+}
+
+// PrometheusRecordFunc is called for each DataPoint alongside OTel recording.
+type PrometheusRecordFunc func(dims map[string]string, value int64)
+
 func isHTTPProtocol(scheme string) bool {
 	return scheme == protocolOTLPHTTPInsecure || scheme == protocolOTLPHTTPSecure
 }
@@ -55,7 +78,13 @@ func isSecureProtocol(scheme string) bool {
 type Metric struct {
 	// default to gauge for now, as count requires the client to keep track of values (total)
 	// we just want to send the current value/state always, hence gauge metric
-	gauge metric.Int64Gauge
+	gauge          metric.Int64Gauge
+	prometheusFunc PrometheusRecordFunc
+}
+
+// SetPrometheusFunc sets a callback that is invoked for each recorded DataPoint.
+func (mc *Metric) SetPrometheusFunc(fn PrometheusRecordFunc) {
+	mc.prometheusFunc = fn
 }
 
 // DataPoint represents a single data point
@@ -234,6 +263,10 @@ func (mc *Metric) RecordMetrics(ctx context.Context, series ...*DataPoint) error
 		}
 
 		mc.gauge.Record(ctx, s.Value, metric.WithAttributes(attrs...))
+
+		if mc.prometheusFunc != nil {
+			mc.prometheusFunc(s.Dimensions, s.Value)
+		}
 	}
 
 	return nil
