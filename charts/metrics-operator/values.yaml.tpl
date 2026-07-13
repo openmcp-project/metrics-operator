@@ -76,10 +76,10 @@ securityContext:
 resources:
   limits:
     # cpu: 100m
-    memory: 2GB
+    memory: 2Gi
   requests:
     # cpu: 100m
-    memory: 1GB
+    memory: 1Gi
 
 crds:
   manage: true
