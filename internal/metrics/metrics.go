@@ -67,14 +67,14 @@ func RecordDataPoint(metricName, namespace string, dims map[string]string, value
 		}
 	}
 	ResourceCountGauge.With(prometheus.Labels{
-		"metric_name": metricName,
-		"namespace":   namespace,
-		"resource":    fixed["resource"],
-		"group":       fixed["group"],
-		"version":     fixed["version"],
-		"cluster":     fixed["cluster"],
-		"kind":        fixed["kind"],
-		"api_version": fixed["api_version"],
+		"metric_name":  metricName,
+		"namespace":    namespace,
+		"resource":     fixed["resource"],
+		"group":        fixed["group"],
+		"version":      fixed["version"],
+		"cluster":      fixed["cluster"],
+		"kind":         fixed["kind"],
+		"api_version":  fixed["api_version"],
 		"extra_labels": extra,
 	}).Set(float64(value))
 }

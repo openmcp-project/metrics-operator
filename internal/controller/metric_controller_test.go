@@ -286,13 +286,11 @@ func testReconcileSecretNotFound(t *testing.T) {
 	}
 	result, err := reconciler.Reconcile(ctx, req)
 
-	// Verify the result
-	require.Error(t, err, "Reconcile should return an error when DataSink is not found")
-	require.Equal(t, RequeueAfterError, result.RequeueAfter, "Should requeue after error time")
-
-	// Verify that events were recorded - now expecting DataSinkNotFound instead of SecretNotFound
-	event := <-recorder.Events
-	require.Contains(t, event, "DataSinkNotFound")
+	// DataSink not found is no longer an error — reconcile continues and records to Prometheus only
+	require.NoError(t, err, "Reconcile should not return an error when DataSink is not found")
+	// Still requeues (at spec.interval, not error interval) since reconcile succeeded
+	require.NotEqual(t, time.Duration(0), result.RequeueAfter, "Should requeue")
+	// No error event expected — not-found is handled gracefully with an Info log
 }
 
 func testReconcileMetricHappyPath(t *testing.T) {

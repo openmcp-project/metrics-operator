@@ -43,7 +43,7 @@ type MetricsExporter interface {
 type noOpExporter struct{}
 
 func (n *noOpExporter) Export(_ context.Context, _ *metricdata.ResourceMetrics) error { return nil }
-func (n *noOpExporter) Shutdown(_ context.Context) error                               { return nil }
+func (n *noOpExporter) Shutdown(_ context.Context) error                              { return nil }
 
 // NewNoOpMetricClient creates a MetricClient that does not export to OTLP.
 // Use this when no DataSink is available but Prometheus recording is still desired.
