@@ -169,10 +169,10 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 
 	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials)
 	if errCli != nil {
-			metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
-			metric.Status.Ready = v1alpha1.StatusStringFalse
-			l.Error(errCli, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-			return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		l.Error(errCli, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
 
 	defer func() {

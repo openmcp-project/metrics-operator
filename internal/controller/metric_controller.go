@@ -175,10 +175,10 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials)
 	if errCli != nil {
-			metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
-			metric.Status.Ready = v1alpha1.StatusStringFalse
-			l.Error(errCli, fmt.Sprintf("metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-			return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
+		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		l.Error(errCli, fmt.Sprintf("metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
 	}
 	defer func() {
 		if err := metricClient.Close(ctx); err != nil {
