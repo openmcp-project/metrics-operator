@@ -4,21 +4,21 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: managedmetrics.metrics.openmcp.cloud
+  name: metrics.metrics.open-control-plane.io
 spec:
-  group: metrics.openmcp.cloud
+  group: metrics.open-control-plane.io
   names:
-    kind: ManagedMetric
-    listKind: ManagedMetricList
-    plural: managedmetrics
-    singular: managedmetric
+    kind: Metric
+    listKind: MetricList
+    plural: metrics
+    singular: metric
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.ready
       name: READY
       type: string
-    - jsonPath: .status.observation.resources
+    - jsonPath: .status.observation.latestValue
       name: VALUE
       type: string
     - jsonPath: .status.observation.timestamp
@@ -27,7 +27,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ManagedMetric is the Schema for the managedmetrics API
+        description: Metric is the Schema for the metrics API
         properties:
           apiVersion:
             description: |-
@@ -47,12 +47,12 @@ spec:
           metadata:
             type: object
           spec:
-            description: ManagedMetricSpec defines the desired state of ManagedMetric
+            description: MetricSpec defines the desired state of Metric
             properties:
               dataSinkRef:
                 default: {}
                 description: |-
-                  DataSinkRef specifies the DataSink to be used for this managed metric.
+                  DataSinkRef specifies the DataSink to be used for this metric.
                   If not specified, the DataSink named "default" in the operator's
                   namespace will be used.
                 properties:
@@ -65,10 +65,23 @@ spec:
                 description: Sets the description that will be used to identify the
                   metric in Dynatrace(or other providers)
                 type: string
-              dimensions:
-                description: |-
-                  Defines dimensions of the metric. All specified fields must be nested strings. Nested slices are not supported.
-                  If not specified, only status.conditions of the CR will be used as dimension.
+              fieldSelector:
+                description: Define fields of your object to adapt filters of the
+                  query
+                type: string
+              interval:
+                default: 10m
+                description: Define in what interval the query should be recorded
+                type: string
+              labelSelector:
+                description: Define labels of your object to adapt filters of the
+                  query
+                type: string
+              name:
+                description: Sets the name that will be used to identify the metric
+                  in Dynatrace(or other providers)
+                type: string
+              projections:
                 items:
                   description: Projection defines the projection of the metric
                   properties:
@@ -102,22 +115,6 @@ spec:
                       type: string
                   type: object
                 type: array
-              fieldSelector:
-                description: Define fields of your object to adapt filters of the
-                  query
-                type: string
-              interval:
-                default: 10m
-                description: Define in what interval the query should be recorded
-                type: string
-              labelSelector:
-                description: Define labels of your object to adapt filters of the
-                  query
-                type: string
-              name:
-                description: Sets the name that will be used to identify the metric
-                  in Dynatrace(or other providers)
-                type: string
               remoteClusterAccessRef:
                 description: RemoteClusterAccessRef is to be used by other types to
                   reference a RemoteClusterAccess type
@@ -128,7 +125,8 @@ spec:
                     type: string
                 type: object
               target:
-                description: Defines which managed resources to observe
+                description: GroupVersionKind defines the group, version and kind
+                  of the object that should be instrumented
                 properties:
                   group:
                     description: Define the group of your object that should be instrumented
@@ -140,9 +138,48 @@ spec:
                     description: Define version of the object you want to be instrumented
                     type: string
                 type: object
+              valueFrom:
+                description: |-
+                  ValueFrom specifies a field whose value is used as the gauge metric value
+                  instead of the default resource count.
+                properties:
+                  aggregation:
+                    default: sum
+                    description: |-
+                      Aggregation specifies how values are combined when multiple objects share the same
+                      label dimensions. It can be "sum", "max", "min", or "mean". Defaults to "sum".
+                    enum:
+                    - sum
+                    - max
+                    - min
+                    - mean
+                    type: string
+                  default:
+                    description: |-
+                      Default specifies a fallback value used when the field specified by fieldPath is
+                      not found or null on a resource. Must be parseable according to Type:
+                      an integer string for "integer", or an RFC3339 timestamp for "timestamp".
+                    x-kubernetes-preserve-unknown-fields: true
+                  fieldPath:
+                    description: Define the path to the field that should be extracted
+                    type: string
+                  type:
+                    default: integer
+                    description: |-
+                      Type specifies the type of the field's value.
+                      Use "integer" for numeric fields — the value is used directly as the gauge value.
+                      Use "timestamp" for RFC3339 time fields — the value is converted to Unix seconds.
+                      If not specified, it will default to "integer".
+                    enum:
+                    - integer
+                    - timestamp
+                    type: string
+                type: object
+            required:
+            - target
             type: object
           status:
-            description: ManagedMetricStatus defines the observed state of ManagedMetric
+            description: MetricStatus defines the observed state of ManagedMetric
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -206,9 +243,18 @@ spec:
                 description: Observation represent the latest available observation
                   of an object's state
                 properties:
-                  resources:
-                    description: Number of resources of the managed metric (i.e. how
-                      many managed resource are there that match the query)
+                  dimensions:
+                    items:
+                      description: Dimension defines the dimension of the metric
+                      properties:
+                        name:
+                          type: string
+                        value:
+                          type: string
+                      type: object
+                    type: array
+                  latestValue:
+                    description: The latest value of the metric
                     type: string
                   timestamp:
                     description: The timestamp of the observation
@@ -216,9 +262,8 @@ spec:
                     type: string
                 type: object
               ready:
-                description: |-
-                  Is set when Metric is Successfully executed and keeps track of the current cycle.
-                  The cycle starts anew and the status will be set to active if execution was successful
+                description: Ready is like a snapshot of the current state of the
+                  metric's lifecycle
                 type: string
             type: object
         type: object
