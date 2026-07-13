@@ -42,6 +42,7 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/init/webhooks"
 
 	"github.com/openmcp-project/metrics-operator/internal/controller"
+	"github.com/openmcp-project/metrics-operator/internal/migration"
 
 	metricsv1alpha1 "github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
@@ -116,6 +117,12 @@ func runInit(setupClient client.Client) {
 	}
 
 	if crdFlags.Install {
+		// Migrate resources from the old API group before installing new CRDs.
+		if err := migration.MigrateAPIGroup(initContext, setupClient); err != nil {
+			setupLog.Error(err, "unable to migrate API group")
+			os.Exit(1)
+		}
+
 		// Install CRDs
 		if err := crds.Install(initContext, setupClient, crdFiles, crdFlags.InstallOptions...); err != nil {
 			setupLog.Error(err, "unable to install Custom Resource Definitions")
