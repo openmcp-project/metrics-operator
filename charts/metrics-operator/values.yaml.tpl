@@ -73,13 +73,13 @@ securityContext:
   # readOnlyRootFilesystem: true
   # runAsUser: 1000
 
-resources: {}
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+resources:
+  limits:
+    # cpu: 100m
+    memory: 2GB
+  requests:
+    # cpu: 100m
+    memory: 1GB
 
 crds:
   manage: true
@@ -90,17 +90,6 @@ metrics:
   service:
     enabled: false
     port: 8080
-    type: ClusterIP
-    annotations: {}
-
-webhooks:
-  manage: true
-  url: ""
-  listen:
-    port: 9443
-  service:
-    enabled: true
-    port: 443
     type: ClusterIP
     annotations: {}
 

@@ -73,13 +73,11 @@ securityContext:
   # readOnlyRootFilesystem: true
   # runAsUser: 1000
 
-resources: {}
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+resources:
+  limits:
+    memory: 2GB
+  requests:
+    memory: 1GB
 
 crds:
   manage: true
@@ -93,52 +91,10 @@ metrics:
     type: ClusterIP
     annotations: {}
 
-webhooks:
-  manage: true
-  url: ""
-  listen:
-    port: 9443
-  service:
-    enabled: true
-    port: 443
-    type: ClusterIP
-    annotations: {}
-
 rbac:
   create: true
   clusterRole:
-    rules:
-      - apiGroups:
-        - metrics.openmcp.cloud
-        resources:
-          - metrics
-          - metrics/status
-          - managedmetrics
-          - managedmetrics/status
-          - federatedmetrics
-          - federatedmetrics/status
-          - federatedmanagedmetrics
-          - federatedmanagedmetrics/status
-        verbs:
-          - "*"
-      - apiGroups:
-          - ""
-        resources:
-          - secrets
-        verbs:
-          - get
-          - list
-          - watch
-      - apiGroups:
-          - events.k8s.io
-        resources:
-          - events
-        verbs:
-          - create
-          - patch
-      - apiGroups: [ "*" ]
-        resources: [ "*" ]
-        verbs: [ "get", "list", "watch" ]
+    rules: []
   role:
     rules: []
 
