@@ -39,13 +39,7 @@ spec:
             - init
             {{- if .Values.crds.manage }}
             - "--install-crds"
-            {{- end }}
-            {{- if .Values.webhooks.manage }}
-            - "--install-webhooks"
-            {{- if .Values.webhooks.url }}
-            - "--webhooks-base-url={{ .Values.webhooks.url }}"
-            - "--webhooks-without-ca"
-            {{- end }}
+            - "--crd-conversion-without-ca"
             {{- end }}
             {{- with .Values.init.args }}
               {{- toYaml . | nindent 12 }}
@@ -66,20 +60,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
-            {{- if .Values.webhooks.manage }}
-            - name: WEBHOOK_SECRET_NAME
-              value: {{ include "operator.fullname" . }}-webhooks-tls
-            - name: WEBHOOK_SECRET_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: WEBHOOK_SERVICE_NAME
-              value: {{ include "operator.fullname" . }}-webhooks
-            - name: WEBHOOK_SERVICE_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            {{- end }}
           {{- with .Values.init.env }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -113,9 +93,6 @@ spec:
           args:
             - start
             - "--metrics-bind-address={{ .Values.metrics.listen.host }}:{{ .Values.metrics.listen.port }}"
-            {{- if .Values.webhooks.listen }}
-            - "--webhooks-bind-address={{ .Values.webhooks.listen.host }}:{{ .Values.webhooks.listen.port }}"
-            {{- end }}
             {{- with .Values.manager.args }}
               {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -123,11 +100,6 @@ spec:
               {{- toYaml . | nindent 12 }}
             {{- end }}
           ports:
-          {{- if .Values.webhooks.listen }}
-            - name: webhooks-https
-              containerPort: {{ .Values.webhooks.listen.port }}
-              protocol: TCP
-          {{- end }}
             - name: metrics-http
               containerPort: {{ .Values.metrics.listen.port }}
               protocol: TCP
@@ -146,11 +118,6 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-          {{- if .Values.webhooks.listen }}
-            - name: webhooks-tls
-              mountPath: /tmp/k8s-webhook-server/serving-certs
-              readOnly: true
-          {{- end }}
           {{- with .Values.manager.volumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -187,12 +154,6 @@ spec:
               value: /var/run/secrets/{{ .name }}-cluster
           {{- end }}
       volumes:
-      {{- if .Values.webhooks.listen }}
-        - name: webhooks-tls
-          secret:
-            defaultMode: 420
-            secretName: {{ include "operator.fullname" . }}-webhooks-tls
-      {{- end }}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
