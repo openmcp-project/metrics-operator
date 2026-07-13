@@ -70,7 +70,7 @@ func (r *FederatedManagedMetricReconciler) getRestConfig() *rest.Config {
 }
 
 // getDataSinkCredentials fetches DataSink configuration and credentials
-func (r *FederatedManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, federatedManagedMetric *v1alpha1.FederatedManagedMetric, l logr.Logger) (common.DataSinkCredentials, bool, error) {
+func (r *FederatedManagedMetricReconciler) getDataSinkCredentials(ctx context.Context, federatedManagedMetric *v1alpha1.FederatedManagedMetric, l logr.Logger) (*common.DataSinkCredentials, error) {
 	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
 	return retriever.GetDataSinkCredentials(ctx, federatedManagedMetric.Spec.DataSinkRef, federatedManagedMetric, l)
 }
@@ -146,13 +146,13 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 	/*
 		1.1 Get the DataSink credentials
 	*/
-	credentials, dataSinkNotFound, errCredentials := r.getDataSinkCredentials(ctx, &metric, l)
+	credentials, errCredentials := r.getDataSinkCredentials(ctx, &metric, l)
 	if errCredentials != nil {
 		metric.SetConditions(common.ReadyFalse("DataSinkUnavailable", errCredentials.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errCredentials
 	}
-	if dataSinkNotFound {
+	if credentials == nil {
 		l.Info("DataSink not found; metrics will only be available via /metrics endpoint", "metric", metric.Spec.Name)
 	}
 
@@ -167,18 +167,12 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	var metricClient *clientoptl.MetricClient
-	if dataSinkNotFound {
-		metricClient = clientoptl.NewNoOpMetricClient()
-	} else {
-		var errCli error
-		metricClient, errCli = clientoptl.NewMetricClient(ctx, &credentials)
-		if errCli != nil {
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials)
+	if errCli != nil {
 			metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
 			metric.Status.Ready = v1alpha1.StatusStringFalse
 			l.Error(errCli, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
-		}
 	}
 
 	defer func() {
@@ -205,7 +199,7 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 
 	for _, queryConfig := range queryConfigs {
 
-		orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithFederatedManaged(metric, gaugeMetric)
+		orchestrator, errOrch := orc.NewOrchestrator(*credentials, queryConfig).WithFederatedManaged(metric, gaugeMetric)
 		if errOrch != nil {
 			metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 			metric.Status.Ready = v1alpha1.StatusStringFalse

@@ -45,20 +45,6 @@ type noOpExporter struct{}
 func (n *noOpExporter) Export(_ context.Context, _ *metricdata.ResourceMetrics) error { return nil }
 func (n *noOpExporter) Shutdown(_ context.Context) error                              { return nil }
 
-// NewNoOpMetricClient creates a MetricClient that does not export to OTLP.
-// Use this when no DataSink is available but Prometheus recording is still desired.
-func NewNoOpMetricClient() *MetricClient {
-	manualReader := sdkmetric.NewManualReader()
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(manualReader),
-	)
-	otel.SetMeterProvider(mp)
-	return &MetricClient{
-		manualReader:    manualReader,
-		metricsExporter: &noOpExporter{},
-	}
-}
-
 // PrometheusRecordFunc is called for each DataPoint alongside OTel recording.
 type PrometheusRecordFunc func(dims map[string]string, value int64)
 
@@ -112,8 +98,19 @@ func (dp *DataPoint) SetValue(value int64) *DataPoint {
 	return dp
 }
 
-// NewMetricClient creates a new metric client
+// NewMetricClient creates a new metric client.
+// If credentials is nil, a no-op client is returned that records nothing to OTLP.
 func NewMetricClient(ctx context.Context, credentials *common.DataSinkCredentials) (*MetricClient, error) {
+	manualReader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(manualReader))
+	otel.SetMeterProvider(mp)
+
+	if credentials == nil {
+		return &MetricClient{
+			manualReader:    manualReader,
+			metricsExporter: &noOpExporter{},
+		}, nil
+	}
 
 	deltaTemporalitySelector := func(sdkmetric.InstrumentKind) metricdata.Temporality {
 		return metricdata.DeltaTemporality
@@ -127,7 +124,6 @@ func NewMetricClient(ctx context.Context, credentials *common.DataSinkCredential
 	}
 
 	var metricsExporter MetricsExporter
-
 	if isHTTPProtocol(parsedURL.Scheme) {
 		metricsExporter, err = newMetricsClientHttp(ctx, credentials, parsedURL, deltaTemporalitySelector)
 		if err != nil {
@@ -141,15 +137,6 @@ func NewMetricClient(ctx context.Context, credentials *common.DataSinkCredential
 	} else {
 		return nil, fmt.Errorf("unsupported protocol scheme, got %s, want http|https|grpc|grpcs", parsedURL.Scheme)
 	}
-
-	// manual reader allows us to collect metrics and send them manually
-	// IF and ONLY IF necessary, we can force shutdown to flush any pending metrics
-	manualReader := sdkmetric.NewManualReader()
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(manualReader),
-	)
-
-	otel.SetMeterProvider(mp)
 
 	return &MetricClient{
 		manualReader:    manualReader,

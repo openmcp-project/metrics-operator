@@ -77,7 +77,7 @@ func (r *MetricReconciler) getRestConfig() *rest.Config {
 }
 
 // getDataSinkCredentials fetches DataSink configuration and credentials
-func (r *MetricReconciler) getDataSinkCredentials(ctx context.Context, metric *v1alpha1.Metric, l logr.Logger) (common.DataSinkCredentials, bool, error) {
+func (r *MetricReconciler) getDataSinkCredentials(ctx context.Context, metric *v1alpha1.Metric, l logr.Logger) (*common.DataSinkCredentials, error) {
 	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
 	return retriever.GetDataSinkCredentials(ctx, metric.Spec.DataSinkRef, metric, l)
 }
@@ -153,13 +153,13 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	/*
 		1.1 Get DataSink configuration and credentials
 	*/
-	credentials, dataSinkNotFound, err := r.getDataSinkCredentials(ctx, &metric, l)
+	credentials, err := r.getDataSinkCredentials(ctx, &metric, l)
 	if err != nil {
 		metric.SetConditions(common.ReadyFalse("DataSinkUnavailable", err.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
-	if dataSinkNotFound {
+	if credentials == nil {
 		l.Info("DataSink not found; metrics will only be available via /metrics endpoint", "metric", metric.Spec.Name)
 	}
 
@@ -173,18 +173,12 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	var metricClient *clientoptl.MetricClient
-	if dataSinkNotFound {
-		metricClient = clientoptl.NewNoOpMetricClient()
-	} else {
-		var errCli error
-		metricClient, errCli = clientoptl.NewMetricClient(ctx, &credentials)
-		if errCli != nil {
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials)
+	if errCli != nil {
 			metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
 			metric.Status.Ready = v1alpha1.StatusStringFalse
 			l.Error(errCli, fmt.Sprintf("metric '%s' failed to create OTel client, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errCli
-		}
 	}
 	defer func() {
 		if err := metricClient.Close(ctx); err != nil {
@@ -209,7 +203,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithMetric(metric, gaugeMetric) // Pass gaugeMetric
+	orchestrator, errOrch := orc.NewOrchestrator(*credentials, queryConfig).WithMetric(metric, gaugeMetric) // Pass gaugeMetric
 	if errOrch != nil {
 		metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
