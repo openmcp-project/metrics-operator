@@ -75,9 +75,9 @@ securityContext:
 
 resources:
   limits:
-    memory: 2GB
+    memory: 2Gi
   requests:
-    memory: 1GB
+    memory: 1Gi
 
 crds:
   manage: true

@@ -58,3 +58,4 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "operator.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
+{{- end }}
