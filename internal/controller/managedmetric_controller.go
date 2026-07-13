@@ -200,7 +200,11 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orchestrator.NewOrchestrator(*credentials, queryConfig).WithManaged(metric, gaugeMetric)
+	creds := common.DataSinkCredentials{}
+	if credentials != nil {
+		creds = *credentials
+	}
+	orchestrator, errOrch := orchestrator.NewOrchestrator(creds, queryConfig).WithManaged(metric, gaugeMetric)
 	if errOrch != nil {
 		metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse

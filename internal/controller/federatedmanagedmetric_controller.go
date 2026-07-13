@@ -197,9 +197,13 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
 	})
 
+	creds := common.DataSinkCredentials{}
+	if credentials != nil {
+		creds = *credentials
+	}
 	for _, queryConfig := range queryConfigs {
 
-		orchestrator, errOrch := orc.NewOrchestrator(*credentials, queryConfig).WithFederatedManaged(metric, gaugeMetric)
+		orchestrator, errOrch := orc.NewOrchestrator(creds, queryConfig).WithFederatedManaged(metric, gaugeMetric)
 		if errOrch != nil {
 			metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 			metric.Status.Ready = v1alpha1.StatusStringFalse
