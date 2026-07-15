@@ -47,11 +47,18 @@ func NewDataSinkCredentialsRetriever(client client.Client, recorder events.Event
 }
 
 // GetDataSinkCredentials fetches DataSink configuration and credentials for any metric type.
-// Returns (nil, nil) when the DataSink CR does not exist — callers should treat nil credentials
-// as "no DataSink configured" and skip OTLP export. A non-nil error indicates a genuine problem.
+// Returns (nil, nil) when dataSinkRef is nil — callers should treat nil credentials as
+// "no DataSink configured" and skip OTLP export. A non-nil error indicates a genuine problem.
+// If dataSinkRef is provided but the DataSink CR cannot be found, an error is returned.
 //
 //nolint:gocyclo
 func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Context, dataSinkRef *v1alpha1.DataSinkReference, eventObject client.Object, l logr.Logger) (*common.DataSinkCredentials, error) {
+	// dataSinkRef is optional; nil means no OTLP export.
+	if dataSinkRef == nil {
+		l.V(1).Info("No dataSinkRef specified; skipping OTLP export")
+		return nil, nil
+	}
+
 	// Determine the namespace where DataSinks are expected to be found.
 	dataSinkLookupNamespace := os.Getenv("OPERATOR_CONFIG_NAMESPACE")
 	if dataSinkLookupNamespace == "" {
@@ -69,7 +76,7 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 
 	// Determine DataSink name
 	dataSinkName := "default"
-	if dataSinkRef != nil && dataSinkRef.Name != "" {
+	if dataSinkRef.Name != "" {
 		dataSinkName = dataSinkRef.Name
 	}
 
@@ -81,10 +88,6 @@ func (d *DataSinkCredentialsRetriever) GetDataSinkCredentials(ctx context.Contex
 	}
 
 	if err := d.client.Get(ctx, dataSinkKey, dataSink); err != nil {
-		if apierrors.IsNotFound(err) {
-			l.Info(fmt.Sprintf("DataSink '%s' not found in namespace '%s'; metrics will only be available via /metrics endpoint", dataSinkName, dataSinkLookupNamespace))
-			return nil, nil
-		}
 		l.Error(err, fmt.Sprintf("unable to fetch DataSink '%s' in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
 		d.recorder.Eventf(eventObject, nil, "Error", "DataSinkFetchError", "GetDataSinkCredentials", fmt.Sprintf("unable to fetch DataSink '%s' in namespace '%s'", dataSinkName, dataSinkLookupNamespace))
 		return nil, err
