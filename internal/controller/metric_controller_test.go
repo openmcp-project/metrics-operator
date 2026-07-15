@@ -193,8 +193,8 @@ func testDataSinkRefDefault(t *testing.T) {
 	err = k8sClient.Get(ctx, metric, &out)
 	require.NoError(t, err, "failed to fetch metric")
 
-	// verify result
-	require.Equal(t, &v1alpha1.DataSinkReference{Name: "default"}, out.Spec.DataSinkRef)
+	// verify result: DataSinkRef is optional; omitting it means nil (no OTLP export)
+	require.Nil(t, out.Spec.DataSinkRef)
 }
 
 // testReconcileMetricNotFound tests the behavior when the Metric is not found
