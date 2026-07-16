@@ -41,11 +41,10 @@ spec:
             description: FederatedManagedMetricSpec defines the desired state of FederatedManagedMetric
             properties:
               dataSinkRef:
-                default: {}
                 description: |-
                   DataSinkRef specifies the DataSink to be used for this federated managed metric.
-                  If not specified, the DataSink named "default" in the operator's
-                  namespace will be used.
+                  If omitted, no OTLP export is performed; metrics are only exposed via /metrics.
+                  If provided, the referenced DataSink must exist or reconciliation will fail.
                 properties:
                   name:
                     default: default

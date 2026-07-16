@@ -35,6 +35,7 @@ import (
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 	"github.com/openmcp-project/metrics-operator/internal/common"
 	"github.com/openmcp-project/metrics-operator/internal/config"
+	internalmetrics "github.com/openmcp-project/metrics-operator/internal/metrics"
 	orc "github.com/openmcp-project/metrics-operator/internal/orchestrator"
 )
 
@@ -76,7 +77,7 @@ func (r *MetricReconciler) getRestConfig() *rest.Config {
 }
 
 // getDataSinkCredentials fetches DataSink configuration and credentials
-func (r *MetricReconciler) getDataSinkCredentials(ctx context.Context, metric *v1alpha1.Metric, l logr.Logger) (common.DataSinkCredentials, error) {
+func (r *MetricReconciler) getDataSinkCredentials(ctx context.Context, metric *v1alpha1.Metric, l logr.Logger) (*common.DataSinkCredentials, error) {
 	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
 	return retriever.GetDataSinkCredentials(ctx, metric.Spec.DataSinkRef, metric, l)
 }
@@ -158,6 +159,9 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
+	if credentials == nil {
+		l.Info("DataSink not found; metrics will only be available via /metrics endpoint", "metric", metric.Spec.Name)
+	}
 
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
@@ -169,7 +173,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, &credentials)
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials)
 	if errCli != nil {
 		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
@@ -191,10 +195,19 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		l.Error(errGauge, fmt.Sprintf("metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
+	metricName := metric.Spec.Name
+	metricNamespace := metric.Namespace
+	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) {
+		internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
+	})
 	/*
 		2. Create a new orchestrator
 	*/
-	orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithMetric(metric, gaugeMetric) // Pass gaugeMetric
+	creds := common.DataSinkCredentials{}
+	if credentials != nil {
+		creds = *credentials
+	}
+	orchestrator, errOrch := orc.NewOrchestrator(creds, queryConfig).WithMetric(metric, gaugeMetric) // Pass gaugeMetric
 	if errOrch != nil {
 		metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
