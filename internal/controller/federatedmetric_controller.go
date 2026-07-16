@@ -35,6 +35,7 @@ import (
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 	"github.com/openmcp-project/metrics-operator/internal/common"
 	"github.com/openmcp-project/metrics-operator/internal/config"
+	internalmetrics "github.com/openmcp-project/metrics-operator/internal/metrics"
 	orc "github.com/openmcp-project/metrics-operator/internal/orchestrator"
 )
 
@@ -69,7 +70,7 @@ func (r *FederatedMetricReconciler) getRestConfig() *rest.Config {
 }
 
 // getDataSinkCredentials fetches DataSink configuration and credentials
-func (r *FederatedMetricReconciler) getDataSinkCredentials(ctx context.Context, federatedMetric *v1alpha1.FederatedMetric, l logr.Logger) (common.DataSinkCredentials, error) {
+func (r *FederatedMetricReconciler) getDataSinkCredentials(ctx context.Context, federatedMetric *v1alpha1.FederatedMetric, l logr.Logger) (*common.DataSinkCredentials, error) {
 	retriever := NewDataSinkCredentialsRetriever(r.getClient(), r.Recorder)
 	return retriever.GetDataSinkCredentials(ctx, federatedMetric.Spec.DataSinkRef, federatedMetric, l)
 }
@@ -153,6 +154,9 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
+	if credentials == nil {
+		l.Info("DataSink not found; metrics will only be available via /metrics endpoint", "metric", metric.Spec.Name)
+	}
 
 	/*
 		1.2 Create QueryConfig to query the resources in the K8S cluster or external cluster based on the kubeconfig secret reference
@@ -165,8 +169,7 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
-	metricClient, errCli := clientoptl.NewMetricClient(ctx, &credentials)
-
+	metricClient, errCli := clientoptl.NewMetricClient(ctx, credentials)
 	if errCli != nil {
 		metric.SetConditions(common.ReadyFalse("OTLPClientCreationFailed", errCli.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
@@ -190,10 +193,19 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		l.Error(errGauge, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
+	metricName := metric.Spec.Name
+	metricNamespace := metric.Namespace
+	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) {
+		internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
+	})
 
+	creds := common.DataSinkCredentials{}
+	if credentials != nil {
+		creds = *credentials
+	}
 	for _, queryConfig := range queryConfigs {
 
-		orchestrator, errOrch := orc.NewOrchestrator(credentials, queryConfig).WithFederated(metric, gaugeMetric)
+		orchestrator, errOrch := orc.NewOrchestrator(creds, queryConfig).WithFederated(metric, gaugeMetric)
 		if errOrch != nil {
 			metric.SetConditions(common.ReadyFalse("OrchestratorCreationFailed", errOrch.Error()))
 			metric.Status.Ready = v1alpha1.StatusStringFalse
