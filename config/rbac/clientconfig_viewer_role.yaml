@@ -12,7 +12,7 @@ metadata:
   name: clientconfig-viewer-role
 rules:
 - apiGroups:
-  - metrics.openmcp.cloud
+  - metrics.open-control-plane.io
   resources:
   - clientconfigs
   verbs:
@@ -20,7 +20,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - metrics.openmcp.cloud
+  - metrics.open-control-plane.io
   resources:
   - clientconfigs/status
   verbs:

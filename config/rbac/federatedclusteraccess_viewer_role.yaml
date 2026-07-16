@@ -8,7 +8,7 @@ metadata:
   name: federatedclusteraccess-viewer-role
 rules:
 - apiGroups:
-  - metrics.openmcp.cloud
+  - metrics.open-control-plane.io
   resources:
   - federatedclusteraccesses
   verbs:
@@ -16,7 +16,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - metrics.openmcp.cloud
+  - metrics.open-control-plane.io
   resources:
   - federatedclusteraccesses/status
   verbs:

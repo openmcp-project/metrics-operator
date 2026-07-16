@@ -146,13 +146,13 @@ graph LR
 
 ## Resource Type Descriptions:
 
-- [**Metric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
-- [**ManagedMetric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
-- [**FederatedMetric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
-- [**FederatedManagedMetric**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
-- [**RemoteClusterAccess**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
-- [**FederatedClusterAccess**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
-- [**DataSink**](cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
+- [**Metric**](cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_metrics.yaml): Monitors specific Kubernetes resources in the local or remote clusters using GroupVersionKind targeting
+- [**ManagedMetric**](cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_managedmetrics.yaml): Specialized for monitoring Crossplane managed resources (resources with "crossplane" and "managed" categories)
+- [**FederatedMetric**](cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_federatedmetrics.yaml): Monitors resources across multiple clusters, aggregating data from federated sources
+- [**FederatedManagedMetric**](cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_federatedmanagedmetrics.yaml): Monitors Crossplane managed resources across multiple clusters
+- [**RemoteClusterAccess**](cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_remoteclusteraccesses.yaml): Provides access configuration for monitoring resources in remote clusters
+- [**FederatedClusterAccess**](cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_federatedclusteraccesses.yaml): Discovers and provides access to multiple clusters for federated monitoring
+- [**DataSink**](cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_datasinks.yaml): Defines where and how metrics data should be sent, supporting various destinations like Dynatrace
 
 ## Installation
 
@@ -215,7 +215,7 @@ Metrics have additional capabilities, such as dimensions. Dimensions allow you t
 See the [dimensions documentation](docs/dimensions-configuration.md) for a comprehensive usage overview.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: Metric
 metadata:
   name: metric-pod-count
@@ -238,7 +238,7 @@ spec:
 Managed metrics are used to monitor Crossplane managed resources. They automatically track resources that have the "crossplane" and "managed" categories in their CRDs. By default, they export dimensions based on `status.conditions`. Custom Dimensions are also supported. See the [dimensions documentation](docs/dimensions-configuration.md) for a comprehensive usage overview.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: ManagedMetric
 metadata:
   name: managed-metric
@@ -257,7 +257,7 @@ spec:
 Federated metrics deal with resources that are spread across multiple clusters. To monitor these resources, you need to define a `FederatedMetric` resource.
 They offer capabilities to aggregate data as well as filtering down to a specific cluster or field using projections.
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-prov
@@ -285,7 +285,7 @@ The pre-condition here is that if a resource comes from a crossplane provider, i
 
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: xfed-managed
@@ -304,7 +304,7 @@ spec:
 By default the gauge value equals the number of resources sharing a given dimension combination. Use `valueFrom` to instead set the gauge value from a field in the resource itself — for example a creation timestamp or a replica count.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: Metric
 metadata:
   name: deployment-age
@@ -337,7 +337,7 @@ Attention, if `fieldType` is not specified, the default type is `primitive` and 
 This can lead to issues if the field specified in the `fieldPath` is of a different type (map or slice). Therefore, it is recommended to always specify the `fieldType` when using default values.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: Metric
 metadata:
   name: metric-condition-healthy
@@ -373,7 +373,7 @@ You can configure access to a remote cluster in one of two ways:
 Use this method if you want the operator to assume a service account in the remote cluster using projected tokens and cluster credentials. This allows for dynamic access for clusters using an OIDC provider.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
@@ -397,7 +397,7 @@ You will also need to setup the required [RBAC configuration](#rbac-configuratio
 Use this method if you already have a kubeconfig for the remote cluster and want to provide it directly.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
@@ -418,7 +418,7 @@ The `kubeConfigPath` field indicates where to find the kubeconfig for each clust
 The type of field that is selected with `kubeConfigPath` can be a string or object.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ca-sample
@@ -437,7 +437,7 @@ If the `namespace` field is omitted, it defaults to the namespace of the discove
 If the `key` field is omitted, it defaults to `kubeconfig`.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ar-sample
@@ -464,7 +464,7 @@ The targets in the `FederatedClusterAccess` resource can be further filtered usi
 Namespace scoping can only be applied if the target resource is namespaced.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedClusterAccess
 metadata:
     name: federate-ca-filtered
@@ -543,7 +543,7 @@ The supported protocols are:
 DataSink supports API key authentication using Kubernetes Secrets. Below is an example of a DataSink configuration for sending metrics to Dynatrace:
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: DataSink
 metadata:
   name: default
@@ -563,7 +563,7 @@ spec:
 DataSink also supports mTLS certificate authentication using Kubernetes Secrets. Below is an example of a DataSink configuration for sending metrics to a gRPC endpoint with mTLS:
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: DataSink
 metadata:
   name: mtls-datasink
@@ -612,7 +612,7 @@ The `DataSinkSpec` contains the following fields:
 All metric types support the `dataSinkRef` field to specify which DataSink to use:
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: Metric
 metadata:
   name: pod-count

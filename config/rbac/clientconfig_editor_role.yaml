@@ -12,7 +12,7 @@ metadata:
   name: clientconfig-editor-role
 rules:
 - apiGroups:
-  - metrics.openmcp.cloud
+  - metrics.open-control-plane.io
   resources:
   - clientconfigs
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - metrics.openmcp.cloud
+  - metrics.open-control-plane.io
   resources:
   - clientconfigs/status
   verbs:

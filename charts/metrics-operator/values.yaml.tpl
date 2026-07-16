@@ -98,7 +98,7 @@ rbac:
   clusterRole:
     rules:
       - apiGroups:
-          - metrics.openmcp.cloud
+          - metrics.open-control-plane.io
         resources:
           - managedmetrics
           - metrics
