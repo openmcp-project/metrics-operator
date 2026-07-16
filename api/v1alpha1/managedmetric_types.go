@@ -47,10 +47,9 @@ type ManagedMetricSpec struct {
 	Interval metav1.Duration `json:"interval,omitempty"`
 
 	// DataSinkRef specifies the DataSink to be used for this managed metric.
-	// If not specified, the DataSink named "default" in the operator's
-	// namespace will be used.
+	// If omitted, no OTLP export is performed; metrics are only exposed via /metrics.
+	// If provided, the referenced DataSink must exist or reconciliation will fail.
 	// +optional
-	// +kubebuilder:default:={}
 	DataSinkRef *DataSinkReference `json:"dataSinkRef,omitempty"`
 
 	// +optional
