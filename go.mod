@@ -3,7 +3,7 @@ module github.com/openmcp-project/metrics-operator
 go 1.26.5
 
 require (
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/openmcp-project/controller-utils v0.31.0
