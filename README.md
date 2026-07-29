@@ -21,7 +21,7 @@ A Kubernetes operator that collects counts and attributes of cluster resources a
 | [Architecture](docs/architecture.md) | Resource types, flows, and data model |
 | [Usage](docs/usage.md) | Metric, ManagedMetric, FederatedMetric, FederatedManagedMetric examples |
 | [Dimensions Configuration](docs/dimensions-configuration.md) | Projections, valueFrom, cardinality |
-| [DataSink Configuration](docs/datasink-configuration.md) | API key, mTLS, multiple sinks |
+| [Metrics Export](docs/metrics-export.md) | DataSink (OTLP push), ServiceMonitor (Prometheus scrape) |
 | [Remote Cluster Access](docs/remote-cluster-access.md) | RemoteClusterAccess and FederatedClusterAccess |
 | [RBAC](docs/rbac.md) | Permissions required for monitored resources |
 | [Development](docs/development.md) | Local development with kind |
@@ -37,7 +37,7 @@ metadata:
   name: my-mcp
   namespace: <your-ocp-namespace>
 spec:
-  version: "v0.13.0"
+  version: "v0.13.0"    # pick latest version from GitHub Releases
 ```
 
 **OR Via Helm:**

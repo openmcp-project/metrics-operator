@@ -137,4 +137,4 @@ spec:
     name: my-datasink
 ```
 
-See [DataSink Configuration](datasink-configuration.md) for setup details.
+See [DataSink Configuration](metrics-export.md) for setup details.

@@ -1,8 +1,19 @@
-# DataSink Configuration Guide
+# Metrics Export
 
-DataSink is a custom resource defining where the Metrics Operator sends collected metrics. It supports HTTP(S) and gRPC(S) endpoints via [OpenTelemetry](https://opentelemetry.io) protocol.
+The Metrics Operator exports data in two complementary ways:
 
-## Specification
+| Method             | Direction | Protocol         | What it covers                                                                         |
+| ------------------ | --------- | ---------------- | -------------------------------------------------------------------------------------- |
+| **DataSink**       | Push      | OTLP (HTTP/gRPC) | Business metrics you define (resource counts, dimensions)                              |
+| **ServiceMonitor** | Pull      | Prometheus       | Business metrics + Operator internals (reconcile counts, errors, resource count gauge) |
+
+---
+
+## DataSink (OTLP Push)
+
+DataSink is a custom resource defining where the operator pushes collected metrics. It supports HTTP(S) and gRPC(S) endpoints via [OpenTelemetry](https://opentelemetry.io) protocol.
+
+### Specification
 
 ```yaml
 apiVersion: metrics.openmcp.cloud/v1alpha1
@@ -61,7 +72,7 @@ authentication:
 
 Secrets must exist in the **same namespace** as the DataSink.
 
-## Creating the Secret
+### Creating the Secret
 
 ```bash
 kubectl create secret generic dynatrace-credentials \
@@ -69,11 +80,11 @@ kubectl create secret generic dynatrace-credentials \
   --namespace=metrics-operator-system
 ```
 
-## Default DataSink
+### Default DataSink
 
 If a metric resource omits `dataSinkRef`, the operator looks for a DataSink named `default` in its own namespace. Create one to keep metric definitions simple.
 
-## Multiple DataSinks
+### Multiple DataSinks
 
 You can define multiple DataSinks for different environments or teams and reference them explicitly:
 
@@ -116,7 +127,7 @@ spec:
         key: api-token
 ```
 
-## Migration from Legacy Configuration
+### Migration from Legacy Configuration
 
 The old hardcoded secret approach (`dynatrace-credentials` in the operator namespace) is removed. Migrate by:
 
@@ -124,7 +135,7 @@ The old hardcoded secret approach (`dynatrace-credentials` in the operator names
 2. Add `dataSinkRef` to your metric resources (or name the DataSink `default`)
 3. Remove any hardcoded secret references from old configs
 
-## Troubleshooting
+### Troubleshooting
 
 ```bash
 # Check DataSink resources
@@ -144,9 +155,63 @@ kubectl logs -n metrics-operator-system deployment/metrics-operator-controller-m
 | `401 Unauthorized`             | Bad token                  | Verify token value and permissions            |
 | `connection refused` / timeout | Wrong endpoint             | Check URL and network/firewall rules          |
 
-## Best Practices
+### Best Practices
 
 - Use separate secrets per environment; rotate tokens regularly
-- Keep `insecureSkipVerify` disabled (not a supported field — TLS is always verified based on the endpoint scheme)
 - Use descriptive DataSink names (`prod-dynatrace`, `dev-prometheus`)
 - Monitor operator logs and DataSink status conditions for delivery failures
+
+---
+
+## ServiceMonitor (Prometheus Scrape)
+
+The operator exposes a standard [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) `/metrics` endpoint (HTTPS, port `https`) that Prometheus can scrape. This covers operator internals such as reconcile durations, error counts, and a `metrics_operator_resource_count` gauge that mirrors the business metrics pushed via DataSink.
+
+### Exposed metric
+
+| Metric                            | Type  | Description                                                                                                                                          |
+| --------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `metrics_operator_resource_count` | Gauge | Count of Kubernetes resources observed, labelled by `metric_name`, `namespace`, `kind`, `group`, `version`, `cluster`, `api_version`, `extra_labels` |
+
+Standard controller-runtime metrics (work queue depth, reconcile errors, etc.) are also available.
+
+### Enabling the ServiceMonitor
+
+A ready-to-use `ServiceMonitor` manifest is included at [`config/prometheus/monitor.yaml`](../config/prometheus/monitor.yaml). It is disabled by default. To enable it, uncomment the prometheus line in `config/default/kustomization.yaml`:
+
+```yaml
+resources:
+- ../crd
+- ../rbac
+- ../manager
+- ../prometheus    # uncomment this line
+```
+
+The manifest selects the controller-manager service by `control-plane: controller-manager` and scrapes `/metrics` over HTTPS using the pod's service account token:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: controller-manager-metrics-monitor
+  namespace: metrics-operator-system
+spec:
+  endpoints:
+    - path: /metrics
+      port: https
+      scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        insecureSkipVerify: true
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+```
+
+> **Prerequisite:** The [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) must be installed in the cluster for `ServiceMonitor` resources to be recognized.
+
+### Applying manually (without kustomize)
+
+```bash
+kubectl apply -f config/prometheus/monitor.yaml -n metrics-operator-system
+```

@@ -23,7 +23,7 @@ cp examples/datasink/basic-datasink.yaml examples/datasink/dynatrace-prod-setup.
 # edit dynatrace-prod-setup.yaml with your endpoint and credentials
 ```
 
-> The `examples/sample_secret.yaml` path is in `.gitignore` — safe to put real credentials here locally.
+> The `examples/datasink/dynatrace-prod-setup.yaml` path is in `.gitignore` — safe to put real credentials here locally.
 
 3. Set up a local kind cluster with all CRDs, Crossplane, and sample resources:
 

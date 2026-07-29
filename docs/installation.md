@@ -33,7 +33,7 @@ The operator will proceed through phases: `Pending` → `Progressing` → `Ready
 kubectl get metricsoperator my-mcp -n project-<project-name>--ws-<workspace-name>
 ```
 
-Once `Ready`, the Metrics Operator CRDs (`Metric`, `ManagedMetric`, `DataSink`, etc.) are available on the associated control plane. Continue with [DataSink Configuration](datasink-configuration.md) and [Usage](usage.md).
+Once `Ready`, the Metrics Operator CRDs (`Metric`, `ManagedMetric`, `DataSink`, etc.) are available on the associated control plane. Continue with [DataSink Configuration](metrics-export.md) and [Usage](usage.md).
 
 
 ---
@@ -77,5 +77,5 @@ kubectl create secret generic dynatrace-credentials \
   --namespace=metrics-operator-system
 ```
 
-See [DataSink Configuration](datasink-configuration.md) for full details including mTLS and multiple sink setups.
+See [DataSink Configuration](metrics-export.md) for full details including mTLS and multiple sink setups.
 
