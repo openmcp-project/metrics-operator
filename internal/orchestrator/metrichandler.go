@@ -74,7 +74,7 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 	return MonitorResult{
 		Observation: metricObservation,
 		Phase:       v1alpha1.PhaseActive,
-		Reason:      "MonitoringActive",
+		Reason:      v1alpha1.ReasonMonitoringActive,
 		Message:     fmt.Sprintf("metric value recorded for resource '%s'", h.metric.GvkToString()),
 	}, nil
 }
