@@ -19,11 +19,11 @@ git submodule update --init
 2. Configure a DataSink for local testing. Copy the example and fill in your credentials:
 
 ```bash
-cp examples/datasink/basic-datasink.yaml examples/datasink/dynatrace-prod-setup.yaml
-# edit dynatrace-prod-setup.yaml with your endpoint and credentials
+cp examples/datasink/basic-datasink.yaml examples/datasink/dynatrace-prod-secret.yaml
+# edit dynatrace-prod-secret.yaml with your endpoint and credentials
 ```
 
-> The `examples/datasink/dynatrace-prod-setup.yaml` path is in `.gitignore` — safe to put real credentials here locally.
+> The `*.secret.yaml` path is in `.gitignore` — safe to put real credentials here locally.
 
 3. Set up a local kind cluster with all CRDs, Crossplane, and sample resources:
 
