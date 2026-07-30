@@ -102,7 +102,7 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 	}
 
 	result.Phase = v1alpha1.PhaseActive
-	result.Reason = "MonitoringActive"
+	result.Reason = v1alpha1.ReasonMonitoringActive
 	result.Message = fmt.Sprintf("metric is monitoring federated managed resources '%s'", h.metric.Name)
 
 	if dimensions != nil {
