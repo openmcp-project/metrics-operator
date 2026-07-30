@@ -82,7 +82,19 @@ kubectl create secret generic dynatrace-credentials \
 
 ### Default DataSink
 
-If a metric resource omits `dataSinkRef`, the operator looks for a DataSink named `default` in its own namespace. Create one to keep metric definitions simple.
+If a metric resource omits `dataSinkRef`, the operator looks for a DataSink named `default`.
+
+The namespace used for this lookup is resolved in this order:
+
+1. `OPERATOR_CONFIG_NAMESPACE`
+2. `POD_NAMESPACE`
+3. `default` (hard fallback)
+
+This lookup namespace is operator runtime configuration and is not derived from the Metric resource namespace.
+
+Example: if the operator runs in `metrics-operator-system` and `POD_NAMESPACE=metrics-operator-system`, then a metric in any namespace still resolves `default` DataSink from `metrics-operator-system`.
+
+If no `default` DataSink exists in the resolved namespace, the operator will not push metrics to any DataSink. The *pull* mode still works.
 
 ### Multiple DataSinks
 
@@ -150,7 +162,6 @@ kubectl logs -n metrics-operator-system deployment/metrics-operator-controller-m
 
 | Error                          | Likely cause               | Fix                                           |
 | ------------------------------ | -------------------------- | --------------------------------------------- |
-| `DataSink "default" not found` | No default DataSink exists | Create one named `default`                    |
 | `Secret "..." not found`       | Missing secret             | Create the secret in the DataSink's namespace |
 | `401 Unauthorized`             | Bad token                  | Verify token value and permissions            |
 | `connection refused` / timeout | Wrong endpoint             | Check URL and network/firewall rules          |

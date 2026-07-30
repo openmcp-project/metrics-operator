@@ -117,19 +117,19 @@ See [Dimensions Configuration](dimensions-configuration.md#setting-the-gauge-val
 
 ## Projection Default Values
 
-Projections support a `default` value used when the field is absent from the resource. The `fieldType` should match the field type to avoid type mismatches.
+Projections support a `default` value used when the field is absent from the resource. The `type` should match the field type to avoid type mismatches.
 
 ```yaml
 projections:
   - name: pod-namespace
     fieldPath: "status.conditions[?(@.type=='Healthy')].status"
-    fieldType: "primitive"
+    type: "primitive"
     default: "unknown"
 ```
 
 ## DataSink Reference
 
-All metric types support `dataSinkRef` to select which DataSink to use. If omitted, the operator uses the DataSink named `default` in its namespace.
+All metric types support `dataSinkRef` to select which DataSink to use. If omitted, the operator will not actively push to any DataSink. The *pull* mode still works. See [Metrics Export](metrics-export.md) for DataSink configuration.
 
 ```yaml
 spec:
