@@ -30,6 +30,7 @@ Dockerfile.cross
 # exclude secret
 examples/sample_secret.yaml
 examples/secret.yaml
+examples/datasink/dynatrace-prod-setup.yaml
 
 # debug file
 *debug*

@@ -175,8 +175,8 @@ spec:
                   endpoint:
                     description: |-
                       Endpoint specifies the target endpoint URL
-                      Currently supported protocols are "http", "https", "grcp", and "grpcs"
-                    pattern: ^(http|https|grcp|grpcs)://.*$
+                      Currently supported protocols are "http", "https", "grpc", and "grpcs"
+                    pattern: ^(http|https|grpc|grpcs)://.*$
                     type: string
                 required:
                 - endpoint
