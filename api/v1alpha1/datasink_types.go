@@ -25,8 +25,8 @@ import (
 // Connection defines the connection details for the DataSink
 type Connection struct {
 	// Endpoint specifies the target endpoint URL
-	// Currently supported protocols are "http", "https", "grcp", and "grpcs"
-	// +kubebuilder:validation:Pattern=`^(http|https|grcp|grpcs)://.*$`
+	// Currently supported protocols are "http", "https", "grpc", and "grpcs"
+	// +kubebuilder:validation:Pattern=`^(http|https|grpc|grpcs)://.*$`
 	Endpoint string `json:"endpoint"`
 }
 

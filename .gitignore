@@ -27,9 +27,9 @@ Dockerfile.cross
 *.swo
 *~
 
-# exclude secret
-examples/sample_secret.yaml
-examples/secret.yaml
+# exclude secrets
+secret.yaml
+*.secret.yaml
 
 # debug file
 *debug*

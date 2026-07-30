@@ -24,7 +24,7 @@ tasks:
     internal: true
     cmds:
     - test -s {{.ROOT_DIR}}/bin/kustomize || GOBIN={{.ROOT_DIR}}/bin/ GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
-  
+
   dev:crd:install:
     desc: "Install CRDs into the K8s cluster specified in ~/.kube/config"
     deps:
@@ -95,8 +95,8 @@ tasks:
     - task dev:operator-namespace
     - task dev:basic-metric
     - task dev:managed-metric
-    - test -e {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml && task dev:dynatrace-prod-setup || echo -e '\n\nYou should add your dynatrace configuration here {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml\n\n'
-     
+    - test -e {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-secret.yaml && task dev:dynatrace-prod-setup || echo -e '\n\nYou should add your dynatrace configuration here {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-secret.yaml\n\n'
+
 
   dev:operator-namespace:
     desc: "Create the operator namespace if it does not exist."
@@ -116,7 +116,7 @@ tasks:
   dev:dynatrace-prod-setup:
     desc: "Apply Dynatrace production setup example to the cluster."
     cmds:
-      - kubectl apply -f {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-setup.yaml
+      - kubectl apply -f {{.ROOT_DIR}}/examples/datasink/dynatrace-prod-secret.yaml
 
   dev:metric-dynatrace-prod:
     desc: "Apply metric using Dynatrace production example to the cluster."
@@ -129,7 +129,7 @@ tasks:
       - task dev:crossplane:install
       - task dev:crossplane:provider:install
       - task dev:helm-provider-sample
-  
+
   dev:crossplane:install:
     desc: "Install Crossplane into the cluster via Helm"
     deps:
