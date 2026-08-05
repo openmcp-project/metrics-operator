@@ -10,7 +10,6 @@
 #   - New CRDs (metrics.open-control-plane.io) already applied to the cluster
 #   - Old CRDs (metrics.openmcp.cloud) still present (will be removed last)
 #   - kubectl configured to the target cluster
-#   - yq >= v4 in PATH
 #
 # Usage:
 #   ./hack/migrate-api-group.sh [--dry-run]
