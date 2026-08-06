@@ -167,7 +167,7 @@ func main() {
 		Metrics:                server.Options{BindAddress: metricsAddr},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "82620e19.metrics.openmcp.cloud",
+		LeaderElectionID:       "82620e19.metrics.open-control-plane.io",
 		Logger:                 logger,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the

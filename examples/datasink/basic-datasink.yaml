@@ -1,5 +1,5 @@
 # Basic DataSink configuration for Dynatrace
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: DataSink
 metadata:
   name: default

@@ -2,13 +2,13 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/metrics.openmcp.cloud_metrics.yaml
-- bases/metrics.openmcp.cloud_managedmetrics.yaml
-- bases/metrics.openmcp.cloud_datasinks.yaml
-- bases/metrics.openmcp.cloud_remoteclusteraccesses.yaml
-- bases/metrics.openmcp.cloud_federatedmetrics.yaml
-- bases/metrics.openmcp.cloud_federatedclusteraccesses.yaml
-- bases/metrics.openmcp.cloud_federatedmanagedmetrics.yaml
+- bases/metrics.open-control-plane.io_metrics.yaml
+- bases/metrics.open-control-plane.io_managedmetrics.yaml
+- bases/metrics.open-control-plane.io_datasinks.yaml
+- bases/metrics.open-control-plane.io_remoteclusteraccesses.yaml
+- bases/metrics.open-control-plane.io_federatedmetrics.yaml
+- bases/metrics.open-control-plane.io_federatedclusteraccesses.yaml
+- bases/metrics.open-control-plane.io_federatedmanagedmetrics.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
