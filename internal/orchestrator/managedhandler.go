@@ -133,7 +133,7 @@ func (h *ManagedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	} else {
 		result.Phase = v1alpha1.PhaseActive
 		result.Observation = &v1alpha1.ManagedObservation{Timestamp: metav1.Now(), Resources: resources}
-		result.Reason = "MonitoringActive"
+		result.Reason = v1alpha1.ReasonMonitoringActive
 		result.Message = fmt.Sprintf("metric is monitoring resource '%s'", h.metric.GvkToString())
 	}
 

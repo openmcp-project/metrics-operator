@@ -21,10 +21,18 @@ linters:
     - unparam
     - unused
   settings:
+    goconst:
+      min-len: 3
+      min-occurrences: 5
     revive:
       rules:
         - name: comment-spacings
   exclusions:
+    rules:
+      - path: "_test\\.go"
+        linters:
+          - goconst
+          - dupl
     generated: lax
     presets:
       - comments
