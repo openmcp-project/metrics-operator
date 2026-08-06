@@ -151,7 +151,7 @@ Use the `valueFrom` field on the metric spec to specify a field whose value beco
 The following metric emits the Unix creation timestamp of each `Deployment` as the gauge value, with the namespace and name as dimensions:
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: Metric
 metadata:
   name: deployment-age
