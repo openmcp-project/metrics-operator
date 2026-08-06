@@ -69,7 +69,7 @@ metadata:
     {{- include "operator.labels" . | nindent 4 }}
 rules:
   - apiGroups:
-      - metrics.openmcp.cloud
+      - metrics.open-control-plane.io
     resources: ["*"]
     verbs:
       - create
@@ -89,7 +89,7 @@ metadata:
     {{- include "operator.labels" . | nindent 4 }}
 rules:
   - apiGroups:
-      - metrics.openmcp.cloud
+      - metrics.open-control-plane.io
     resources: ["*"]
     verbs:
       - get
