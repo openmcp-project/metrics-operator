@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.20.1
-  name: remoteclusteraccesses.metrics.openmcp.cloud
+  name: remoteclusteraccesses.metrics.open-control-plane.io
 spec:
-  group: metrics.openmcp.cloud
+  group: metrics.open-control-plane.io
   names:
     kind: RemoteClusterAccess
     listKind: RemoteClusterAccessList

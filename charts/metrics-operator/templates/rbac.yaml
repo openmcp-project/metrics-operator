@@ -11,7 +11,7 @@ rules:
       - customresourcedefinitions
     verbs: ["*"]
   - apiGroups:
-      - metrics.openmcp.cloud
+      - metrics.open-control-plane.io
     resources:
       - metrics
       - metrics/status
