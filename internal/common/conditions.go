@@ -22,7 +22,7 @@ func Available(message string) metav1.Condition {
 		Type:               v1alpha1.TypeAvailable,
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
-		Reason:             v1alpha1.ReasonMonitoringActive,
+		Reason:             v1alpha1.ReasonAvailable,
 		Message:            message,
 	}
 }
