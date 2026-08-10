@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -14,7 +15,10 @@ import (
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 )
 
-const defaultAutoDiscoveryCacheThreshold = 500 * time.Millisecond
+const (
+	defaultAutoDiscoveryCacheThreshold = 500 * time.Millisecond
+	verbList                           = "list"
+)
 
 type targetResource struct {
 	GVR schema.GroupVersionResource
@@ -200,10 +204,5 @@ func isListableTopLevelResource(resource metav1.APIResource) bool {
 	if len(resource.Verbs) == 0 {
 		return true
 	}
-	for _, verb := range resource.Verbs {
-		if verb == "list" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(resource.Verbs, verbList)
 }
