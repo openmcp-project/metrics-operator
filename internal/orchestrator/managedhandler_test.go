@@ -211,7 +211,7 @@ func TestGetManagedResources(t *testing.T) {
 				dCli:   setupFakeDynamicClient(t, tt.clusterResources),
 				metric: v1alpha1.ManagedMetric{
 					Spec: v1alpha1.ManagedMetricSpec{
-						Target: &v1alpha1.GroupVersionKind{
+						Target: &v1alpha1.GroupVersionKindTarget{
 							Group:   tt.gvkTarget.Group,
 							Version: tt.gvkTarget.Version,
 							Kind:    tt.gvkTarget.Kind,

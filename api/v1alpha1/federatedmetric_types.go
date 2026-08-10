@@ -30,7 +30,7 @@ type FederatedMetricSpec struct {
 	Description string `json:"description,omitempty"`
 
 	// +kubebuilder:validation:Required
-	Target GroupVersionKind `json:"target,omitempty"`
+	Target GroupVersionKindTarget `json:"target,omitempty"`
 
 	// Define labels of your object to adapt filters of the query
 	// +optional
@@ -61,9 +61,10 @@ type FederatedMetricSpec struct {
 
 // FederatedObservation represents the latest available observation of an object's state
 type FederatedObservation struct {
-	ActiveCount  int `json:"activeCount,omitempty"`
-	FailedCount  int `json:"failedCount,omitempty"`
-	PendingCount int `json:"pendingCount,omitempty"`
+	CommonObservation `json:",inline"`
+	ActiveCount       int `json:"activeCount,omitempty"`
+	FailedCount       int `json:"failedCount,omitempty"`
+	PendingCount      int `json:"pendingCount,omitempty"`
 }
 
 // FederatedMetricStatus defines the observed state of FederatedMetric

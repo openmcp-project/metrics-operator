@@ -109,17 +109,37 @@ spec:
                   type: object
                 type: array
               target:
-                description: GroupVersionKind defines the group, version and kind
-                  of the object that should be instrumented
+                description: GroupVersionKindTarget defines the group, version and
+                  kind of the object that should be instrumented
                 properties:
+                  cache:
+                    description: |-
+                      If GVK selection has a large result set, caching can improve performance.
+                      Cache controls discovery cache behavior for this target.
+                    properties:
+                      enabled:
+                        default: auto
+                        description: Enabled controls discovery cache behavior. Defaults
+                          to "auto".
+                        enum:
+                        - auto
+                        - true
+                        - false
+                        type: string
+                      ttlInMinutes:
+                        default: 10
+                        description: TTLInMinutes controls cache entry lifetime. Defaults
+                          to 10 minutes.
+                        type: integer
+                    type: object
                   group:
-                    description: Define the group of your object that should be instrumented
+                    description: Define the group of your object that should be instrumented.
                     type: string
                   kind:
-                    description: Define the kind of the object that should be instrumented
+                    description: Define the kind of the object that should be instrumented.
                     type: string
                   version:
-                    description: Define version of the object you want to be instrumented
+                    description: Define version of the object you want to be instrumented.
                     type: string
                 type: object
               valueFrom:
@@ -235,6 +255,16 @@ spec:
                   failedCount:
                     type: integer
                   pendingCount:
+                    type: integer
+                  targetLookupCacheHits:
+                    description: TargetLookupCacheHits is the number of target lookups
+                      served from discovery cache.
+                    format: int64
+                    type: integer
+                  targetLookupDurationMillis:
+                    description: TargetLookupDurationMillis is the total duration
+                      of target GVK/GVR discovery lookups.
+                    format: int64
                     type: integer
                 type: object
               ready:

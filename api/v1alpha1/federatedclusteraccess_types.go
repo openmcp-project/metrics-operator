@@ -31,7 +31,7 @@ type FederateClusterAccessRef struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.kubeConfigPath) && size(self.kubeConfigPath) > 0) != (has(self.secretRefPath) && size(self.secretRefPath) > 0)",message="exactly one of kubeConfigPath or secretRefPath must be set"
 type FederatedClusterAccessSpec struct {
 	// Define the target resources that should be monitored
-	Target GroupVersionKind `json:"target,omitempty"`
+	Target GroupVersionKindTarget `json:"target,omitempty"`
 
 	// Define labels of your object to adapt filters of the query
 	// +optional

@@ -197,7 +197,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "",
 								Version: "v1",
 								Kind:    "ConfigMap",
@@ -245,7 +245,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "test",
 								Version: "v1",
 								Kind:    "DataObject",
@@ -297,7 +297,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "test",
 								Version: "v1",
 								Kind:    "DataObject",
@@ -357,7 +357,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "test",
 								Version: "v1",
 								Kind:    "DataObject",
@@ -418,7 +418,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "test",
 								Version: "v1",
 								Kind:    "DataObject",
@@ -480,7 +480,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "",
 								Version: "v1",
 								Kind:    "ConfigMap",
@@ -556,7 +556,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "",
 								Version: "v1",
 								Kind:    "ConfigMap",
@@ -627,7 +627,7 @@ func TestCreateExternalQueryConfigSet(t *testing.T) {
 				case *insight.FederatedClusterAccess:
 					*obj = insight.FederatedClusterAccess{
 						Spec: insight.FederatedClusterAccessSpec{
-							Target: insight.GroupVersionKind{
+							Target: insight.GroupVersionKindTarget{
 								Group:   "",
 								Version: "v1",
 								Kind:    "ConfigMap",

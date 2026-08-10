@@ -31,7 +31,7 @@ type ManagedMetricSpec struct {
 	Description string `json:"description,omitempty"`
 	// Defines which managed resources to observe
 	// +optional
-	Target *GroupVersionKind `json:"target,omitempty"`
+	Target *GroupVersionKindTarget `json:"target,omitempty"`
 	// Defines dimensions of the metric. All specified fields must be nested strings. Nested slices are not supported.
 	// If not specified, only status.conditions of the CR will be used as dimension.
 	// +optional
