@@ -182,7 +182,7 @@ The operator exposes a standard [controller-runtime](https://github.com/kubernet
 
 | Metric                            | Type  | Description                                                                                                                                          |
 | --------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `metrics_operator_resource_count` | Gauge | Count of Kubernetes resources observed, labelled by `metric_name`, `namespace`, `kind`, `group`, `version`, `cluster`, `api_version`, `extra_labels` |
+| `metrics_operator_resource_count` | Gauge | Count of Kubernetes resources observed, labelled by `metric_name`, `namespace`, `target_kind`, `target_group`, `target_version`, `target_api_version`, `cr_kind`, `cr_group`, `cr_version`, `cr_api_version`, `cluster`, `extra_labels` |
 
 Standard controller-runtime metrics (work queue depth, reconcile errors, etc.) are also available.
 

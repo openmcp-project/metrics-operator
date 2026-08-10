@@ -81,7 +81,7 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		return MonitorResult{}, fmt.Errorf("could not retrieve target resource(s) %w", err)
 	}
 
-	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
+	groups := extractProjectionGroupsFromWithResourceGVK(list, h.metric.Spec.Projections, true)
 	valueByUID := resolveValueFrom(list, h.metric.Spec.ValueFrom)
 	dimensions := make(map[string]int)
 
@@ -89,12 +89,9 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		// Calculate count as the number of resource instances with this combination
 		count := len(fieldGroups)
 
-		dp := clientoptl.NewDataPoint().
-			AddDimension(CLUSTER, *h.clusterName).
-			AddDimension(RESOURCE, h.metric.Spec.Target.Kind).
-			AddDimension(GROUP, h.metric.Spec.Target.Group).
-			AddDimension(VERSION, h.metric.Spec.Target.Version).
-			SetValue(int64(count))
+		dp := clientoptl.NewDataPoint().SetValue(int64(count))
+		addClusterDimension(dp, h.clusterName)
+		addTargetGVKDimensions(dp, &h.metric.Spec.Target)
 
 		if len(fieldGroups) > 0 {
 			// Use aggregated valueFrom across all objects in the group if available

@@ -50,6 +50,7 @@ func NewManagedHandler(metric v1alpha1.ManagedMetric, qc QueryConfig, gaugeMetri
 }
 
 func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string, error) {
+	target := h.metric.Spec.Target
 	l := log.FromContext(ctx)
 	resources, err := h.getResourcesStatus(ctx)
 	if err != nil {
@@ -61,18 +62,12 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 		// Create a new data point for each resource
 		dataPoint := clientoptl.NewDataPoint()
 
+		addTargetGVKDimensions(dataPoint, target)
+		addResourceGVKDimensions(dataPoint, gvkFromAPIVersionAndKind(cr.MangedResource.APIVersion, cr.MangedResource.Kind))
+
 		// Preserve old logic so that if custom dimensions are not set, we use status.conditions
 		// as default dimensions
 		if h.metric.Spec.Dimensions == nil {
-			gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
-			if err != nil {
-				return "", err
-			}
-
-			dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
-			dataPoint.AddDimension(GROUP, gv.Group)
-			dataPoint.AddDimension(VERSION, gv.Version)
-
 			for typ, state := range cr.Status {
 				t := strings.ToLower(typ)
 				if t == "ready" || t == "synced" {
@@ -99,10 +94,7 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 			}
 		}
 
-		// Add cluster dimension if available
-		if h.clusterName != nil {
-			dataPoint.AddDimension(CLUSTER, *h.clusterName)
-		}
+		addClusterDimension(dataPoint, h.clusterName)
 
 		// Set the value to 1 for each resource
 		dataPoint.SetValue(1)

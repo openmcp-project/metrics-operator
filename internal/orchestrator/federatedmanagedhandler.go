@@ -37,6 +37,7 @@ func NewFederatedManagedHandler(metric v1alpha1.FederatedManagedMetric, qc Query
 		discoClient: disco,
 		gauge:       gaugeMetric,
 		clusterName: qc.ClusterName,
+		target:      qc.Target,
 	}
 
 	return handler, nil
@@ -52,6 +53,7 @@ type FederatedManagedHandler struct {
 
 	gauge       *clientoptl.Metric
 	clusterName *string
+	target      *v1alpha1.GroupVersionKindTarget
 }
 
 // Monitor is used to monitor the metric
@@ -70,6 +72,7 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 	}
 
 	var dimensions []v1alpha1.Dimension
+	target := h.target
 
 	// this is not right, we need to do a group by on the resources based on gvk
 
@@ -83,11 +86,11 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 
 	for _, cr := range resources {
 		dp := clientoptl.NewDataPoint().
-			AddDimension(CLUSTER, *h.clusterName).
-			AddDimension(KIND, cr.MangedResource.Kind).
-			AddDimension(APIVERSION, cr.MangedResource.APIVersion).
 			AddDimension("UUID", string(cr.MangedResource.Metadata.UID)). // this has to be unique, otherwise all the tuples are the same and the metric is not recorded properly
 			SetValue(int64(1))
+		addClusterDimension(dp, h.clusterName)
+		addTargetGVKDimensions(dp, target)
+		addResourceGVKDimensions(dp, gvkFromAPIVersionAndKind(cr.MangedResource.APIVersion, cr.MangedResource.Kind))
 
 		for fieldName, state := range cr.Status {
 			dp.AddDimension(fieldName, strconv.FormatBool(state))

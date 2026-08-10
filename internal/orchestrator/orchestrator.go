@@ -12,23 +12,52 @@ import (
 )
 
 const (
-	// KIND Constant for k8s resource fields
+	// KIND Constant for k8s resource fields.
+	// Deprecated: use TARGET_KIND or CR_KIND for GVK dimensions.
 	KIND string = "kind"
 
-	// GROUP Constant for k8s resource fields
+	// GROUP Constant for k8s resource fields.
+	// Deprecated: use TARGET_GROUP or CR_GROUP for GVK dimensions.
 	GROUP string = "group"
 
-	// VERSION Constant for k8s resource fields
+	// VERSION Constant for k8s resource fields.
+	// Deprecated: use TARGET_VERSION or CR_VERSION for GVK dimensions.
 	VERSION string = "version"
 
 	// CLUSTER Constant for k8s resource fields
 	CLUSTER string = "cluster"
 
-	// RESOURCE Constant for k8s resource fields
+	// RESOURCE Constant for k8s resource fields.
+	// Deprecated: use TARGET_KIND or CR_KIND for GVK dimensions.
 	RESOURCE string = "resource"
 
-	// APIVERSION Constant for k8s resource fields
+	// APIVERSION Constant for k8s resource fields.
+	// Deprecated: use TARGET_APIVERSION or CR_APIVERSION for GVK dimensions.
 	APIVERSION string = "apiVersion"
+
+	// TARGET_KIND Constant for monitored spec.target kind dimension.
+	TARGET_KIND string = "target_kind"
+
+	// TARGET_GROUP Constant for monitored spec.target group dimension.
+	TARGET_GROUP string = "target_group"
+
+	// TARGET_VERSION Constant for monitored spec.target version dimension.
+	TARGET_VERSION string = "target_version"
+
+	// TARGET_APIVERSION Constant for monitored spec.target apiVersion dimension.
+	TARGET_APIVERSION string = "target_api_version"
+
+	// CR_KIND Constant for observed resource kind dimension.
+	CR_KIND string = "cr_kind"
+
+	// CR_GROUP Constant for observed resource group dimension.
+	CR_GROUP string = "cr_group"
+
+	// CR_VERSION Constant for observed resource version dimension.
+	CR_VERSION string = "cr_version"
+
+	// CR_APIVERSION Constant for observed resource apiVersion dimension.
+	CR_APIVERSION string = "cr_api_version"
 )
 
 // GenericHandler is used to monitor the metric
@@ -50,6 +79,7 @@ type QueryConfig struct {
 	Client      rcli.Client
 	RestConfig  rest.Config
 	ClusterName *string
+	Target      *v1alpha1.GroupVersionKindTarget
 }
 
 // NewOrchestrator creates a new Orchestrator
