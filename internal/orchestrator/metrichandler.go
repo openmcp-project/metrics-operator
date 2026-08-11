@@ -39,6 +39,13 @@ func (h *MetricHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 
 	list, lookup, errGet := h.getResources(ctx)
 	if errGet != nil {
+		result.Observation = &v1alpha1.MetricObservation{
+			Timestamp: metav1.Now(),
+			CommonObservation: v1alpha1.CommonObservation{
+				TargetLookupDurationMillis: lookup.Duration.Milliseconds(),
+				TargetLookupCacheHits:      lookup.CacheHits,
+			},
+		}
 		result.Error = errGet
 		result.Phase = v1alpha1.PhaseFailed
 		result.Reason = "GetResourcesFailed"

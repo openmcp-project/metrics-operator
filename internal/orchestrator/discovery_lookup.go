@@ -37,12 +37,6 @@ type discoveryCacheEntry struct {
 	LastDuration time.Duration
 }
 
-type DiscoveryResource interface {
-	GetTarget() *v1alpha1.GroupVersionKindTarget
-	GetMetricObservation() *v1alpha1.MetricObservation
-	SetMetricObservation(*v1alpha1.MetricObservation)
-}
-
 var discoveryLookupCache = struct {
 	sync.Mutex
 	entries map[string]discoveryCacheEntry
