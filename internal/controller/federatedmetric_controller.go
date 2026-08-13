@@ -203,6 +203,8 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if credentials != nil {
 		creds = *credentials
 	}
+	metric.Status.Observation.TargetLookupDurationMillis = 0
+	metric.Status.Observation.TargetLookupCacheHits = 0
 	for _, queryConfig := range queryConfigs {
 
 		orchestrator, errOrch := orc.NewOrchestrator(creds, queryConfig).WithFederated(metric, gaugeMetric)
@@ -214,7 +216,11 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errOrch
 		}
 
-		_, errMon := orchestrator.Handler.Monitor(ctx)
+		result, errMon := orchestrator.Handler.Monitor(ctx)
+		if obs, ok := result.Observation.(*v1alpha1.MetricObservation); ok {
+			metric.Status.Observation.TargetLookupDurationMillis += obs.TargetLookupDurationMillis
+			metric.Status.Observation.TargetLookupCacheHits += obs.TargetLookupCacheHits
+		}
 
 		if errMon != nil {
 			metric.SetConditions(common.ReadyFalse("MonitoringFailed", errMon.Error()))

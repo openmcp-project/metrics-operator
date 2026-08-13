@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -15,18 +16,78 @@ const (
 	StatusFalse = "False"
 )
 
-// GroupVersionKind defines the group, version and kind of the object that should be instrumented
-type GroupVersionKind struct {
-	// Define the kind of the object that should be instrumented
+// TargetCacheEnabled controls discovery cache behavior for a target lookup.
+type TargetCacheEnabled string
+
+const (
+	// TargetCacheEnabledAuto enables cache after slow discovery lookups.
+	TargetCacheEnabledAuto TargetCacheEnabled = "auto"
+	// TargetCacheEnabledTrue always caches target discovery lookups.
+	TargetCacheEnabledTrue TargetCacheEnabled = "true"
+	// TargetCacheEnabledFalse disables target discovery cache.
+	TargetCacheEnabledFalse TargetCacheEnabled = "false"
+)
+
+// TargetCache defines discovery cache settings for a target lookup.
+type TargetCache struct {
+	// Enabled controls discovery cache behavior. Defaults to "auto".
+	// +optional
+	// +kubebuilder:validation:Enum=auto;true;false
+	// +kubebuilder:default:=auto
+	Enabled TargetCacheEnabled `json:"enabled,omitempty"`
+
+	// TTLInMinutes controls cache entry lifetime. Defaults to 10 minutes.
+	// +optional
+	// +kubebuilder:default:=10
+	TTLInMinutes int `json:"ttlInMinutes,omitempty"`
+}
+
+// Mode returns the configured cache mode with defaults applied.
+func (tc *TargetCache) Mode() TargetCacheEnabled {
+	if tc == nil || tc.Enabled == "" {
+		return TargetCacheEnabledAuto
+	}
+	return tc.Enabled
+}
+
+// TTL returns the configured cache TTL with defaults applied.
+func (tc *TargetCache) TTL() time.Duration {
+	if tc == nil || tc.TTLInMinutes <= 0 {
+		return 10 * time.Minute
+	}
+	return time.Duration(tc.TTLInMinutes) * time.Minute
+}
+
+// GroupVersionKindTarget defines the group, version and kind of the object that should be instrumented
+type GroupVersionKindTarget struct {
+	// Define the kind of the object that should be instrumented.
+	// +optional
 	Kind string `json:"kind,omitempty"`
-	// Define the group of your object that should be instrumented
+
+	// Define the group of your object that should be instrumented.
+	// +optional
 	Group string `json:"group,omitempty"`
-	// Define version of the object you want to be instrumented
+
+	// Define version of the object you want to be instrumented.
+	// +optional
 	Version string `json:"version,omitempty"`
+
+	// If GVK selection has a large result set, caching can improve performance.
+	// Cache controls discovery cache behavior for this target.
+	// +optional
+	Cache TargetCache `json:"cache,omitempty"`
+}
+
+type CommonObservation struct {
+	// TargetLookupDurationMillis is the total duration of target GVK/GVR discovery lookups.
+	TargetLookupDurationMillis int64 `json:"targetLookupDurationMillis,omitempty"`
+
+	// TargetLookupCacheHits is the number of target lookups served from discovery cache.
+	TargetLookupCacheHits int64 `json:"targetLookupCacheHits,omitempty"`
 }
 
 // GVK returns the schema.GroupVersionKind object of v1alpha1 GVK
-func (gvk *GroupVersionKind) GVK() schema.GroupVersionKind {
+func (gvk *GroupVersionKindTarget) GVK() schema.GroupVersionKind {
 	return schema.GroupVersionKind{
 		Group:   gvk.Group,
 		Kind:    gvk.Kind,
@@ -167,6 +228,8 @@ const (
 
 // MetricObservation represents the latest available observation of an object's state
 type MetricObservation struct {
+	CommonObservation `json:",inline"`
+
 	// The timestamp of the observation
 	Timestamp metav1.Time `json:"timestamp,omitempty"`
 

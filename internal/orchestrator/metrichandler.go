@@ -25,6 +25,7 @@ type MetricHandler struct {
 
 	gaugeMetric *clientoptl.Metric // Changed from dtClient
 	clusterName *string
+	clusterKey  string
 }
 
 // Monitor is used to monitor the metric
@@ -36,8 +37,15 @@ func (h *MetricHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	// This handler focuses on fetching resources, grouping, and recording data points.
 	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
-	list, errGet := h.getResources(ctx)
+	list, lookup, errGet := h.getResources(ctx)
 	if errGet != nil {
+		result.Observation = &v1alpha1.MetricObservation{
+			Timestamp: metav1.Now(),
+			CommonObservation: v1alpha1.CommonObservation{
+				TargetLookupDurationMillis: lookup.Duration.Milliseconds(),
+				TargetLookupCacheHits:      lookup.CacheHits,
+			},
+		}
 		result.Error = errGet
 		result.Phase = v1alpha1.PhaseFailed
 		result.Reason = "GetResourcesFailed"
@@ -46,12 +54,12 @@ func (h *MetricHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	}
 
 	if len(h.metric.Spec.Projections) == 0 {
-		return h.simpleMonitor(ctx, list)
+		return h.simpleMonitor(ctx, list, lookup)
 	}
-	return h.projectionsMonitor(ctx, list)
+	return h.projectionsMonitor(ctx, list, lookup)
 }
 
-func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.UnstructuredList) (MonitorResult, error) {
+func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult) (MonitorResult, error) {
 	primaryCount := len(list.Items)
 	dataPoint := clientoptl.NewDataPoint().SetValue(int64(primaryCount))
 	h.setDataPointBaseDimensions(dataPoint)
@@ -59,6 +67,10 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 	metricObservation := &v1alpha1.MetricObservation{
 		Timestamp:   metav1.Now(),
 		LatestValue: strconv.Itoa(len(list.Items)),
+		CommonObservation: v1alpha1.CommonObservation{
+			TargetLookupDurationMillis: lookup.Duration.Milliseconds(),
+			TargetLookupCacheHits:      lookup.CacheHits,
+		},
 	}
 
 	if err := h.gaugeMetric.RecordMetrics(ctx, dataPoint); err != nil {
@@ -79,7 +91,7 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 	}, nil
 }
 
-func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructured.UnstructuredList) (MonitorResult, error) {
+func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult) (MonitorResult, error) {
 	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
 	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
@@ -138,7 +150,15 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 			result.Reason = v1alpha1.ReasonMonitoringActive
 			result.Message = fmt.Sprintf("metric values recorded for resource '%s'", h.metric.GvkToString())
 			// Observation might need adjustment depending on how results should be represented in status
-			result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), LatestValue: strconv.Itoa(len(list.Items))} // Report total count for now
+			// Report total count for now
+			result.Observation = &v1alpha1.MetricObservation{
+				Timestamp:   metav1.Now(),
+				LatestValue: strconv.Itoa(len(list.Items)),
+				CommonObservation: v1alpha1.CommonObservation{
+					TargetLookupDurationMillis: lookup.Duration.Milliseconds(),
+					TargetLookupCacheHits:      lookup.CacheHits,
+				},
+			}
 		}
 		// Return the result, error indicates failure in Monitor execution, not necessarily metric export failure (handled by controller)
 	}
@@ -146,14 +166,18 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 }
 
 func (h *MetricHandler) setDataPointBaseDimensions(dataPoint *clientoptl.DataPoint) {
-	if h.metric.Spec.Target.Kind != "" {
-		dataPoint.AddDimension(RESOURCE, h.metric.Spec.Target.Kind)
+	h.setDataPointBaseDimensionsFor(dataPoint, h.metric.Spec.Target.GVK())
+}
+
+func (h *MetricHandler) setDataPointBaseDimensionsFor(dataPoint *clientoptl.DataPoint, gvk schema.GroupVersionKind) {
+	if gvk.Kind != "" {
+		dataPoint.AddDimension(RESOURCE, gvk.Kind)
 	}
-	if h.metric.Spec.Target.Group != "" {
-		dataPoint.AddDimension(GROUP, h.metric.Spec.Target.Group)
+	if gvk.Group != "" {
+		dataPoint.AddDimension(GROUP, gvk.Group)
 	}
-	if h.metric.Spec.Target.Version != "" {
-		dataPoint.AddDimension(VERSION, h.metric.Spec.Target.Version)
+	if gvk.Version != "" {
+		dataPoint.AddDimension(VERSION, gvk.Version)
 	}
 	if h.clusterName != nil && *h.clusterName != "" {
 		dataPoint.AddDimension(CLUSTER, *h.clusterName)
@@ -172,7 +196,7 @@ func (e *projectedField) GetID() string {
 	return fmt.Sprintf("%s: %s", e.name, e.value)
 }
 
-func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, error) {
+func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.UnstructuredList, targetLookupResult, error) {
 	var options = metav1.ListOptions{}
 	// if not defined in the metric, the list options need to be empty to get resources based on GVR only
 	// Add label selector if present
@@ -185,16 +209,24 @@ func (h *MetricHandler) getResources(ctx context.Context) (*unstructured.Unstruc
 		options.FieldSelector = h.metric.Spec.FieldSelector
 	}
 
-	gvr, err := GetGVRfromGVK(h.metric.Spec.Target.GVK(), h.discoClient)
+	lookup, err := lookupTargetResources(h.metric.Spec.Target, h.metric.Status.Observation.CommonObservation, h.discoClient, h.clusterKey)
 	if err != nil {
-		return nil, err
-	}
-	list, err := h.dCli.Resource(gvr).List(ctx, options)
-	if err != nil {
-		return nil, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", gvr.String(), err)
+		return nil, lookup, err
 	}
 
-	return list, nil
+	combined := &unstructured.UnstructuredList{Items: make([]unstructured.Unstructured, 0)}
+	for _, resource := range lookup.Resources {
+		list, err := h.dCli.Resource(resource.GVR).List(ctx, options)
+		if err != nil {
+			return nil, lookup, fmt.Errorf("could not find any matching resources for metric set with filter '%s'. %w", resource.GVR.String(), err)
+		}
+		for _, item := range list.Items {
+			item.SetGroupVersionKind(resource.GVK)
+			combined.Items = append(combined.Items, item)
+		}
+	}
+
+	return combined, lookup, nil
 }
 
 // NewMetricHandler creates a new MetricHandler
@@ -215,6 +247,7 @@ func NewMetricHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clien
 		discoClient: disco,
 		gaugeMetric: gaugeMetric,
 		clusterName: qc.ClusterName,
+		clusterKey:  discoveryCacheKeyFromConfig(qc),
 	}
 
 	return handler, nil
@@ -222,13 +255,15 @@ func NewMetricHandler(metric v1alpha1.Metric, qc QueryConfig, gaugeMetric *clien
 
 // GetGVRfromGVK converts GVK to GVR
 func GetGVRfromGVK(gvk schema.GroupVersionKind, disco discovery.DiscoveryInterface) (schema.GroupVersionResource, error) {
-	// TODO: this could be optimized later (e.g. by caching the discovery client)
 	groupResources, err := disco.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
 	if err != nil {
 		return schema.GroupVersionResource{}, err
 	}
 
 	for _, resource := range groupResources.APIResources {
+		if !isListableTopLevelResource(resource) {
+			continue
+		}
 		if strings.EqualFold(resource.Kind, gvk.Kind) {
 			return schema.GroupVersionResource{
 				Group:    gvk.Group,
@@ -238,5 +273,5 @@ func GetGVRfromGVK(gvk schema.GroupVersionKind, disco discovery.DiscoveryInterfa
 		}
 	}
 
-	return schema.GroupVersionResource{}, nil
+	return schema.GroupVersionResource{}, fmt.Errorf("no resource found for %s", gvk.String())
 }

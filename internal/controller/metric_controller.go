@@ -259,6 +259,10 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Timestamp:   result.Observation.GetTimestamp(),
 		LatestValue: cObs.LatestValue,
 		Dimensions:  cObs.Dimensions,
+		CommonObservation: v1alpha1.CommonObservation{
+			TargetLookupDurationMillis: cObs.TargetLookupDurationMillis,
+			TargetLookupCacheHits:      cObs.TargetLookupCacheHits,
+		},
 	}
 
 	// Update LastReconcileTime

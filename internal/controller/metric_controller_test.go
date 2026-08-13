@@ -141,7 +141,6 @@ func TestMetricController(t *testing.T) {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{"../../config/crd/bases"},
 		ErrorIfCRDPathMissing: true,
-		BinaryAssetsDirectory: "../../bin/k8s/1.27.1-darwin-arm64", // Use the binaries in the bin directory
 	}
 
 	var err error
@@ -249,7 +248,7 @@ func testReconcileSecretNotFound(t *testing.T) {
 		Spec: v1alpha1.MetricSpec{
 			Name:        "test-metric-no-datasink",
 			Description: "Test metric description",
-			Target: v1alpha1.GroupVersionKind{
+			Target: v1alpha1.GroupVersionKindTarget{
 				Kind:    "Pod",
 				Group:   "",
 				Version: "v1",
@@ -310,7 +309,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 		Spec: v1alpha1.MetricSpec{
 			Name:        "test-metric",
 			Description: "Test metric description",
-			Target: v1alpha1.GroupVersionKind{
+			Target: v1alpha1.GroupVersionKindTarget{
 				Kind:    "Pod",
 				Group:   "",
 				Version: "v1",
@@ -391,7 +390,7 @@ func testReconcileMetricHappyPath(t *testing.T) {
 	}
 	require.NotNil(t, availableCondition)
 	require.Equal(t, metav1.ConditionTrue, availableCondition.Status)
-	require.Equal(t, "MonitoringActive", availableCondition.Reason)
+	require.Equal(t, "Available", availableCondition.Reason)
 	require.Equal(t, "metric is monitoring resource '/v1, Kind=Pod'", availableCondition.Message)
 
 	// Verify that events were recorded

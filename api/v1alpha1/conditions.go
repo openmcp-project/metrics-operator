@@ -4,6 +4,9 @@ const (
 	// ReasonMonitoringActive is used to indicate that the metric is currently monitoring the resource
 	ReasonMonitoringActive = "MonitoringActive"
 
+	// ReasonAvailable is used to indicate that the resource being monitored is available
+	ReasonAvailable = "Available"
+
 	// ReasonSendMetricFailed is used to indicate that the metric failed to send the metric value to the data sink
 	ReasonSendMetricFailed = "SendMetricFailed"
 
@@ -16,7 +19,7 @@ const (
 	// ReasonInactive is used to indicate that the resource being monitored is currently unavailable
 	ReasonInactive = "MonitoringInactive"
 
-	// ReasonMetricsCreating is used to indicate that the metric is currently being crevated
+	// ReasonMetricsCreating is used to indicate that the metric is currently being created and not yet ready to monitor the resource
 	ReasonMetricsCreating = "MetricsCreating"
 
 	// TypeAvailable is a generic condition type that indicates the resource being monitored is currently available

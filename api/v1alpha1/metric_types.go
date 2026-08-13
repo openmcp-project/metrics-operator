@@ -53,7 +53,7 @@ type MetricSpec struct {
 	// +optional
 	Description string `json:"description,omitempty"`
 	// +kubebuilder:validation:Required
-	Target GroupVersionKind `json:"target,omitempty"`
+	Target GroupVersionKindTarget `json:"target,omitempty"`
 	// Define labels of your object to adapt filters of the query
 	// +optional
 	LabelSelector string `json:"labelSelector,omitempty"`
