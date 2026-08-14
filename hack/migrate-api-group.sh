@@ -58,11 +58,11 @@ for KIND in "${KINDS[@]}"; do
     echo "  namespace=${NS}: found ${COUNT} object(s)"
 
     # Write each object rewritten to new apiVersion
-    echo "${ITEMS}" | python3 - <<'PYEOF' "${NS}" "${KIND}" "${OLD_GROUP}" "${NEW_GROUP}" "${VERSION}" "${TMPDIR}" "${KUBECTL_FLAGS}"
+    ITEMS_JSON="${ITEMS}" python3 - <<'PYEOF' "${NS}" "${KIND}" "${OLD_GROUP}" "${NEW_GROUP}" "${VERSION}" "${TMPDIR}" "${KUBECTL_FLAGS}"
 import sys, json, subprocess, os, tempfile
 
 ns, kind, old_group, new_group, version, tmpdir, kubectl_flags = sys.argv[1:]
-data = json.load(sys.stdin)
+data = json.loads(os.environ["ITEMS_JSON"])
 
 for item in data.get("items", []):
     name = item["metadata"]["name"]

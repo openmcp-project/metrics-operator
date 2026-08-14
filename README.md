@@ -9,22 +9,33 @@ A Kubernetes operator that collects counts and attributes of cluster resources a
 - **Flexible targeting**: Monitor any Kubernetes or Crossplane resource by GroupVersionKind
 - **Federation**: Aggregate metrics across multiple clusters
 - **Rich dimensions**: Extract labels, annotations, conditions, or any field as metric attributes
+- **Comprehensive Resource Tracking**: Quantifies and catalogs various resource types, providing a holistic view of resource distribution and utilization.
+- **Multi-dimensional Analysis**: Examines specific attributes and dimensions of resources, generating nuanced metrics for deeper understanding of system behavior.
+- **Comparative Analytics**: Enables side-by-side analysis of different resource configurations, highlighting patterns and potential imbalances in resource allocation.
+- **Custom Component Focus**: Tailored to monitor and analyze complex, custom-defined resources across your infrastructure.
+- **Predictive Insights**: Aggregates data over time to identify emerging trends, supporting data-driven decision making for future system enhancements.
+- **Strategic Decision Support**: Offers data-backed insights to guide product evolution.
+- **Customizable Alerting System**: Allows defining alerts based on specific metric thresholds, enabling proactive response to potential issues or significant changes in system state.
 - **Pluggable sinks**: Send to any OTLP-compatible endpoint via `DataSink` CRDs
 - **Standardized**: Full OpenTelemetry protocol support
 - **ServiceMonitor integration**: Create `ServiceMonitor` resources for Prometheus scraping
 
+#### Current Limitations
+- Pod-level log aggregation & collection not currently supported
+- Pod metrics collection feature in [backlog](https://github.com/openmcp-project/metrics-operator/issues/70)
+- 
 ## Documentation
 
-| Topic | Description |
-|---|---|
-| [Installation](docs/installation.md) | Helm deployment and post-install setup |
-| [Architecture](docs/architecture.md) | Resource types, flows, and data model |
-| [Usage](docs/usage.md) | Metric, ManagedMetric, FederatedMetric, FederatedManagedMetric examples |
-| [Dimensions Configuration](docs/dimensions-configuration.md) | Projections, valueFrom, cardinality |
-| [Metrics Export](docs/metrics-export.md) | DataSink (OTLP push), ServiceMonitor (Prometheus scrape) |
-| [Remote Cluster Access](docs/remote-cluster-access.md) | RemoteClusterAccess and FederatedClusterAccess |
-| [RBAC](docs/rbac.md) | Permissions required for monitored resources |
-| [Development](docs/development.md) | Local development with kind |
+| Topic                                                        | Description                                                             |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [Installation](docs/installation.md)                         | Helm deployment and post-install setup                                  |
+| [Architecture](docs/architecture.md)                         | Resource types, flows, and data model                                   |
+| [Usage](docs/usage.md)                                       | Metric, ManagedMetric, FederatedMetric, FederatedManagedMetric examples |
+| [Dimensions Configuration](docs/dimensions-configuration.md) | Projections, valueFrom, cardinality                                     |
+| [Metrics Export](docs/metrics-export.md)                     | DataSink (OTLP push), ServiceMonitor (Prometheus scrape)                |
+| [Remote Cluster Access](docs/remote-cluster-access.md)       | RemoteClusterAccess and FederatedClusterAccess                          |
+| [RBAC](docs/rbac.md)                                         | Permissions required for monitored resources                            |
+| [Development](docs/development.md)                           | Local development with kind                                             |
 
 ## Quickstart
 
