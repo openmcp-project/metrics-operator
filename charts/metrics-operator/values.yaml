@@ -44,7 +44,9 @@ manager:
   args: []
   extraArgs: []
 
-  env: []
+  env:
+  - name: OTEL_SERVICE_NAME
+    value: metrics-operator
   # Extra environment variables to add to the manager container.
   extraEnv: []
 
