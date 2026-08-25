@@ -44,7 +44,12 @@ manager:
   args: []
   extraArgs: []
 
-  env: []
+  env:
+  - name: "OTEL_SERVICE_NAME"
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+        
   # Extra environment variables to add to the manager container.
   extraEnv: []
 
