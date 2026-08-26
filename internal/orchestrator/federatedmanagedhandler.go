@@ -3,12 +3,13 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -17,6 +18,8 @@ import (
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 )
+
+const federatedManagedListPageSize int64 = 500
 
 // NewFederatedManagedHandler creates a new FederatedManagedHandler
 func NewFederatedManagedHandler(metric v1alpha1.FederatedManagedMetric, qc QueryConfig, gaugeMetric *clientoptl.Metric) (*FederatedManagedHandler, error) {
@@ -54,13 +57,19 @@ type FederatedManagedHandler struct {
 	clusterName *string
 }
 
+type federatedManagedBucket struct {
+	cluster    string
+	kind       string
+	apiVersion string
+	ready      string
+	synced     string
+}
+
 // Monitor is used to monitor the metric
 func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
-
 	result := MonitorResult{}
 
-	resources, err := h.getResourcesStatus(ctx)
-
+	count, err := h.recordManagedResourceCounts(ctx)
 	if err != nil {
 		result.Error = err
 		result.Phase = v1alpha1.PhaseFailed
@@ -69,100 +78,31 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 		return result, nil //nolint:nilerr
 	}
 
-	var dimensions []v1alpha1.Dimension
-
-	// this is not right, we need to do a group by on the resources based on gvk
-
-	// groups := lo.GroupBy(resources, func(r ClusterResourceStatus) string {
-	//	return fmt.Sprintf("%s/%s", r.MangedResource.Kind, r.MangedResource.APIVersion)
-	// })
-	//
-	// for _, group := range groups {
-	//
-	// }
-
-	for _, cr := range resources {
-		dp := clientoptl.NewDataPoint().
-			AddDimension(CLUSTER, *h.clusterName).
-			AddDimension(KIND, cr.MangedResource.Kind).
-			AddDimension(APIVERSION, cr.MangedResource.APIVersion).
-			AddDimension("UUID", string(cr.MangedResource.Metadata.UID)). // this has to be unique, otherwise all the tuples are the same and the metric is not recorded properly
-			SetValue(int64(1))
-
-		for fieldName, state := range cr.Status {
-			dp.AddDimension(fieldName, strconv.FormatBool(state))
-			dimensions = append(dimensions, v1alpha1.Dimension{Name: fieldName, Value: strconv.FormatBool(state)})
-		}
-
-		err = h.gauge.RecordMetrics(ctx, dp)
-		if err != nil {
-			return MonitorResult{}, fmt.Errorf("could not record metric: %w", err)
-		}
-
-	}
-
 	result.Phase = v1alpha1.PhaseActive
 	result.Reason = v1alpha1.ReasonMonitoringActive
 	result.Message = fmt.Sprintf("metric is monitoring federated managed resources '%s'", h.metric.Name)
-
-	if dimensions != nil {
-		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now(), Dimensions: []v1alpha1.Dimension{{Name: dimensions[0].Name, Value: strconv.Itoa(len(resources))}}}
-	} else {
-		result.Observation = &v1alpha1.MetricObservation{Timestamp: metav1.Now()}
+	result.Observation = &v1alpha1.MetricObservation{
+		Timestamp:   metav1.Now(),
+		LatestValue: strconv.Itoa(count),
+		Dimensions:  []v1alpha1.Dimension{{Name: "resources", Value: strconv.Itoa(count)}},
 	}
 
 	return result, nil
-
 }
 
-func (h *FederatedManagedHandler) getResourcesStatus(ctx context.Context) ([]ClusterResourceStatus, error) {
-	managedResources, err := h.getManagedResources(ctx)
-	if err != nil {
-		return []ClusterResourceStatus{}, err
-	}
-
-	crStatuses := make([]ClusterResourceStatus, 0)
-
-	for _, item := range managedResources {
-		rsStatus := ClusterResourceStatus{MangedResource: item, Status: make(map[string]bool)}
-		for _, condition := range item.Status.Conditions {
-			status, _ := strconv.ParseBool(condition.Status)
-			rsStatus.Status[condition.Type] = status
-		}
-		crStatuses = append(crStatuses, rsStatus)
-	}
-
-	return crStatuses, nil
-}
-
-// is used to check if a resource from the cluster has a specific field
-func (h *FederatedManagedHandler) hasCategory(category string, crd apiextensionsv1.CustomResourceDefinition) bool {
-	for _, v := range crd.Spec.Names.Categories {
-		if v == category {
-			return true
-		}
-	}
-
-	return false
-}
-
-//nolint:gocyclo
-func (h *FederatedManagedHandler) getManagedResources(ctx context.Context) ([]Managed, error) {
-
+func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Context) (int, error) {
 	crds := &apiextensionsv1.CustomResourceDefinitionList{} // get ALL custom resource definitions
 	if err := h.client.List(ctx, crds); err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	var resourceCRDs []apiextensionsv1.CustomResourceDefinition
+	counts := map[federatedManagedBucket]int64{}
+	total := 0
+
 	for _, crd := range crds.Items {
-		if h.hasCategory("crossplane", crd) && h.hasCategory("managed", crd) { // filter previously acquired crds
-			resourceCRDs = append(resourceCRDs, crd)
+		if !slices.Contains(crd.Spec.Names.Categories, "crossplane") || !slices.Contains(crd.Spec.Names.Categories, "managed") { // filter previously acquired crds
+			continue
 		}
-	}
-
-	var resources []unstructured.Unstructured
-	for _, crd := range resourceCRDs {
 
 		// Use the stored versions of the CRD
 		storedVersions := make(map[string]bool)
@@ -181,27 +121,77 @@ func (h *FederatedManagedHandler) getManagedResources(ctx context.Context) ([]Ma
 				Version:  crdv.Name,
 			}
 
-			list, err := h.dCli.Resource(gvr).List(ctx, metav1.ListOptions{}) // gets resources from all the available crds
-			if err != nil {
-				return nil, fmt.Errorf("could not find any matching resources for metric '%s'. %w", h.metric.Name, err)
-			}
+			opts := metav1.ListOptions{Limit: federatedManagedListPageSize}
+			for {
+				list, err := h.dCli.Resource(gvr).List(ctx, opts) // gets resources from all the available crds
+				if err != nil {
+					return total, fmt.Errorf("could not find any matching resources for metric '%s'. %w", h.metric.Name, err)
+				}
 
-			if len(list.Items) > 0 {
-				resources = append(resources, list.Items...)
+				for i := range list.Items {
+					item := &list.Items[i]
+					counts[federatedManagedBucket{
+						cluster:    h.clusterDimension(),
+						kind:       item.GetKind(),
+						apiVersion: item.GetAPIVersion(),
+						ready:      conditionStatus(item, "Ready"),
+						synced:     conditionStatus(item, "Synced"),
+					}]++
+					total++
+				}
+
+				if list.GetContinue() == "" {
+					break
+				}
+				opts.Continue = list.GetContinue()
 			}
 		}
 	}
 
-	managedResources := make([]Managed, 0, len(resources))
-	for _, u := range resources {
-		managed := Managed{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &managed)
-		if err != nil {
-			return nil, err
-		}
+	for bucket, count := range counts {
+		dataPoint := clientoptl.NewDataPoint().
+			AddDimension(CLUSTER, bucket.cluster).
+			AddDimension(KIND, bucket.kind).
+			AddDimension(APIVERSION, bucket.apiVersion).
+			AddDimension("Ready", bucket.ready).
+			AddDimension("Synced", bucket.synced).
+			SetValue(count)
 
-		managedResources = append(managedResources, managed)
+		if err := h.gauge.RecordMetrics(ctx, dataPoint); err != nil {
+			return total, fmt.Errorf("could not record metric: %w", err)
+		}
 	}
 
-	return managedResources, nil
+	return total, nil
+}
+
+func (h *FederatedManagedHandler) clusterDimension() string {
+	if h.clusterName == nil {
+		return ""
+	}
+	return *h.clusterName
+}
+
+func conditionStatus(item *unstructured.Unstructured, conditionType string) string {
+	conditions, ok, _ := unstructured.NestedSlice(item.Object, "status", "conditions")
+	if !ok {
+		return "unknown"
+	}
+
+	for _, condition := range conditions {
+		conditionMap, ok := condition.(map[string]any)
+		if !ok {
+			continue
+		}
+		if conditionMap["type"] != conditionType {
+			continue
+		}
+		status, ok := conditionMap["status"].(string)
+		if !ok {
+			return "unknown"
+		}
+		return strings.ToLower(status)
+	}
+
+	return "unknown"
 }
