@@ -91,7 +91,7 @@ metrics:
   listen:
     port: 8080
   service:
-    enabled: false
+    enabled: true
     port: 8080
     type: ClusterIP
     annotations: {}
