@@ -281,11 +281,18 @@ func aggregateGroupValue(uids []string, valueByUID map[string]int64, vf *v1alpha
 
 // It returns a map where the key is a unique combination of projected values and the value is a list of groups of projected fields that share that combination.
 func extractProjectionGroupsFrom(list *unstructured.UnstructuredList, projections []v1alpha1.Projection) projectionGroups {
+	return extractProjectionGroupsFromWithResourceGVK(list, projections, false)
+}
+
+func extractProjectionGroupsFromWithResourceGVK(list *unstructured.UnstructuredList, projections []v1alpha1.Projection, includeResourceGVK bool) projectionGroups {
 	collection := make([][]projectedField, 0, len(list.Items))
 
 	for _, obj := range list.Items {
 		uid := string(obj.GetUID())
 		var fields []projectedField
+		if includeResourceGVK {
+			fields = append(fields, resourceGVKProjectedFields(obj)...)
+		}
 		for _, projection := range projections {
 			if projection.Name != "" && projection.FieldPath != "" {
 				name := projection.Name

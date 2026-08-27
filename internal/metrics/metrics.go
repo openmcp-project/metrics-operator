@@ -7,21 +7,39 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+const (
+	labelMetricName       = "metric_name"
+	labelNamespace        = "namespace"
+	labelTargetKind       = "target_kind"
+	labelTargetGroup      = "target_group"
+	labelTargetVersion    = "target_version"
+	labelTargetAPIVersion = "target_api_version"
+	labelCRKind           = "cr_kind"
+	labelCRGroup          = "cr_group"
+	labelCRVersion        = "cr_version"
+	labelCRAPIVersion     = "cr_api_version"
+	labelCluster          = "cluster"
+	labelExtraLabels      = "extra_labels"
+)
+
 var ResourceCountGauge = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "metrics_operator_resource_count",
 		Help: "Count of Kubernetes resources observed by the metrics-operator.",
 	},
 	[]string{
-		"metric_name",
-		"namespace",
-		"resource",
-		"group",
-		"version",
-		"cluster",
-		"kind",
-		"api_version",
-		"extra_labels",
+		labelMetricName,
+		labelNamespace,
+		labelTargetKind,
+		labelTargetGroup,
+		labelTargetVersion,
+		labelTargetAPIVersion,
+		labelCRKind,
+		labelCRGroup,
+		labelCRVersion,
+		labelCRAPIVersion,
+		labelCluster,
+		labelExtraLabels,
 	},
 )
 
@@ -34,28 +52,37 @@ func init() {
 // dims is the DataPoint.Dimensions map, value is the gauge value.
 func RecordDataPoint(metricName, namespace string, dims map[string]string, value int64) {
 	fixed := map[string]string{
-		"resource":    "",
-		"group":       "",
-		"version":     "",
-		"cluster":     "",
-		"kind":        "",
-		"api_version": "",
+		labelTargetKind:       "",
+		labelTargetGroup:      "",
+		labelTargetVersion:    "",
+		labelTargetAPIVersion: "",
+		labelCRKind:           "",
+		labelCRGroup:          "",
+		labelCRVersion:        "",
+		labelCRAPIVersion:     "",
+		labelCluster:          "",
 	}
 	overflow := make(map[string]string)
 	for k, v := range dims {
 		switch k {
-		case "resource":
-			fixed["resource"] = v
-		case "group":
-			fixed["group"] = v
-		case "version":
-			fixed["version"] = v
-		case "cluster":
-			fixed["cluster"] = v
-		case "kind":
-			fixed["kind"] = v
-		case "apiVersion":
-			fixed["api_version"] = v
+		case labelTargetKind:
+			fixed[labelTargetKind] = v
+		case labelTargetGroup:
+			fixed[labelTargetGroup] = v
+		case labelTargetVersion:
+			fixed[labelTargetVersion] = v
+		case labelTargetAPIVersion:
+			fixed[labelTargetAPIVersion] = v
+		case labelCRKind:
+			fixed[labelCRKind] = v
+		case labelCRGroup:
+			fixed[labelCRGroup] = v
+		case labelCRVersion:
+			fixed[labelCRVersion] = v
+		case labelCRAPIVersion, "cr_apiVersion":
+			fixed[labelCRAPIVersion] = v
+		case labelCluster:
+			fixed[labelCluster] = v
 		default:
 			overflow[k] = v
 		}
@@ -67,14 +94,17 @@ func RecordDataPoint(metricName, namespace string, dims map[string]string, value
 		}
 	}
 	ResourceCountGauge.With(prometheus.Labels{
-		"metric_name":  metricName,
-		"namespace":    namespace,
-		"resource":     fixed["resource"],
-		"group":        fixed["group"],
-		"version":      fixed["version"],
-		"cluster":      fixed["cluster"],
-		"kind":         fixed["kind"],
-		"api_version":  fixed["api_version"],
-		"extra_labels": extra,
+		labelMetricName:       metricName,
+		labelNamespace:        namespace,
+		labelTargetKind:       fixed[labelTargetKind],
+		labelTargetGroup:      fixed[labelTargetGroup],
+		labelTargetVersion:    fixed[labelTargetVersion],
+		labelTargetAPIVersion: fixed[labelTargetAPIVersion],
+		labelCRKind:           fixed[labelCRKind],
+		labelCRGroup:          fixed[labelCRGroup],
+		labelCRVersion:        fixed[labelCRVersion],
+		labelCRAPIVersion:     fixed[labelCRAPIVersion],
+		labelCluster:          fixed[labelCluster],
+		labelExtraLabels:      extra,
 	}).Set(float64(value))
 }

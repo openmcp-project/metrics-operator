@@ -53,10 +53,15 @@ func (h *MetricHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		return result, nil // Return error state, but not the error itself to controller
 	}
 
-	if len(h.metric.Spec.Projections) == 0 {
-		return h.simpleMonitor(ctx, list, lookup)
+	return h.monitorByProjectionGroups(ctx, list, lookup)
+}
+
+func (h *MetricHandler) monitorByProjectionGroups(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult) (MonitorResult, error) {
+	groups := extractProjectionGroupsFromWithResourceGVK(list, h.metric.Spec.Projections, true)
+	if len(groups) > 0 {
+		return h.projectionsMonitor(ctx, list, lookup, groups)
 	}
-	return h.projectionsMonitor(ctx, list, lookup)
+	return h.simpleMonitor(ctx, list, lookup)
 }
 
 func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult) (MonitorResult, error) {
@@ -91,8 +96,7 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 	}, nil
 }
 
-func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult) (MonitorResult, error) {
-	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
+func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult, groups projectionGroups) (MonitorResult, error) {
 	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
 	// Pre-resolve valueFrom per object UID
@@ -166,22 +170,8 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 }
 
 func (h *MetricHandler) setDataPointBaseDimensions(dataPoint *clientoptl.DataPoint) {
-	h.setDataPointBaseDimensionsFor(dataPoint, h.metric.Spec.Target.GVK())
-}
-
-func (h *MetricHandler) setDataPointBaseDimensionsFor(dataPoint *clientoptl.DataPoint, gvk schema.GroupVersionKind) {
-	if gvk.Kind != "" {
-		dataPoint.AddDimension(RESOURCE, gvk.Kind)
-	}
-	if gvk.Group != "" {
-		dataPoint.AddDimension(GROUP, gvk.Group)
-	}
-	if gvk.Version != "" {
-		dataPoint.AddDimension(VERSION, gvk.Version)
-	}
-	if h.clusterName != nil && *h.clusterName != "" {
-		dataPoint.AddDimension(CLUSTER, *h.clusterName)
-	}
+	addTargetGVKDimensions(dataPoint, &h.metric.Spec.Target)
+	addClusterDimension(dataPoint, h.clusterName)
 }
 
 type projectedField struct {

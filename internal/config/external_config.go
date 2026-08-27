@@ -318,13 +318,14 @@ func CreateExternalQueryConfigSet(ctx context.Context, fcaRef v1alpha1.FederateC
 			if errQC != nil {
 				return nil, fmt.Errorf("failed to create query config from kubeconfig secret ref: %w", errQC)
 			}
+			qc.Target = &set.Spec.Target
 			queryConfigs = append(queryConfigs, *qc)
 		}
 
 		return queryConfigs, nil
 	}
 
-	return extractKubeConfigs(kcPath, list)
+	return extractKubeConfigsWithTarget(kcPath, list, &set.Spec.Target)
 }
 
 func extractSecretRefs(kcPath string, list *unstructured.UnstructuredList) ([]v1alpha1.KubeConfigSecretRef, error) {
@@ -367,7 +368,7 @@ func extractSecretRefs(kcPath string, list *unstructured.UnstructuredList) ([]v1
 	return kubeConfigSecretRefs, nil
 }
 
-func extractKubeConfigs(kcPath string, list *unstructured.UnstructuredList) ([]orchestrator.QueryConfig, error) {
+func extractKubeConfigsWithTarget(kcPath string, list *unstructured.UnstructuredList, target *v1alpha1.GroupVersionKindTarget) ([]orchestrator.QueryConfig, error) {
 	queryConfigs := make([]orchestrator.QueryConfig, 0, len(list.Items))
 
 	// TODO: not all resources will have kubeconfig data, need to handle this case
@@ -417,7 +418,7 @@ func extractKubeConfigs(kcPath string, list *unstructured.UnstructuredList) ([]o
 			return nil, fmt.Errorf("failed to create external client query config: %w", err)
 		}
 
-		queryConfigs = append(queryConfigs, orchestrator.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName})
+		queryConfigs = append(queryConfigs, orchestrator.QueryConfig{Client: externalClient, RestConfig: *config, ClusterName: &clusterName, Target: target})
 
 	}
 
