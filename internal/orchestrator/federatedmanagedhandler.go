@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -28,16 +27,10 @@ func NewFederatedManagedHandler(metric v1alpha1.FederatedManagedMetric, qc Query
 		return nil, errCli
 	}
 
-	disco, errDisco := discovery.NewDiscoveryClientForConfig(&qc.RestConfig)
-	if errDisco != nil {
-		return nil, errDisco
-	}
-
 	var handler = &FederatedManagedHandler{
 		client:      qc.Client,
 		metric:      metric,
 		dCli:        dynamicClient,
-		discoClient: disco,
 		gauge:       gaugeMetric,
 		clusterName: qc.ClusterName,
 	}
@@ -47,9 +40,8 @@ func NewFederatedManagedHandler(metric v1alpha1.FederatedManagedMetric, qc Query
 
 // FederatedManagedHandler is used to monitor the metric
 type FederatedManagedHandler struct {
-	client      rcli.Client
-	dCli        dynamic.Interface
-	discoClient discovery.DiscoveryInterface
+	client rcli.Client
+	dCli   dynamic.Interface
 
 	metric v1alpha1.FederatedManagedMetric
 
@@ -104,14 +96,8 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 			continue
 		}
 
-		// Use the stored versions of the CRD
-		storedVersions := make(map[string]bool)
-		for _, v := range crd.Status.StoredVersions {
-			storedVersions[v] = true
-		}
-
 		for _, crdv := range crd.Spec.Versions {
-			if !crdv.Served || !storedVersions[crdv.Name] {
+			if !crdv.Served || !crdv.Storage {
 				continue
 			}
 

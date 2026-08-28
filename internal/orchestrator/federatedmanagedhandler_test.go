@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -147,6 +148,60 @@ func TestFederatedManagedRecordManagedResourceCountsAggregates(t *testing.T) {
 	}
 }
 
+func TestFederatedManagedRecordManagedResourceCountsUsesStorageVersion(t *testing.T) {
+	storageGVK := schema.GroupVersionKind{
+		Group:   "kubernetes.m.crossplane.io",
+		Version: "v1",
+		Kind:    "Object",
+	}
+	oldGVK := storageGVK
+	oldGVK.Version = "v1beta1"
+
+	handler := FederatedManagedHandler{
+		client: setupFakeClient(t, []string{fmt.Sprintf(`apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: objects.kubernetes.m.crossplane.io
+spec:
+  group: kubernetes.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    kind: Object
+    listKind: ObjectList
+    plural: objects
+    singular: object
+  scope: Cluster
+  versions:
+  - name: %s
+    served: true
+    storage: false
+  - name: %s
+    served: true
+    storage: true
+status:
+  storedVersions:
+  - %s
+  - %s
+`, oldGVK.Version, storageGVK.Version, oldGVK.Version, storageGVK.Version)}),
+		dCli: setupFakeDynamicClient(t, []string{
+			fakeResource(oldGVK),
+			fakeResource(storageGVK),
+		}),
+		metric: v1alpha1.FederatedManagedMetric{},
+		gauge:  newTestGauge(t),
+	}
+
+	count, err := handler.recordManagedResourceCounts(context.Background())
+	if err != nil {
+		t.Fatalf("recordManagedResourceCounts failed: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("unexpected resource count: wanted=1, got=%d", count)
+	}
+}
+
 func TestFederatedManagedClusterDimensionDefaultsToEmpty(t *testing.T) {
 	handler := FederatedManagedHandler{}
 	if got := handler.clusterDimension(); got != "" {
@@ -227,7 +282,7 @@ func newTestGauge(t *testing.T) *clientoptl.Metric {
 }
 
 func federatedManagedCRD(gvk schema.GroupVersionKind) string {
-	return managedAndServedCRD(gvk) + `status:
+	return managedAndServedCRD(gvk) + "    storage: true\n" + `status:
   storedVersions:
   - ` + gvk.Version + `
 `
