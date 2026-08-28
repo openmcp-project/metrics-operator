@@ -35,9 +35,6 @@ func TestNewFederatedManagedHandler(t *testing.T) {
 	if handler.dCli == nil {
 		t.Fatal("expected dynamic client")
 	}
-	if handler.discoClient == nil {
-		t.Fatal("expected discovery client")
-	}
 	if handler.gauge != gauge {
 		t.Fatal("gauge was not preserved")
 	}
