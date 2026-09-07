@@ -307,7 +307,7 @@ func yamlNameGVK(t *testing.T, yaml string) string {
 
 func fakeResource(gvk schema.GroupVersionKind) string {
 	return fmt.Sprintf(`apiVersion: %v
-kind: %v 
+kind: %v
 metadata:
   name: %v
 spec:
