@@ -114,11 +114,12 @@ func TestFederatedManagedRecordManagedResourceCountsAggregates(t *testing.T) {
 	gauge := newTestGauge(t)
 
 	records := make(map[string]int64)
-	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
+	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
 		if _, ok := dims["UUID"]; ok {
 			t.Errorf("unexpected UUID dimension: %v", dims)
 		}
 		records[dims[CLUSTER]+"|"+dims[KIND]+"|"+dims[APIVERSION]+"|"+dims["Ready"]+"|"+dims["Synced"]] = value
+		return nil
 	})
 
 	handler := FederatedManagedHandler{
@@ -142,6 +143,23 @@ func TestFederatedManagedRecordManagedResourceCountsAggregates(t *testing.T) {
 	}
 	if len(records) != 1 {
 		t.Fatalf("unexpected record count: wanted=1, got=%d (%#v)", len(records), records)
+	}
+
+}
+func TestFederatedManagedRecordManagedResourceCountsPropagatesRecordErrors(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1alpha1", Kind: "Object"}
+	failed := errors.New("Prometheus registration failed")
+	gauge := newTestGauge(t)
+	gauge.SetPrometheusFunc(func(map[string]string, int64) error { return failed })
+	handler := FederatedManagedHandler{
+		client: setupFakeClient(t, []string{federatedManagedCRD(gvk)}),
+		dCli:   setupFakeDynamicClient(t, []string{fakeResource(gvk)}),
+		metric: v1alpha1.FederatedManagedMetric{},
+		gauge:  gauge,
+	}
+	_, err := handler.recordManagedResourceCounts(context.Background())
+	if !errors.Is(err, failed) {
+		t.Fatalf("recordManagedResourceCounts error = %v, want %v", err, failed)
 	}
 }
 

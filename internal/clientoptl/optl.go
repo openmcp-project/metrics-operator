@@ -46,7 +46,7 @@ func (n *noOpExporter) Export(_ context.Context, _ *metricdata.ResourceMetrics) 
 func (n *noOpExporter) Shutdown(_ context.Context) error                              { return nil }
 
 // PrometheusRecordFunc is called for each DataPoint alongside OTel recording.
-type PrometheusRecordFunc func(dims map[string]string, value int64)
+type PrometheusRecordFunc func(dims map[string]string, value int64) error
 
 func isHTTPProtocol(scheme string) bool {
 	return scheme == protocolOTLPHTTPInsecure || scheme == protocolOTLPHTTPSecure
@@ -252,10 +252,12 @@ func (mc *Metric) RecordMetrics(ctx context.Context, series ...*DataPoint) error
 		mc.gauge.Record(ctx, s.Value, metric.WithAttributes(attrs...))
 
 		if mc.prometheusFunc != nil {
-			mc.prometheusFunc(s.Dimensions, s.Value)
+			if err := mc.prometheusFunc(s.Dimensions, s.Value); err != nil {
+				return fmt.Errorf("failed to record Prometheus metric: %w", err)
+			}
+
 		}
 	}
-
 	return nil
 }
 

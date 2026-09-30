@@ -17,7 +17,9 @@ limitations under the License.
 package metrics
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -25,87 +27,126 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
-// dynamicRegistry holds lazily-created GaugeVecs for named metrics.
-// Key: "<metricName>/<sorted-comma-joined-labelNames>".
-var (
-	dynamicMu       sync.Mutex
-	dynamicGauges   = map[string]*prometheus.GaugeVec{}
-	dynamicRegistry prometheus.Registerer = ctrlmetrics.Registry
-)
+const metricHelp = "Metric exposed by metrics-operator from spec.name with projection labels."
 
-// namedGaugeKey returns the map key for a (metricName, labelNames) pair.
-// labelNames must already be sorted.
-func namedGaugeKey(metricName string, sortedLabels []string) string {
-	return metricName + "/" + strings.Join(sortedLabels, ",")
+var dynamicMetrics = newDynamicGaugeCollector(ctrlmetrics.Registry)
+
+type dynamicGaugeCollector struct {
+	registerer prometheus.Registerer
+
+	mu         sync.RWMutex
+	registered bool
+	gauges     map[string]map[string]*prometheus.GaugeVec
 }
 
-// getOrCreateGauge returns an existing GaugeVec or registers a new one.
-// labelNames must already be sorted.
-func getOrCreateGauge(metricName string, sortedLabels []string) *prometheus.GaugeVec {
-	key := namedGaugeKey(metricName, sortedLabels)
-
-	dynamicMu.Lock()
-	defer dynamicMu.Unlock()
-
-	if g, ok := dynamicGauges[key]; ok {
-		return g
+func newDynamicGaugeCollector(registerer prometheus.Registerer) *dynamicGaugeCollector {
+	return &dynamicGaugeCollector{
+		registerer: registerer,
+		gauges:     make(map[string]map[string]*prometheus.GaugeVec),
 	}
+}
 
-	g := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: metricName,
-			Help: "Metric exposed by metrics-operator from spec.name with projection labels.",
-		},
-		sortedLabels,
-	)
+func validateProjectionLabels(metricName string, labelNames []string) error {
+	if err := prometheus.NewDesc(metricName, metricHelp, labelNames, nil).Err(); err != nil {
+		return fmt.Errorf("invalid labels for metric %q: %w", metricName, err)
+	}
+	return nil
+}
 
-	// Register may fail if a metric with the same name but different labels was
-	// registered before (e.g. label set changed between reconcile loops).  In that
-	// case try to unregister the old one first, then re-register.
-	if err := dynamicRegistry.Register(g); err != nil {
-		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
-			// The existing collector is compatible — reuse it.
-			if existing, ok := are.ExistingCollector.(*prometheus.GaugeVec); ok {
-				dynamicGauges[key] = existing
-				return existing
-			}
-			// Incompatible existing collector — unregister and replace.
-			dynamicRegistry.Unregister(are.ExistingCollector)
-			if err2 := dynamicRegistry.Register(g); err2 != nil {
-				// Give up; recording to this named gauge is skipped.
-				return nil
-			}
-		} else {
-			// Non-recoverable error (e.g. invalid metric name); skip named gauge.
-			return nil
+// Describe makes this collector unchecked because one metric family may have
+// multiple projection label schemas.
+func (*dynamicGaugeCollector) Describe(chan<- *prometheus.Desc) {}
+
+func (c *dynamicGaugeCollector) Collect(ch chan<- prometheus.Metric) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, schemas := range c.gauges {
+		for _, gauge := range schemas {
+			gauge.Collect(ch)
 		}
 	}
-
-	dynamicGauges[key] = g
-	return g
 }
 
-// RecordDataPoint registers a dynamically-named prometheus.GaugeVec for
-// metricName (the CR spec.name) and records value with all dims plus namespace
-// as individual Prometheus labels.
-func RecordDataPoint(metricName, namespace string, dims map[string]string, value int64) {
-	// Build the full label set: all dims plus "namespace".
-	labels := make(prometheus.Labels, len(dims)+1)
-	for k, v := range dims {
-		labels[k] = v
+func (c *dynamicGaugeCollector) recordDataPoint(metricName, namespace string, dims map[string]string, value int64) error {
+	if err := ValidateMetricName(metricName); err != nil {
+		return err
+	}
+
+	resourceNamespace, hasNamespace := dims["namespace"]
+	if existingResourceNamespace, ok := dims["resource_namespace"]; hasNamespace && ok && resourceNamespace != existingResourceNamespace {
+		return fmt.Errorf("projection labels namespace %q conflicts with resource_namespace %q", resourceNamespace, existingResourceNamespace)
+	}
+
+	labelNames := make([]string, 0, len(dims)+1)
+	for name := range dims {
+		if name == "namespace" {
+			name = "resource_namespace"
+		} else if name == "resource_namespace" && hasNamespace {
+			continue
+		}
+		labelNames = append(labelNames, name)
+	}
+	labelNames = append(labelNames, "namespace")
+	sort.Strings(labelNames)
+	schemaKey := labelSchemaKey(labelNames)
+	labels := make(prometheus.Labels, len(labelNames))
+	for name, value := range dims {
+		if name == "namespace" {
+			name = "resource_namespace"
+		}
+		labels[name] = value
 	}
 	labels["namespace"] = namespace
 
-	// Collect and sort label names so that the GaugeVec key is stable.
-	names := make([]string, 0, len(labels))
-	for k := range labels {
-		names = append(names, k)
-	}
-	sort.Strings(names)
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	g := getOrCreateGauge(metricName, names)
-	if g == nil {
-		return
+	schemas := c.gauges[metricName]
+	gauge := schemas[schemaKey]
+	if gauge == nil {
+		if err := validateProjectionLabels(metricName, labelNames); err != nil {
+			return err
+		}
+		gauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: metricName,
+			Help: metricHelp,
+		}, labelNames)
 	}
-	g.With(labels).Set(float64(value))
+
+	metric, err := gauge.GetMetricWith(labels)
+	if err != nil {
+		return fmt.Errorf("get metric %q with projection labels: %w", metricName, err)
+	}
+	if !c.registered {
+		if err := c.registerer.Register(c); err != nil {
+			return fmt.Errorf("register dynamic metrics collector: %w", err)
+		}
+		c.registered = true
+	}
+	if schemas == nil {
+		schemas = make(map[string]*prometheus.GaugeVec)
+		c.gauges[metricName] = schemas
+	}
+	if schemas[schemaKey] == nil {
+		schemas[schemaKey] = gauge
+	}
+	metric.Set(float64(value))
+	return nil
+}
+
+func labelSchemaKey(sortedLabels []string) string {
+	var key strings.Builder
+	for _, label := range sortedLabels {
+		key.WriteString(strconv.Itoa(len(label)))
+		key.WriteByte(':')
+		key.WriteString(label)
+	}
+	return key.String()
+}
+
+// RecordDataPoint records a dynamically named gauge for metricName with
+// projection labels and the CR namespace. The CR namespace is exposed as
+// "namespace"; a projected namespace is exposed as "resource_namespace".
+func RecordDataPoint(metricName, namespace string, dims map[string]string, value int64) error {
+	return dynamicMetrics.recordDataPoint(metricName, namespace, dims, value)
 }
