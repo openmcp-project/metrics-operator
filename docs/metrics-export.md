@@ -176,13 +176,13 @@ kubectl logs -n metrics-operator-system deployment/metrics-operator-controller-m
 
 ## ServiceMonitor (Prometheus Scrape)
 
-The operator exposes a standard [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) `/metrics` endpoint (HTTPS, port `https`) that Prometheus can scrape. This covers operator internals such as reconcile durations, error counts, and a `metrics_operator_resource_count` gauge that mirrors the business metrics pushed via DataSink.
+The operator exposes a standard [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) `/metrics` endpoint (HTTPS, port `https`) that Prometheus can scrape. This covers operator internals such as reconcile durations and error counts, and also exposes each business metric defined via `spec.name` as its own named Prometheus gauge.
 
-### Exposed metric
+### Exposed metrics
 
-| Metric                            | Type  | Description                                                                                                                                          |
-| --------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `metrics_operator_resource_count` | Gauge | Count of Kubernetes resources observed, labelled by `metric_name`, `namespace`, `kind`, `group`, `version`, `cluster`, `api_version`, `extra_labels` |
+| Metric | Type | Description |
+| --- | --- | --- |
+| `<spec.name>` | Gauge | One gauge per CR `spec.name`. All projection dimensions plus `namespace` are exposed as individual labels, e.g. `velero_schedule_last_backup_seconds{cluster="...", namespace="velero", schedule_name="crate", schedule_phase="Enabled", ...}` |
 
 Standard controller-runtime metrics (work queue depth, reconcile errors, etc.) are also available.
 
