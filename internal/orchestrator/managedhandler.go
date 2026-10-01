@@ -169,26 +169,6 @@ func (h *ManagedHandler) hasCategory(category string, crd apiextensionsv1.Custom
 	return false
 }
 
-func (h *ManagedHandler) getResourcesStatus(ctx context.Context) ([]ClusterResourceStatus, error) {
-	managedResources, err := h.getManagedResources(ctx)
-	if err != nil {
-		return []ClusterResourceStatus{}, err
-	}
-
-	crStatuses := make([]ClusterResourceStatus, 0)
-
-	for _, item := range managedResources {
-		rsStatus := ClusterResourceStatus{MangedResource: item, Status: make(map[string]bool)}
-		for _, condition := range item.Status.Conditions {
-			status, _ := strconv.ParseBool(condition.Status)
-			rsStatus.Status[condition.Type] = status
-		}
-		crStatuses = append(crStatuses, rsStatus)
-	}
-
-	return crStatuses, nil
-}
-
 //nolint:gocyclo
 func (h *ManagedHandler) getManagedResources(ctx context.Context) ([]Managed, error) {
 
