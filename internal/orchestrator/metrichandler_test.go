@@ -6,8 +6,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/discovery/fake"
+	clienttesting "k8s.io/client-go/testing"
 
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 )
