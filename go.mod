@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/openmcp-project/controller-utils v0.33.1
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/client_model v0.6.2
+	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.70.1
 	github.com/samber/lo v1.53.0
 	github.com/stretchr/testify v1.12.1
