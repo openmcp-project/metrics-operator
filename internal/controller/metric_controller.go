@@ -144,6 +144,11 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if meta.FindStatusCondition(metric.Status.Conditions, v1alpha1.TypeReady) == nil {
 		metric.SetConditions(common.ReadyUnknown("Reconciling", "Initial reconciliation"))
 	}
+	if err := internalmetrics.ValidateMetricName(metric.Spec.Name); err != nil {
+		metric.SetConditions(common.ReadyFalse("InvalidMetricName", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	}
 
 	// Check if enough time has passed since the last reconciliation
 	if !r.shouldReconcile(&metric) {
@@ -197,8 +202,8 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	metricName := metric.Spec.Name
 	metricNamespace := metric.Namespace
-	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) {
-		internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
+	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) error {
+		return internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
 	})
 	/*
 		2. Create a new orchestrator
@@ -235,8 +240,10 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		metric.SetConditions(common.Available(result.Message))
 		r.Recorder.Eventf(&metric, nil, "Normal", "MetricAvailable", "ReconcileMetric", result.Message)
 	case v1alpha1.PhaseFailed:
-		l.Error(result.Error, result.Message, "reason", result.Reason)
-		metric.SetConditions(common.Error(result.Message))
+		condition := monitoringFailureCondition(result)
+		l.Error(result.Error, result.Message, "reason", condition.Reason)
+		metric.SetConditions(common.Error(result.Message), condition)
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		r.Recorder.Eventf(&metric, nil, "Warning", "MetricFailed", "ReconcileMetric", result.Message)
 	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
@@ -244,13 +251,13 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	cObs := result.Observation.(*v1alpha1.MetricObservation)
-
-	// Set Ready condition based on export result
 	if errExport != nil {
-		metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
-		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errExport, fmt.Sprintf("metric '%s' failed to export, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-	} else {
+		if result.Phase != v1alpha1.PhaseFailed {
+			metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
+		}
+	} else if result.Phase != v1alpha1.PhaseFailed {
 		metric.SetConditions(common.ReadyTrue("Metric reconciled successfully"))
 		metric.Status.Ready = v1alpha1.StatusStringTrue
 	}
@@ -274,7 +281,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
 	*/
 	var requeueTime time.Duration
-	if result.Error != nil || errExport != nil { // Requeue faster on monitor or export error
+	if result.Error != nil || result.Phase == v1alpha1.PhaseFailed || errExport != nil {
 		requeueTime = RequeueAfterError
 	} else {
 		requeueTime = metric.Spec.Interval.Duration

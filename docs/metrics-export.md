@@ -176,15 +176,32 @@ kubectl logs -n metrics-operator-system deployment/metrics-operator-controller-m
 
 ## ServiceMonitor (Prometheus Scrape)
 
-The operator exposes a standard [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) `/metrics` endpoint (HTTPS, port `https`) that Prometheus can scrape. This covers operator internals such as reconcile durations, error counts, and a `metrics_operator_resource_count` gauge that mirrors the business metrics pushed via DataSink.
+The operator exposes a standard [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) `/metrics` endpoint (HTTPS, port `https`) that Prometheus can scrape. This covers operator internals such as reconcile durations and error counts, and also exposes each business metric defined via `spec.name` as its own named Prometheus gauge.
 
-### Exposed metric
+### Exposed metrics
 
-| Metric                            | Type  | Description                                                                                                                                          |
-| --------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `metrics_operator_resource_count` | Gauge | Count of Kubernetes resources observed, labelled by `metric_name`, `namespace`, `kind`, `group`, `version`, `cluster`, `api_version`, `extra_labels` |
+| Metric | Type | Description |
+| --- | --- | --- |
+| `<spec.name>` | Gauge | Named gauge with individual projection labels. `namespace` identifies the metric CR's namespace; a projection named `namespace` is exposed as `resource_namespace`. |
 
 Standard controller-runtime metrics (work queue depth, reconcile errors, etc.) are also available.
+
+### Metric names and labels
+
+Before reconciliation starts, the operator snapshots its registered metric names once. These names are reserved for operator telemetry. The snapshot includes collectors with no samples yet and conservatively reserves each name's `_bucket`, `_sum`, and `_count` variants to protect histogram and summary series. Names that collide after Prometheus name escaping are also rejected.
+
+A collision sets `Ready=False` with reason `InvalidMetricName` on `Metric`, `ManagedMetric`, `FederatedMetric`, or `FederatedManagedMetric`. The condition message identifies the conflicting name. Choose a different `spec.name`; the rejected metric does not break scraping of other metrics.
+
+For namespace projections, the scrape labels distinguish the metric CR from the observed resource:
+
+```prometheus
+deployment_age_seconds{namespace="monitoring",resource_namespace="team-a",name="web",...} 1790755226
+deployment_age_seconds{namespace="monitoring",resource_namespace="team-b",name="web",...} 1790755230
+```
+
+Other projection names are unchanged. If both `namespace` and `resource_namespace` are projected with different values, recording fails rather than discarding either value. OTLP dimension names are unchanged.
+
+Metrics sharing a `spec.name` may expose different projection label sets. Adding or removing a projection does not prevent subsequent samples from being recorded. Existing series are retained until the operator restarts; this change does not add series expiration. Invalid label names or recording failures are reported through the metric's failure condition rather than silently skipped.
 
 ### Enabling the ServiceMonitor
 

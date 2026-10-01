@@ -42,6 +42,7 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/init/webhooks"
 
 	"github.com/openmcp-project/metrics-operator/internal/controller"
+	internalmetrics "github.com/openmcp-project/metrics-operator/internal/metrics"
 
 	metricsv1alpha1 "github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
@@ -129,11 +130,11 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the health probe endpoint binds to.")
 
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+			"Enabling this will ensure that only one active controller manager is running.")
 
 	opts := zap.Options{
 		Development: true,
@@ -169,11 +170,10 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "82620e19.metrics.open-control-plane.io",
 		Logger:                 logger,
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// LeaderElectionReleaseOnCancel defines if the manager should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
 		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
 		//
 		// In the default scaffold provided, the program ends immediately after
 		// the manager stops, so would be fine to enable this option. However,
@@ -202,6 +202,10 @@ func main() {
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+	if err := internalmetrics.InitializeReservedMetricNames(); err != nil {
+		setupLog.Error(err, "unable to initialize reserved metric names")
 		os.Exit(1)
 	}
 
