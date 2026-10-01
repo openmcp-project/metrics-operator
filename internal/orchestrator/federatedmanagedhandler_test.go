@@ -118,7 +118,7 @@ func TestFederatedManagedRecordManagedResourceCountsAggregates(t *testing.T) {
 		if _, ok := dims["UUID"]; ok {
 			t.Errorf("unexpected UUID dimension: %v", dims)
 		}
-		records[dims[CLUSTER]+"|"+dims[KIND]+"|"+dims[APIVERSION]+"|"+dims["Ready"]+"|"+dims["Synced"]] = value
+		records[dims[CLUSTER]+"|"+dims[KIND]+"|"+dims[APIVERSION]+"|"+dims["ready"]+"|"+dims["synced"]] = value
 	})
 
 	handler := FederatedManagedHandler{
@@ -136,7 +136,7 @@ func TestFederatedManagedRecordManagedResourceCountsAggregates(t *testing.T) {
 	if count != 2 {
 		t.Fatalf("unexpected resource count: wanted=2, got=%d", count)
 	}
-	key := "test-cluster|Object|kubernetes.m.crossplane.io/v1alpha1|true|true"
+	key := "test-cluster|Object|kubernetes.m.crossplane.io/v1alpha1|True|True"
 	if records[key] != 2 {
 		t.Fatalf("unexpected aggregated records: wanted %q=2, got %#v", key, records)
 	}

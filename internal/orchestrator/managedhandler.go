@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
@@ -50,74 +48,94 @@ func NewManagedHandler(metric v1alpha1.ManagedMetric, qc QueryConfig, gaugeMetri
 }
 
 func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string, error) {
-	l := log.FromContext(ctx)
-	resources, err := h.getResourcesStatus(ctx)
+	list, err := h.getManagedUnstructured(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	// data point split by dimensions
-	for _, cr := range resources {
-		// Create a new data point for each resource
-		dataPoint := clientoptl.NewDataPoint()
+	projections := h.metric.Spec.Dimensions
+	if projections == nil {
+		projections = defaultManagedProjections()
+	}
 
-		// Preserve old logic so that if custom dimensions are not set, we use status.conditions
-		// as default dimensions
-		if h.metric.Spec.Dimensions == nil {
-			gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
-			if err != nil {
-				return "", err
-			}
+	groups := extractProjectionGroupsFrom(list, projections)
+	for _, group := range groups {
+		count := len(group)
+		dp := clientoptl.NewDataPoint().SetValue(int64(count))
 
-			dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
-			dataPoint.AddDimension(GROUP, gv.Group)
-			dataPoint.AddDimension(VERSION, gv.Version)
-
-			for typ, state := range cr.Status {
-				t := strings.ToLower(typ)
-				if t == "ready" || t == "synced" {
-					dataPoint.AddDimension(t, strconv.FormatBool(state))
-				}
-			}
-		} else {
-			objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cr.MangedResource)
-			if err != nil {
-				return "", err
-			}
-
-			u := &unstructured.Unstructured{Object: objMap}
-
-			for _, dimension := range h.metric.Spec.Dimensions {
-				if dimension.Name != "" && dimension.FieldPath != "" {
-					value, _, err := nestedFieldValue(*u, dimension.FieldPath, dimension.Type, dimension.Default)
-					if err != nil {
-						l.Error(err, fmt.Sprintf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", dimension.Name, dimension.FieldPath, err))
-						continue
-					}
-					dataPoint.AddDimension(dimension.Name, value)
-				}
-			}
-		}
-
-		// Add cluster dimension if available
 		if h.clusterName != nil {
-			dataPoint.AddDimension(CLUSTER, *h.clusterName)
+			dp.AddDimension(CLUSTER, *h.clusterName)
+		}
+		if len(group) > 0 {
+			for _, pf := range group[0] {
+				if pf.error == nil && pf.value != "" {
+					dp.AddDimension(pf.name, pf.value)
+				}
+			}
 		}
 
-		// Set the value to 1 for each resource
-		dataPoint.SetValue(1)
-
-		// Record the metric
-		err = h.gaugeMetric.RecordMetrics(ctx, dataPoint)
-		if err != nil {
+		if err := h.gaugeMetric.RecordMetrics(ctx, dp); err != nil {
 			return "", err
 		}
 	}
 
-	resourcesCount := len(resources)
+	return strconv.Itoa(len(list.Items)), nil
+}
 
-	// if no err, returns nil...duh!
-	return strconv.Itoa(resourcesCount), err
+// defaultManagedProjections returns the default ready/synced projections for Managed* resources.
+// These preserve backwards-compatible label dimensions when no custom Dimensions are configured.
+func defaultManagedProjections() []v1alpha1.Projection {
+	return []v1alpha1.Projection{
+		{Name: "ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive},
+		{Name: "synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive},
+	}
+}
+
+// defaultFederatedManagedProjections returns projections for FederatedManagedMetric resources,
+// including resource identity (kind, apiVersion) and the standard ready/synced conditions.
+func defaultFederatedManagedProjections() []v1alpha1.Projection {
+	return append([]v1alpha1.Projection{
+		{Name: KIND, FieldPath: "kind", Type: v1alpha1.TypePrimitive},
+		{Name: APIVERSION, FieldPath: "apiVersion", Type: v1alpha1.TypePrimitive},
+	}, defaultManagedProjections()...)
+}
+
+// getManagedUnstructured returns the raw unstructured list of all matching managed resources.
+func (h *ManagedHandler) getManagedUnstructured(ctx context.Context) (*unstructured.UnstructuredList, error) {
+	crds := &apiextensionsv1.CustomResourceDefinitionList{}
+	if err := h.client.List(ctx, crds); err != nil {
+		return nil, err
+	}
+
+	result := &unstructured.UnstructuredList{Items: make([]unstructured.Unstructured, 0)}
+	for _, crd := range crds.Items {
+		if !h.hasCategory("crossplane", crd) || !h.hasCategory("managed", crd) {
+			continue
+		}
+		if !h.matchesGroupVersionKind(crd) {
+			continue
+		}
+		for _, crdv := range crd.Spec.Versions {
+			if !crdv.Served {
+				continue
+			}
+			target := h.metric.Spec.Target
+			if target != nil && target.Version != "" && target.Version != crdv.Name {
+				continue
+			}
+			gvr := schema.GroupVersionResource{
+				Resource: crd.Spec.Names.Plural,
+				Group:    crd.Spec.Group,
+				Version:  crdv.Name,
+			}
+			list, err := h.dCli.Resource(gvr).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("could not find any matching resources for metric with filter '%s'. %w", h.metric.GvkToString(), err)
+			}
+			result.Items = append(result.Items, list.Items...)
+		}
+	}
+	return result, nil
 }
 
 // Monitor executes the monitoring of the metric

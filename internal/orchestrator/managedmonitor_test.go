@@ -54,7 +54,7 @@ func TestManagedHandlerMonitorRecordsDefaultDimensions(t *testing.T) {
 	gauge := newTestGauge(t)
 	recorded := make(map[string]int64)
 	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
-		recorded[dims[KIND]+"|"+dims["ready"]+"|"+dims["synced"]] = value
+		recorded[dims["ready"]+"|"+dims["synced"]] = value
 	})
 
 	handler := &ManagedHandler{
@@ -68,10 +68,10 @@ func TestManagedHandlerMonitorRecordsDefaultDimensions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// fakeResource has Ready=True, Synced=True; each emits value=1
-	key := "Object|true|true"
-	if recorded[key] != 1 {
-		t.Fatalf("unexpected record for %q: wanted=1, got=%d (all=%v)", key, recorded[key], recorded)
+	// fakeResource has Ready=True, Synced=True; 2 resources in one bucket → count=2
+	key := "True|True"
+	if recorded[key] != 2 {
+		t.Fatalf("unexpected record for %q: wanted=2, got=%d (all=%v)", key, recorded[key], recorded)
 	}
 }
 

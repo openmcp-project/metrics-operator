@@ -49,14 +49,6 @@ type FederatedManagedHandler struct {
 	clusterName *string
 }
 
-type federatedManagedBucket struct {
-	cluster    string
-	kind       string
-	apiVersion string
-	ready      string
-	synced     string
-}
-
 // Monitor is used to monitor the metric
 func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 	result := MonitorResult{}
@@ -83,49 +75,32 @@ func (h *FederatedManagedHandler) Monitor(ctx context.Context) (MonitorResult, e
 }
 
 func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Context) (int, error) {
-	crds := &apiextensionsv1.CustomResourceDefinitionList{} // get ALL custom resource definitions
+	crds := &apiextensionsv1.CustomResourceDefinitionList{}
 	if err := h.client.List(ctx, crds); err != nil {
 		return 0, err
 	}
 
-	counts := map[federatedManagedBucket]int64{}
-	total := 0
-
+	all := &unstructured.UnstructuredList{Items: make([]unstructured.Unstructured, 0)}
 	for _, crd := range crds.Items {
-		if !slices.Contains(crd.Spec.Names.Categories, "crossplane") || !slices.Contains(crd.Spec.Names.Categories, "managed") { // filter previously acquired crds
+		if !slices.Contains(crd.Spec.Names.Categories, "crossplane") || !slices.Contains(crd.Spec.Names.Categories, "managed") {
 			continue
 		}
-
 		for _, crdv := range crd.Spec.Versions {
 			if !crdv.Served || !crdv.Storage {
 				continue
 			}
-
 			gvr := schema.GroupVersionResource{
 				Resource: crd.Spec.Names.Plural,
 				Group:    crd.Spec.Group,
 				Version:  crdv.Name,
 			}
-
 			opts := metav1.ListOptions{Limit: federatedManagedListPageSize}
 			for {
-				list, err := h.dCli.Resource(gvr).List(ctx, opts) // gets resources from all the available crds
+				list, err := h.dCli.Resource(gvr).List(ctx, opts)
 				if err != nil {
-					return total, fmt.Errorf("could not find any matching resources for metric '%s'. %w", h.metric.Name, err)
+					return len(all.Items), fmt.Errorf("could not find any matching resources for metric '%s'. %w", h.metric.Name, err)
 				}
-
-				for i := range list.Items {
-					item := &list.Items[i]
-					counts[federatedManagedBucket{
-						cluster:    h.clusterDimension(),
-						kind:       item.GetKind(),
-						apiVersion: item.GetAPIVersion(),
-						ready:      conditionStatus(item, "Ready"),
-						synced:     conditionStatus(item, "Synced"),
-					}]++
-					total++
-				}
-
+				all.Items = append(all.Items, list.Items...)
 				if list.GetContinue() == "" {
 					break
 				}
@@ -134,21 +109,28 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 		}
 	}
 
-	for bucket, count := range counts {
-		dataPoint := clientoptl.NewDataPoint().
-			AddDimension(CLUSTER, bucket.cluster).
-			AddDimension(KIND, bucket.kind).
-			AddDimension(APIVERSION, bucket.apiVersion).
-			AddDimension("Ready", bucket.ready).
-			AddDimension("Synced", bucket.synced).
-			SetValue(count)
+	groups := extractProjectionGroupsFrom(all, defaultFederatedManagedProjections())
+	for _, group := range groups {
+		count := len(group)
+		dp := clientoptl.NewDataPoint().SetValue(int64(count))
 
-		if err := h.gauge.RecordMetrics(ctx, dataPoint); err != nil {
-			return total, fmt.Errorf("could not record metric: %w", err)
+		if h.clusterName != nil {
+			dp.AddDimension(CLUSTER, *h.clusterName)
+		}
+		if len(group) > 0 {
+			for _, pf := range group[0] {
+				if pf.error == nil && pf.value != "" {
+					dp.AddDimension(pf.name, pf.value)
+				}
+			}
+		}
+
+		if err := h.gauge.RecordMetrics(ctx, dp); err != nil {
+			return len(all.Items), fmt.Errorf("could not record metric: %w", err)
 		}
 	}
 
-	return total, nil
+	return len(all.Items), nil
 }
 
 func (h *FederatedManagedHandler) clusterDimension() string {
