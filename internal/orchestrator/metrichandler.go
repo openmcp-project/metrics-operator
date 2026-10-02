@@ -60,10 +60,13 @@ func (h *MetricHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 }
 
 func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult) (MonitorResult, error) {
-	primaryCount := len(list.Items)
-	dataPoint := clientoptl.NewDataPoint().SetValue(int64(primaryCount))
-	h.setDataPointBaseDimensions(dataPoint)
-
+primaryCount := len(list.Items)
+dataPoint := clientoptl.NewDataPoint().SetValue(int64(primaryCount))
+if primaryCount > 0 {
+ h.setDataPointBaseDimensionsFor(dataPoint, list.Items[0].GroupVersionKind())
+} else {
+ h.setDataPointBaseDimensions(dataPoint)
+}
 	metricObservation := &v1alpha1.MetricObservation{
 		Timestamp:   metav1.Now(),
 		LatestValue: strconv.Itoa(len(list.Items)),
@@ -87,13 +90,13 @@ func (h *MetricHandler) simpleMonitor(ctx context.Context, list *unstructured.Un
 		Observation: metricObservation,
 		Phase:       v1alpha1.PhaseActive,
 		Reason:      v1alpha1.ReasonMonitoringActive,
-		Message:     fmt.Sprintf("metric value recorded for resource '%s'", h.metric.GvkToString()),
-	}, nil
+Message:     fmt.Sprintf("metric value recorded for resource '%s'", h.metric.GvkToString()),
+}, nil
 }
 
 func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructured.UnstructuredList, lookup targetLookupResult) (MonitorResult, error) {
-	groups := extractProjectionGroupsFrom(list, h.metric.Spec.Projections)
-	result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
+ groups := groupProjectionResultsByGVK(list, h.metric.Spec.Projections)
+ result := MonitorResult{Observation: &v1alpha1.MetricObservation{Timestamp: metav1.Now()}}
 
 	// Pre-resolve valueFrom per object UID
 	valueByUID := resolveValueFrom(list, h.metric.Spec.ValueFrom)
@@ -105,9 +108,12 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 		groupCount := len(group)
 		dataPoint := clientoptl.NewDataPoint().SetValue(int64(groupCount))
 
-		// Add base dimensions only if they have a non-empty value
-		h.setDataPointBaseDimensions(dataPoint)
-
+ // Base dimensions describe returned objects, not potentially incomplete target labels.
+ if len(group) > 0 && len(group[0]) > 0 {
+  h.setDataPointBaseDimensionsFor(dataPoint, group[0][0].gvk)
+ } else {
+  h.setDataPointBaseDimensions(dataPoint)
+ }
 		// Collect all UIDs in the group for aggregation, and use the first object's fields as dimensions
 		if len(group) > 0 {
 			uids := make([]string, 0, len(group))
@@ -119,14 +125,13 @@ func (h *MetricHandler) projectionsMonitor(ctx context.Context, list *unstructur
 			if v, ok := aggregateGroupValue(uids, valueByUID, h.metric.Spec.ValueFrom); ok {
 				dataPoint.SetValue(v)
 			}
-			for _, pField := range group[0] {
-				// Add projected dimension only if the value is non-empty and no error occurred
-				if pField.error == nil && pField.value != "" {
-					dataPoint.AddDimension(pField.name, pField.value)
-				} else {
-					recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.name, pField.error))
-				}
-			}
+for _, pField := range group[0] {
+ if pField.error == nil && pField.value != "" && pField.name != RESOURCE && pField.name != GROUP && pField.name != VERSION && pField.name != CLUSTER {
+  dataPoint.AddDimension(pField.name, pField.value)
+ } else if pField.error != nil {
+  recordErrors = append(recordErrors, fmt.Errorf("projection error for %s: %w", pField.name, pField.error))
+ }
+}
 		}
 
 		dataPoints = append(dataPoints, dataPoint)
@@ -185,13 +190,38 @@ func (h *MetricHandler) setDataPointBaseDimensionsFor(dataPoint *clientoptl.Data
 }
 
 type projectedField struct {
-	uid   string
-	name  string
-	value string
-	found bool
-	error error
+ uid string
+ name string
+ value string
+ found bool
+ error error
+ gvk schema.GroupVersionKind
 }
 
+
+func groupProjectionResultsByGVK(list *unstructured.UnstructuredList, projections []v1alpha1.Projection) projectionGroups {
+ groups := make(projectionGroups)
+ for i := range list.Items {
+  gvk := list.Items[i].GroupVersionKind()
+  objectList := &unstructured.UnstructuredList{Items: []unstructured.Unstructured{list.Items[i]}}
+  objectGroups := extractProjectionGroupsFrom(objectList, projections)
+  if len(objectGroups) == 0 {
+   objectGroups = projectionGroups{"": {nil}}
+  }
+  for _, group := range objectGroups {
+   for j := range group {
+    group[j].gvk = gvk
+   }
+   projectionKey := ""
+   if len(group) > 0 {
+    projectionKey = group[0].GetID()
+   }
+   key := fmt.Sprintf("%s|%s|%s|%s", gvk.Group, gvk.Version, gvk.Kind, projectionKey)
+   groups[key] = append(groups[key], group)
+  }
+ }
+ return groups
+}
 func (e *projectedField) GetID() string {
 	return fmt.Sprintf("%s: %s", e.name, e.value)
 }
