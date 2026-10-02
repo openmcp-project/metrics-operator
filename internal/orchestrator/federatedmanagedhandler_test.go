@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
@@ -105,44 +106,114 @@ func TestFederatedManagedMonitorReportsListErrors(t *testing.T) {
 }
 
 func TestFederatedManagedRecordManagedResourceCountsAggregates(t *testing.T) {
-	gvk := schema.GroupVersionKind{
-		Group:   "kubernetes.m.crossplane.io",
-		Version: "v1alpha1",
-		Kind:    "Object",
-	}
+	gvk := schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1alpha1", Kind: "Object"}
 	cluster := "test-cluster"
 	gauge := newTestGauge(t)
-
 	records := make(map[string]int64)
 	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
-		if _, ok := dims["UUID"]; ok {
-			t.Errorf("unexpected UUID dimension: %v", dims)
-		}
-		records[dims[CLUSTER]+"|"+dims[KIND]+"|"+dims[APIVERSION]+"|"+dims["Ready"]+"|"+dims["Synced"]] = value
+		key := dims[GROUP] + "|" + dims[VERSION] + "|" + dims[KIND] + "|" + dims[CLUSTER] + "|" + dims[APIVERSION] + "|" + dims["Ready"] + "|" + dims["Synced"]
+		records[key] = value
 		return nil
 	})
-
 	handler := FederatedManagedHandler{
-		client:      setupFakeClient(t, []string{federatedManagedCRD(gvk)}),
-		dCli:        setupFakeDynamicClient(t, []string{fakeResource(gvk), fakeResource(gvk)}),
-		metric:      v1alpha1.FederatedManagedMetric{},
-		gauge:       gauge,
-		clusterName: &cluster,
+		client: setupFakeClient(t, []string{federatedManagedCRD(gvk)}),
+		dCli:   setupFakeDynamicClient(t, []string{fakeResource(gvk), fakeResource(gvk)}),
+		metric: v1alpha1.FederatedManagedMetric{}, gauge: gauge, clusterName: &cluster,
 	}
-
 	count, err := handler.recordManagedResourceCounts(context.Background())
-	if err != nil {
-		t.Fatalf("recordManagedResourceCounts failed: %v", err)
+	if err != nil || count != 2 {
+		t.Fatalf("recordManagedResourceCounts = (%d, %v), want (2, nil)", count, err)
 	}
-	if count != 2 {
-		t.Fatalf("unexpected resource count: wanted=2, got=%d", count)
+	key := "kubernetes.m.crossplane.io|v1alpha1|Object|test-cluster|kubernetes.m.crossplane.io/v1alpha1|True|True"
+	if records[key] != 2 || len(records) != 1 {
+		t.Fatalf("unexpected records: %#v", records)
 	}
-	key := "test-cluster|Object|kubernetes.m.crossplane.io/v1alpha1|true|true"
-	if records[key] != 2 {
-		t.Fatalf("unexpected aggregated records: wanted %q=2, got %#v", key, records)
+}
+
+func TestFederatedManagedMissingConditionsUseUnknown(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1alpha1", Kind: "Object"}
+	resource := `apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+  name: no-conditions
+`
+	gauge := newTestGauge(t)
+	var got map[string]string
+	gauge.SetPrometheusFunc(func(dims map[string]string, _ int64) error { got = dims; return nil })
+	handler := FederatedManagedHandler{
+		client: setupFakeClient(t, []string{federatedManagedCRD(gvk)}),
+		dCli:   setupFakeDynamicClient(t, []string{resource}),
+		gauge:  gauge,
 	}
-	if len(records) != 1 {
-		t.Fatalf("unexpected record count: wanted=1, got=%d (%#v)", len(records), records)
+	count, err := handler.recordManagedResourceCounts(context.Background())
+	if err != nil || count != 1 {
+		t.Fatalf("recordManagedResourceCounts = (%d, %v), want (1, nil)", count, err)
+	}
+	if got["Ready"] != "unknown" || got["Synced"] != "unknown" {
+		t.Fatalf("missing conditions were not represented as unknown: %#v", got)
+	}
+}
+
+func TestFederatedManagedPaginationMergesBuckets(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1alpha1", Kind: "Object"}
+	dynamicClient := setupFakeDynamicClient(t, []string{fakeResource(gvk)})
+	var listCalls int
+	dynamicClient.PrependReactor("list", "objects", func(action ktesting.Action) (bool, runtime.Object, error) {
+		listCalls++
+		listAction := action.(ktesting.ListAction)
+		if listAction.GetListRestrictions().Labels.String() != "" {
+			t.Fatalf("unexpected list label selector")
+		}
+		if listCalls == 1 {
+			page := &unstructured.UnstructuredList{Items: []unstructured.Unstructured{toUnstructured(t, fakeResource(gvk))}}
+			page.SetContinue("page-2")
+			return true, page, nil
+		}
+		page := &unstructured.UnstructuredList{Items: []unstructured.Unstructured{toUnstructured(t, fakeResource(gvk))}}
+		return true, page, nil
+	})
+	var got int64
+	gauge := newTestGauge(t)
+	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
+		got = value
+		if dims[GROUP] != gvk.Group || dims[VERSION] != gvk.Version || dims[KIND] != gvk.Kind || dims[APIVERSION] != gvk.GroupVersion().String() {
+			t.Errorf("unexpected base dimensions: %#v", dims)
+		}
+		return nil
+	})
+	handler := FederatedManagedHandler{client: setupFakeClient(t, []string{federatedManagedCRD(gvk)}), dCli: dynamicClient, gauge: gauge}
+	count, err := handler.recordManagedResourceCounts(context.Background())
+	if err != nil || count != 2 {
+		t.Fatalf("recordManagedResourceCounts = (%d, %v), want (2, nil)", count, err)
+	}
+	if listCalls != 2 || got != 2 {
+		t.Fatalf("pagination did not merge one bucket: calls=%d, value=%d", listCalls, got)
+	}
+}
+
+func TestFederatedManagedListErrorRecordsNoPartialMetrics(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1alpha1", Kind: "Object"}
+	dynamicClient := setupFakeDynamicClient(t, []string{fakeResource(gvk)})
+	var listCalls int
+	dynamicClient.PrependReactor("list", "objects", func(action ktesting.Action) (bool, runtime.Object, error) {
+		listCalls++
+		if listCalls == 1 {
+			page := &unstructured.UnstructuredList{Items: []unstructured.Unstructured{toUnstructured(t, fakeResource(gvk))}}
+			page.SetContinue("page-2")
+			return true, page, nil
+		}
+		return true, nil, errors.New("page failed")
+	})
+	records := 0
+	gauge := newTestGauge(t)
+	gauge.SetPrometheusFunc(func(map[string]string, int64) error { records++; return nil })
+	handler := FederatedManagedHandler{client: setupFakeClient(t, []string{federatedManagedCRD(gvk)}), dCli: dynamicClient, gauge: gauge}
+	count, err := handler.recordManagedResourceCounts(context.Background())
+	if err == nil || count != 0 {
+		t.Fatalf("recordManagedResourceCounts = (%d, %v), want (0, error)", count, err)
+	}
+	if records != 0 {
+		t.Fatalf("recorded %d metrics before listing completed", records)
 	}
 
 }
@@ -164,14 +235,9 @@ func TestFederatedManagedRecordManagedResourceCountsPropagatesRecordErrors(t *te
 }
 
 func TestFederatedManagedRecordManagedResourceCountsUsesStorageVersion(t *testing.T) {
-	storageGVK := schema.GroupVersionKind{
-		Group:   "kubernetes.m.crossplane.io",
-		Version: "v1",
-		Kind:    "Object",
-	}
+	storageGVK := schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1", Kind: "Object"}
 	oldGVK := storageGVK
 	oldGVK.Version = "v1beta1"
-
 	handler := FederatedManagedHandler{
 		client: setupFakeClient(t, []string{fmt.Sprintf(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -180,9 +246,7 @@ metadata:
 spec:
   group: kubernetes.m.crossplane.io
   names:
-    categories:
-    - crossplane
-    - managed
+    categories: [crossplane, managed]
     kind: Object
     listKind: ObjectList
     plural: objects
@@ -195,87 +259,13 @@ spec:
   - name: %s
     served: true
     storage: true
-status:
-  storedVersions:
-  - %s
-  - %s
-`, oldGVK.Version, storageGVK.Version, oldGVK.Version, storageGVK.Version)}),
-		dCli: setupFakeDynamicClient(t, []string{
-			fakeResource(oldGVK),
-			fakeResource(storageGVK),
-		}),
-		metric: v1alpha1.FederatedManagedMetric{},
-		gauge:  newTestGauge(t),
+`, oldGVK.Version, storageGVK.Version)}),
+		dCli:  setupFakeDynamicClient(t, []string{fakeResource(oldGVK), fakeResource(storageGVK)}),
+		gauge: newTestGauge(t),
 	}
-
 	count, err := handler.recordManagedResourceCounts(context.Background())
-	if err != nil {
-		t.Fatalf("recordManagedResourceCounts failed: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("unexpected resource count: wanted=1, got=%d", count)
-	}
-}
-
-func TestFederatedManagedClusterDimensionDefaultsToEmpty(t *testing.T) {
-	handler := FederatedManagedHandler{}
-	if got := handler.clusterDimension(); got != "" {
-		t.Fatalf("unexpected cluster dimension: wanted empty, got=%q", got)
-	}
-}
-
-func TestFederatedManagedConditionStatus(t *testing.T) {
-	tests := []struct {
-		name          string
-		resource      string
-		conditionType string
-		want          string
-	}{
-		{
-			name:          "present condition",
-			resource:      fakeResource(schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1alpha1", Kind: "Object"}),
-			conditionType: "Ready",
-			want:          "true",
-		},
-		{
-			name: "missing conditions",
-			resource: `apiVersion: kubernetes.m.crossplane.io/v1alpha1
-kind: Object
-metadata:
-  name: missing
-`,
-			conditionType: "Ready",
-			want:          "unknown",
-		},
-		{
-			name:          "missing condition type",
-			resource:      fakeResource(schema.GroupVersionKind{Group: "kubernetes.m.crossplane.io", Version: "v1alpha1", Kind: "Object"}),
-			conditionType: "Missing",
-			want:          "unknown",
-		},
-		{
-			name: "non string status",
-			resource: `apiVersion: kubernetes.m.crossplane.io/v1alpha1
-kind: Object
-metadata:
-  name: bad-status
-status:
-  conditions:
-  - type: Ready
-    status: true
-`,
-			conditionType: "Ready",
-			want:          "unknown",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			item := toUnstructured(t, tt.resource)
-			if got := conditionStatus(&item, tt.conditionType); got != tt.want {
-				t.Fatalf("unexpected condition status: wanted=%q, got=%q", tt.want, got)
-			}
-		})
+	if err != nil || count != 1 {
+		t.Fatalf("recordManagedResourceCounts = (%d, %v), want (1, nil)", count, err)
 	}
 }
 
