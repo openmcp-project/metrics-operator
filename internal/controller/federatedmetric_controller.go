@@ -139,6 +139,11 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if meta.FindStatusCondition(metric.Status.Conditions, v1alpha1.TypeReady) == nil {
 		metric.SetConditions(common.ReadyUnknown("Reconciling", "Initial reconciliation"))
 	}
+	if err := internalmetrics.ValidateMetricName(metric.Spec.Name); err != nil {
+		metric.SetConditions(common.ReadyFalse("InvalidMetricName", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	}
 
 	// Check if enough time has passed since the last reconciliation
 	if !shouldReconcile(&metric) {
@@ -195,8 +200,8 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 	metricName := metric.Spec.Name
 	metricNamespace := metric.Namespace
-	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) {
-		internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
+	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) error {
+		return internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
 	})
 
 	creds := common.DataSinkCredentials{}
@@ -228,14 +233,19 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			l.Error(errMon, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
 		}
+		if result.Phase == v1alpha1.PhaseFailed {
+			metric.SetConditions(common.Error(result.Message), monitoringFailureCondition(result))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
+			return ctrl.Result{RequeueAfter: RequeueAfterError}, nil
+		}
 
 	}
 
 	errExport := metricClient.ExportMetrics(ctx)
 	if errExport != nil {
+		l.Error(errExport, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
 		metric.Status.Ready = v1alpha1.StatusStringFalse
-		l.Error(errExport, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 	} else {
 		metric.SetConditions(common.ReadyTrue("Federated metric reconciled successfully"))
 		metric.Status.Ready = v1alpha1.StatusStringTrue

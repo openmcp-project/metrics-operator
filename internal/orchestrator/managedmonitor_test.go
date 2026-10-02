@@ -53,8 +53,9 @@ func TestManagedHandlerMonitorRecordsDefaultDimensions(t *testing.T) {
 
 	gauge := newTestGauge(t)
 	recorded := make(map[string]int64)
-	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
+	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
 		recorded[dims["ready"]+"|"+dims["synced"]] = value
+		return nil
 	})
 
 	handler := &ManagedHandler{
@@ -84,8 +85,9 @@ func TestManagedHandlerMonitorCustomDimensions(t *testing.T) {
 
 	gauge := newTestGauge(t)
 	recorded := make(map[string]int64)
-	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
+	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
 		recorded[dims["syncedStatus"]] += value
+		return nil
 	})
 
 	handler := &ManagedHandler{
@@ -144,7 +146,7 @@ func TestManagedHandlerMonitorBaseDimensions(t *testing.T) {
 			recorded := make(map[string]int64)
 			recordCount := 0
 			gauge := newTestGauge(t)
-			gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
+			gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
 				if dims[CLUSTER] != "authoritative-cluster" {
 					t.Errorf("cluster dimension was not authoritative: %v", dims)
 				}
@@ -163,6 +165,7 @@ func TestManagedHandlerMonitorBaseDimensions(t *testing.T) {
 				key := dims[KIND] + "|" + dims[GROUP] + "|" + dims[VERSION]
 				recorded[key] += value
 				recordCount++
+				return nil
 			})
 			handler := &ManagedHandler{
 				client:      setupFakeClient(t, crds),

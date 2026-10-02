@@ -33,13 +33,14 @@ func newMetricHandlerForTest(t *testing.T, gvk schema.GroupVersionKind, resource
 	t.Helper()
 	gauge := newTestGauge(t)
 	recorded := make(map[string]int64)
-	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
+	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
 		// key is all dims joined; caller can inspect as needed
 		key := dims[RESOURCE] + "|" + dims[GROUP] + "|" + dims[VERSION]
 		for _, p := range projections {
 			key += "|" + p.Name + "=" + dims[p.Name]
 		}
 		recorded[key] = value
+		return nil
 	})
 	handler := &MetricHandler{
 		dCli:        setupFakeDynamicClient(t, resources),

@@ -25,7 +25,7 @@ func TestMetricCountsKeepActualIdentity(t *testing.T) {
 			cluster := "actual"
 			gauge := newTestGauge(t)
 			counts := map[string]int64{}
-			gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
+			gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
 				if dims[CLUSTER] != cluster {
 					t.Errorf("wrong cluster: %v", dims)
 				}
@@ -33,6 +33,7 @@ func TestMetricCountsKeepActualIdentity(t *testing.T) {
 					t.Errorf("missing custom dimension: %v", dims)
 				}
 				counts[dims[GROUP]+"/"+dims[VERSION]+"/"+dims[KIND]] = value
+				return nil
 			})
 			h := MetricHandler{metric: v1alpha1.Metric{Spec: v1alpha1.MetricSpec{Projections: projections}}, clusterName: &cluster, gaugeMetric: gauge}
 			result, err := h.projectionsMonitor(t.Context(), list, targetLookupResult{})

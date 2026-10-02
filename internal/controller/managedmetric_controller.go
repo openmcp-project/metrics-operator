@@ -135,6 +135,11 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if meta.FindStatusCondition(metric.Status.Conditions, v1alpha1.TypeReady) == nil {
 		metric.SetConditions(common.ReadyUnknown("Reconciling", "Initial reconciliation"))
 	}
+	if err := internalmetrics.ValidateMetricName(metric.Spec.Name); err != nil {
+		metric.SetConditions(common.ReadyFalse("InvalidMetricName", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+	}
 
 	// Check if enough time has passed since the last reconciliation
 	if !r.shouldReconcile(&metric) {
@@ -193,8 +198,8 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 	metricName := metric.Spec.Name
 	metricNamespace := metric.Namespace
-	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) {
-		internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
+	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) error {
+		return internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
 	})
 
 	/*
@@ -235,8 +240,10 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		metric.SetConditions(common.Available(result.Message))
 		r.Recorder.Eventf(&metric, nil, "Normal", "MetricAvailable", "ManagedMetricReconcile", result.Message)
 	case v1alpha1.PhaseFailed:
-		l.Error(result.Error, result.Message, "reason", result.Reason)
-		metric.SetConditions(common.Error(result.Message))
+		condition := monitoringFailureCondition(result)
+		l.Error(result.Error, result.Message, "reason", condition.Reason)
+		metric.SetConditions(common.Error(result.Message), condition)
+		metric.Status.Ready = v1alpha1.StatusStringFalse
 		r.Recorder.Eventf(&metric, nil, "Warning", "MetricFailed", "ManagedMetricReconcile", result.Message)
 	case v1alpha1.PhasePending:
 		metric.SetConditions(common.Creating())
@@ -245,18 +252,22 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// Set Ready condition based on export result
 	if errExport != nil {
-		metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
-		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errExport, fmt.Sprintf("managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
-	} else {
+		if result.Phase != v1alpha1.PhaseFailed {
+			metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
+		}
+	} else if result.Phase != v1alpha1.PhaseFailed {
 		metric.SetConditions(common.ReadyTrue("Managed metric reconciled successfully"))
 		metric.Status.Ready = v1alpha1.StatusStringTrue
 	}
 
 	// Update the observation timestamp to track when this reconciliation happened
-	metric.Status.Observation = v1alpha1.ManagedObservation{
-		Timestamp: metav1.Now(),
-		Resources: result.Observation.GetValue(),
+	if observation, ok := result.Observation.(*v1alpha1.ManagedObservation); ok {
+		metric.Status.Observation = v1alpha1.ManagedObservation{
+			Timestamp: metav1.Now(),
+			Resources: observation.GetValue(),
+		}
 	}
 
 	// Note: Status update is handled by the defer function at the beginning
@@ -265,7 +276,7 @@ func (r *ManagedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		4. Requeue the metric after the frequency or after 2 minutes if an error occurred
 	*/
 	var requeueTime time.Duration
-	if result.Error != nil || errExport != nil {
+	if result.Error != nil || result.Phase == v1alpha1.PhaseFailed || errExport != nil {
 		requeueTime = RequeueAfterError
 	} else {
 		requeueTime = metric.Spec.Interval.Duration

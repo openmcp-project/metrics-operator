@@ -172,11 +172,11 @@ spec:
       fieldPath: "metadata.name"
 ```
 
-This allows a PromQL expression to select only the most recently created deployment per namespace:
+On `/metrics`, the projected resource namespace is exposed as `resource_namespace`; `namespace` identifies the metric CR's namespace. OTLP retains the projection name `namespace`. This PromQL expression selects the most recently created deployment per resource namespace within each metric CR namespace:
 
 ```promql
-deployment_age_seconds and on(namespace, name)
-  topk by(namespace) (1, max by(namespace, name) (deployment_age_seconds))
+deployment_age_seconds and on(namespace, resource_namespace, name)
+  topk by(namespace, resource_namespace) (1, max by(namespace, resource_namespace, name) (deployment_age_seconds))
 ```
 
 ### Example: integer field with aggregation
