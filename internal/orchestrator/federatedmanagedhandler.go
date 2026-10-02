@@ -5,15 +5,12 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
-
+	
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 )
@@ -80,7 +77,18 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 		return 0, err
 	}
 
-	all := &unstructured.UnstructuredList{Items: make([]unstructured.Unstructured, 0)}
+	type bucket struct {
+		count  int64
+		fields []projectedField
+	}
+	type resourceBuckets struct {
+		gvk     schema.GroupVersionKind
+		buckets map[string]*bucket
+	}
+	byGVK := make(map[schema.GroupVersionKind]*resourceBuckets)
+	resourceCount := 0
+	projections := federatedManagedConditionProjections()
+
 	for _, crd := range crds.Items {
 		if !slices.Contains(crd.Spec.Names.Categories, "crossplane") || !slices.Contains(crd.Spec.Names.Categories, "managed") {
 			continue
@@ -89,18 +97,29 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 			if !crdv.Served || !crdv.Storage {
 				continue
 			}
-			gvr := schema.GroupVersionResource{
-				Resource: crd.Spec.Names.Plural,
-				Group:    crd.Spec.Group,
-				Version:  crdv.Name,
+			gvk := schema.GroupVersionKind{Group: crd.Spec.Group, Version: crdv.Name, Kind: crd.Spec.Names.Kind}
+			resourceSet := byGVK[gvk]
+			if resourceSet == nil {
+				resourceSet = &resourceBuckets{gvk: gvk, buckets: make(map[string]*bucket)}
+				byGVK[gvk] = resourceSet
 			}
+			gvr := schema.GroupVersionResource{Resource: crd.Spec.Names.Plural, Group: crd.Spec.Group, Version: crdv.Name}
 			opts := metav1.ListOptions{Limit: federatedManagedListPageSize}
 			for {
 				list, err := h.dCli.Resource(gvr).List(ctx, opts)
 				if err != nil {
-					return len(all.Items), fmt.Errorf("could not find any matching resources for metric '%s'. %w", h.metric.Name, err)
+					return 0, fmt.Errorf("could not find any matching resources for metric '%s'. %w", h.metric.Name, err)
 				}
-				all.Items = append(all.Items, list.Items...)
+				groups := extractProjectionGroupsFrom(list, projections)
+				for key, group := range groups {
+					merged := resourceSet.buckets[key]
+					if merged == nil {
+						merged = &bucket{fields: group[0]}
+						resourceSet.buckets[key] = merged
+					}
+					merged.count += int64(len(group))
+					resourceCount += len(group)
+				}
 				if list.GetContinue() == "" {
 					break
 				}
@@ -109,57 +128,35 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 		}
 	}
 
-	groups := extractProjectionGroupsFrom(all, defaultFederatedManagedProjections())
-	for _, group := range groups {
-		count := len(group)
-		dp := clientoptl.NewDataPoint().SetValue(int64(count))
-
-		if h.clusterName != nil {
-			dp.AddDimension(CLUSTER, *h.clusterName)
-		}
-		if len(group) > 0 {
-			for _, pf := range group[0] {
-				if pf.error == nil && pf.value != "" {
-					dp.AddDimension(pf.name, pf.value)
+	for _, resourceBuckets := range byGVK {
+		for _, group := range resourceBuckets.buckets {
+			dp := clientoptl.NewDataPoint().SetValue(group.count)
+			dp.AddDimension(GROUP, resourceBuckets.gvk.Group)
+			dp.AddDimension(VERSION, resourceBuckets.gvk.Version)
+			dp.AddDimension(KIND, resourceBuckets.gvk.Kind)
+			dp.AddDimension(APIVERSION, resourceBuckets.gvk.GroupVersion().String())
+			if h.clusterName != nil && *h.clusterName != "" {
+				dp.AddDimension(CLUSTER, *h.clusterName)
+			}
+			for _, field := range group.fields {
+				if field.error == nil && field.value != "" {
+					dp.AddDimension(field.name, field.value)
 				}
 			}
-		}
-
-		if err := h.gauge.RecordMetrics(ctx, dp); err != nil {
-			return len(all.Items), fmt.Errorf("could not record metric: %w", err)
+			if err := h.gauge.RecordMetrics(ctx, dp); err != nil {
+				return resourceCount, fmt.Errorf("could not record metric: %w", err)
+			}
 		}
 	}
 
-	return len(all.Items), nil
+	return resourceCount, nil
 }
 
-func (h *FederatedManagedHandler) clusterDimension() string {
-	if h.clusterName == nil {
-		return ""
+func federatedManagedConditionProjections() []v1alpha1.Projection {
+	unknown := v1alpha1.NewProjectionDefaultValue("unknown")
+	return []v1alpha1.Projection{
+		{Name: "ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
+		{Name: "synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
 	}
-	return *h.clusterName
 }
 
-func conditionStatus(item *unstructured.Unstructured, conditionType string) string {
-	conditions, ok, _ := unstructured.NestedSlice(item.Object, "status", "conditions")
-	if !ok {
-		return "unknown"
-	}
-
-	for _, condition := range conditions {
-		conditionMap, ok := condition.(map[string]any)
-		if !ok {
-			continue
-		}
-		if conditionMap["type"] != conditionType {
-			continue
-		}
-		status, ok := conditionMap["status"].(string)
-		if !ok {
-			return "unknown"
-		}
-		return strings.ToLower(status)
-	}
-
-	return "unknown"
-}
