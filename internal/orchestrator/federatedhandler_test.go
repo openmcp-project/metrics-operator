@@ -1,10 +1,12 @@
 package orchestrator
 
 import (
-	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"testing"
+
+	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 )
 
 func TestMetricCountsKeepActualIdentity(t *testing.T) {
