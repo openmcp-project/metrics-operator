@@ -1,55 +1,47 @@
 package orchestrator
 
 import (
-	"testing"
-
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
-	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"testing"
 )
 
-func TestGroupProjectionResultsByGVKIncludesEmptyProjections(t *testing.T) {
-	gvks := []schema.GroupVersionKind{
-		{Group: "one.io", Version: "v1", Kind: "One"},
-		{Group: "two.io", Version: "v2", Kind: "Two"},
-	}
-	list := &unstructured.UnstructuredList{Items: make([]unstructured.Unstructured, len(gvks))}
-	for i, gvk := range gvks {
-		list.Items[i].SetGroupVersionKind(gvk)
-	}
-	groups := groupProjectionResultsByGVK(list, nil)
-	if len(groups) != len(gvks) {
-		t.Fatalf("expected one base group per GVK, got %d", len(groups))
-	}
-	for _, group := range groups {
-		if len(group) != 1 || len(group[0]) != 0 {
-			t.Fatalf("expected empty projection fields for one object, got %#v", group)
-		}
-	}
-}
-
-func TestMetricBaseDimensionsAreNotOverriddenByCustomProjection(t *testing.T) {
-	gvk := schema.GroupVersionKind{Group: "actual.io", Version: "v1", Kind: "Actual"}
-	list := &unstructured.UnstructuredList{Items: []unstructured.Unstructured{{}}}
-	list.Items[0].SetGroupVersionKind(gvk)
-	groups := groupProjectionResultsByGVK(list, []v1alpha1.Projection{{Name: RESOURCE, FieldPath: "metadata.name"}})
-	for _, group := range groups {
-		if len(group) != 1 || group[0][0].gvk != gvk {
-			t.Fatalf("custom base-name projection lost actual identity: %#v", group)
-		}
-	}
-	gauge := newTestGauge(t)
-	var dims map[string]string
-	gauge.SetPrometheusFunc(func(got map[string]string, _ int64) { dims = got })
-	dp := clientoptl.NewDataPoint()
-	handler := &MetricHandler{clusterName: nil}
-	handler.setDataPointBaseDimensionsFor(dp, gvk)
-	dp.AddDimension(RESOURCE, "not-actual")
-	if err := gauge.RecordMetrics(t.Context(), dp); err != nil {
-		t.Fatalf("record metric: %v", err)
-	}
-	if dims[RESOURCE] != gvk.Kind || dims[GROUP] != gvk.Group || dims[VERSION] != gvk.Version {
-		t.Fatalf("base identity was overridden: %v", dims)
+func TestMetricCountsKeepActualIdentity(t *testing.T) {
+	for _, custom := range []bool{false, true} {
+		t.Run(map[bool]string{false: "empty", true: "custom"}[custom], func(t *testing.T) {
+			first := schema.GroupVersionKind{Group: "one.io", Version: "v1", Kind: "One"}
+			second := schema.GroupVersionKind{Group: "two.io", Version: "v2", Kind: "Two"}
+			list := &unstructured.UnstructuredList{}
+			for i, gvk := range []schema.GroupVersionKind{first, first, second} {
+				obj := unstructured.Unstructured{Object: map[string]any{"metadata": map[string]any{"annotations": map[string]any{"cluster": []string{"fake-a", "fake-b", "fake-c"}[i], "team": "platform"}}}}
+				obj.SetGroupVersionKind(gvk)
+				list.Items = append(list.Items, obj)
+			}
+			var projections []v1alpha1.Projection
+			if custom {
+				projections = []v1alpha1.Projection{{Name: CLUSTER, FieldPath: "metadata.annotations.cluster", Type: v1alpha1.TypePrimitive}, {Name: "team", FieldPath: "metadata.annotations.team", Type: v1alpha1.TypePrimitive}}
+			}
+			cluster := "actual"
+			gauge := newTestGauge(t)
+			counts := map[string]int64{}
+			gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
+				if dims[CLUSTER] != cluster {
+					t.Errorf("wrong cluster: %v", dims)
+				}
+				if custom && dims["team"] != "platform" {
+					t.Errorf("missing custom dimension: %v", dims)
+				}
+				counts[dims[GROUP]+"/"+dims[VERSION]+"/"+dims[KIND]] = value
+			})
+			h := MetricHandler{metric: v1alpha1.Metric{Spec: v1alpha1.MetricSpec{Projections: projections}}, clusterName: &cluster, gaugeMetric: gauge}
+			result, err := h.projectionsMonitor(t.Context(), list, targetLookupResult{})
+			if err != nil || result.Error != nil {
+				t.Fatalf("monitor: %v / %v", err, result.Error)
+			}
+			if len(counts) != 2 || counts["one.io/v1/One"] != 2 || counts["two.io/v2/Two"] != 1 {
+				t.Fatalf("wrong identity counts: %v", counts)
+			}
+		})
 	}
 }

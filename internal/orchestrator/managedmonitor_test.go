@@ -121,8 +121,8 @@ func TestManagedHandlerMonitorBaseDimensions(t *testing.T) {
 	crds := []string{managedAndServedCRD(first), managedAndServedCRD(second)}
 
 	tests := []struct {
-		name        string
-		dimensions  []v1alpha1.Projection
+		name       string
+		dimensions []v1alpha1.Projection
 	}{
 		{name: "nil defaults"},
 		{name: "explicitly empty", dimensions: []v1alpha1.Projection{}},
@@ -165,9 +165,9 @@ func TestManagedHandlerMonitorBaseDimensions(t *testing.T) {
 				recordCount++
 			})
 			handler := &ManagedHandler{
-				client: setupFakeClient(t, crds),
-				dCli: setupFakeDynamicClient(t, resources),
-				metric: v1alpha1.ManagedMetric{Spec: v1alpha1.ManagedMetricSpec{Dimensions: tt.dimensions}},
+				client:      setupFakeClient(t, crds),
+				dCli:        setupFakeDynamicClient(t, resources),
+				metric:      v1alpha1.ManagedMetric{Spec: v1alpha1.ManagedMetricSpec{Dimensions: tt.dimensions}},
 				clusterName: &clusterName,
 				gaugeMetric: gauge,
 			}

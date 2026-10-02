@@ -111,12 +111,12 @@ func TestFederatedManagedRecordManagedResourceCountsAggregates(t *testing.T) {
 	gauge := newTestGauge(t)
 	records := make(map[string]int64)
 	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) {
-		key := dims[GROUP] + "|" + dims[VERSION] + "|" + dims[KIND] + "|" + dims[CLUSTER] + "|" + dims[APIVERSION] + "|" + dims["ready"] + "|" + dims["synced"]
+		key := dims[GROUP] + "|" + dims[VERSION] + "|" + dims[KIND] + "|" + dims[CLUSTER] + "|" + dims[APIVERSION] + "|" + dims["Ready"] + "|" + dims["Synced"]
 		records[key] = value
 	})
 	handler := FederatedManagedHandler{
 		client: setupFakeClient(t, []string{federatedManagedCRD(gvk)}),
-		dCli: setupFakeDynamicClient(t, []string{fakeResource(gvk), fakeResource(gvk)}),
+		dCli:   setupFakeDynamicClient(t, []string{fakeResource(gvk), fakeResource(gvk)}),
 		metric: v1alpha1.FederatedManagedMetric{}, gauge: gauge, clusterName: &cluster,
 	}
 	count, err := handler.recordManagedResourceCounts(context.Background())
@@ -141,14 +141,14 @@ metadata:
 	gauge.SetPrometheusFunc(func(dims map[string]string, _ int64) { got = dims })
 	handler := FederatedManagedHandler{
 		client: setupFakeClient(t, []string{federatedManagedCRD(gvk)}),
-		dCli: setupFakeDynamicClient(t, []string{resource}),
-		gauge: gauge,
+		dCli:   setupFakeDynamicClient(t, []string{resource}),
+		gauge:  gauge,
 	}
 	count, err := handler.recordManagedResourceCounts(context.Background())
 	if err != nil || count != 1 {
 		t.Fatalf("recordManagedResourceCounts = (%d, %v), want (1, nil)", count, err)
 	}
-	if got["ready"] != "unknown" || got["synced"] != "unknown" {
+	if got["Ready"] != "unknown" || got["Synced"] != "unknown" {
 		t.Fatalf("missing conditions were not represented as unknown: %#v", got)
 	}
 }
@@ -241,7 +241,7 @@ spec:
     served: true
     storage: true
 `, oldGVK.Version, storageGVK.Version)}),
-		dCli: setupFakeDynamicClient(t, []string{fakeResource(oldGVK), fakeResource(storageGVK)}),
+		dCli:  setupFakeDynamicClient(t, []string{fakeResource(oldGVK), fakeResource(storageGVK)}),
 		gauge: newTestGauge(t),
 	}
 	count, err := handler.recordManagedResourceCounts(context.Background())

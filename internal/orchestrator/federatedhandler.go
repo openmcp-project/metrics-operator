@@ -81,27 +81,43 @@ func (h *FederatedHandler) Monitor(ctx context.Context) (MonitorResult, error) {
 		return MonitorResult{}, fmt.Errorf("could not retrieve target resource(s) %w", err)
 	}
 
-groups := groupProjectionResultsByGVK(list, h.metric.Spec.Projections)
-valueByUID := resolveValueFrom(list, h.metric.Spec.ValueFrom)
+	groups := groupProjectionResultsByGVK(list, h.metric.Spec.Projections)
+	valueByUID := resolveValueFrom(list, h.metric.Spec.ValueFrom)
 	dimensions := make(map[string]int)
 
 	for _, fieldGroups := range groups {
 		// Calculate count as the number of resource instances with this combination
 		count := len(fieldGroups)
 
-dp := clientoptl.NewDataPoint().SetValue(int64(count))
-if len(fieldGroups) > 0 && len(fieldGroups[0]) > 0 {
- gvk := fieldGroups[0][0].gvk
- if gvk.Kind != "" { dp.AddDimension(RESOURCE, gvk.Kind) }
- if gvk.Group != "" { dp.AddDimension(GROUP, gvk.Group) }
- if gvk.Version != "" { dp.AddDimension(VERSION, gvk.Version) }
-} else {
- gvk := h.metric.Spec.Target.GVK()
- if gvk.Kind != "" { dp.AddDimension(RESOURCE, gvk.Kind) }
- if gvk.Group != "" { dp.AddDimension(GROUP, gvk.Group) }
- if gvk.Version != "" { dp.AddDimension(VERSION, gvk.Version) }
-}
-if h.clusterName != nil && *h.clusterName != "" { dp.AddDimension(CLUSTER, *h.clusterName) }
+		dp := clientoptl.NewDataPoint().SetValue(int64(count))
+		if len(fieldGroups) > 0 && len(fieldGroups[0]) > 0 {
+			gvk := fieldGroups[0][0].gvk
+			if gvk.Kind != "" {
+				dp.AddDimension(RESOURCE, gvk.Kind)
+				dp.AddDimension(KIND, gvk.Kind)
+			}
+			if gvk.Group != "" {
+				dp.AddDimension(GROUP, gvk.Group)
+			}
+			if gvk.Version != "" {
+				dp.AddDimension(VERSION, gvk.Version)
+			}
+		} else {
+			gvk := h.metric.Spec.Target.GVK()
+			if gvk.Kind != "" {
+				dp.AddDimension(RESOURCE, gvk.Kind)
+				dp.AddDimension(KIND, gvk.Kind)
+			}
+			if gvk.Group != "" {
+				dp.AddDimension(GROUP, gvk.Group)
+			}
+			if gvk.Version != "" {
+				dp.AddDimension(VERSION, gvk.Version)
+			}
+		}
+		if h.clusterName != nil && *h.clusterName != "" {
+			dp.AddDimension(CLUSTER, *h.clusterName)
+		}
 
 		if len(fieldGroups) > 0 {
 			// Use aggregated valueFrom across all objects in the group if available
@@ -115,16 +131,14 @@ if h.clusterName != nil && *h.clusterName != "" { dp.AddDimension(CLUSTER, *h.cl
 				dp.SetValue(v)
 			}
 			for _, pField := range fieldGroups[0] {
-if pField.error == nil && pField.name != RESOURCE && pField.name != GROUP && pField.name != VERSION && pField.name != CLUSTER {
+				if pField.error == nil && pField.name != "" {
 					// empty values will be ignored and rejected by the opentelemetry collector, need to give it some Value to avoid this
 					value := pField.value
 					if value == "" {
 						value = "n/a"
 					}
-if pField.name != RESOURCE && pField.name != GROUP && pField.name != VERSION && pField.name != CLUSTER {
- dp.AddDimension(pField.name, value)
- dimensions[pField.name] = dimensions[pField.name] + count
-}
+					dp.AddDimension(pField.name, value)
+					dimensions[pField.name] += count
 				}
 			}
 		}

@@ -9,8 +9,9 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
-	
+
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
 )
@@ -155,8 +156,7 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 func federatedManagedConditionProjections() []v1alpha1.Projection {
 	unknown := v1alpha1.NewProjectionDefaultValue("unknown")
 	return []v1alpha1.Projection{
-		{Name: "ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
-		{Name: "synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
+		{Name: "Ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
+		{Name: "Synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
 	}
 }
-
