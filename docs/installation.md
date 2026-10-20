@@ -51,6 +51,19 @@ helm upgrade --install metrics-operator oci://ghcr.io/openmcp-project/charts/met
 
 Available versions are listed on [GitHub releases](https://github.com/openmcp-project/metrics-operator/releases).
 
+### OpenTelemetry logs
+
+The operator writes logs to stdout and can additionally export them over OTLP/gRPC. Configure the standard OpenTelemetry environment variables through the chart's `manager.extraEnv` values:
+
+```yaml
+manager:
+  extraEnv:
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: http://otel-collector.monitoring.svc:4317
+```
+
+Log export remains disabled when neither `OTEL_EXPORTER_OTLP_ENDPOINT` nor `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` is set. Set `OTEL_LOGS_EXPORTER=none` to disable it explicitly. Exported logs use the SDK's default resource, including `service.name` and `telemetry.sdk.*` attributes. The Prometheus endpoint exposes the same SDK identity as labels on its `target_info` series so collectors can promote them to resource attributes for scraped metrics.
+
 ### Post-install: Create a DataSink
 
 After deploying, configure at least one DataSink so the operator knows where to send metrics:
@@ -78,4 +91,3 @@ kubectl create secret generic dynatrace-credentials \
 ```
 
 See [DataSink Configuration](metrics-export.md) for full details including mTLS and multiple sink setups.
-

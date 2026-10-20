@@ -21,6 +21,7 @@ import (
 	"embed"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -33,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -43,6 +45,7 @@ import (
 
 	"github.com/openmcp-project/metrics-operator/internal/controller"
 	internalmetrics "github.com/openmcp-project/metrics-operator/internal/metrics"
+	"github.com/openmcp-project/metrics-operator/internal/telemetry"
 
 	metricsv1alpha1 "github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
@@ -148,8 +151,25 @@ func main() {
 		return
 	}
 
-	logger := zap.New(zap.UseFlagOptions(&opts))
+	logger := telemetry.NewLogger(&opts)
 	ctrl.SetLogger(logger)
+	ctx := ctrl.SetupSignalHandler()
+
+	if err := telemetry.RegisterSDKInfoMetric(ctrlmetrics.Registry); err != nil {
+		setupLog.Error(err, "unable to expose OpenTelemetry SDK metric metadata")
+	}
+
+	shutdownLogs, err := telemetry.SetupLogs(ctx)
+	if err != nil {
+		setupLog.Error(err, "unable to set up OpenTelemetry logs, continuing with stdout")
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownLogs(shutdownCtx); err != nil {
+			setupLog.Error(err, "unable to shut down OpenTelemetry logs")
+		}
+	}()
 
 	config := ctrl.GetConfigOrDie()
 	setupClient, err := client.New(config, client.Options{Scheme: scheme})
@@ -210,7 +230,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
