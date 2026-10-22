@@ -98,8 +98,8 @@ github.com/onsi/ginkgo/v2 v2.33.0 h1:C8gBA6Uc2ZEubiV+SXiu5tZnMTwEmXHgkJwGozKtZf8
 github.com/onsi/ginkgo/v2 v2.33.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.44.0 h1:eAiGl3Pw5jz5GQdDff0BcxYpAX1JxW8xD7mFUuwNfZQ=
 github.com/onsi/gomega v1.44.0/go.mod h1:e/C2HwaZ1DhvjzXXuFhcR7hY7Sh9pl7MmoWKEjzwcdA=
-github.com/openmcp-project/controller-utils v0.33.2 h1:uanfYESayx6JALKor3wkIjja3Hq1pTq1VGB/KKPlCgY=
-github.com/openmcp-project/controller-utils v0.33.2/go.mod h1:hwfKYzTzYjC2vI0q7e1EE35UuPzJJ2gk4GK01x21GyI=
+github.com/openmcp-project/controller-utils v0.33.3 h1:39LCy527WqnuCiIEbgNldBdwwVcb6M9uBfke3uBX0Ds=
+github.com/openmcp-project/controller-utils v0.33.3/go.mod h1:Yr4RsUv75F+YJeoH/93Q45X7mIAWGbf1hKqbczmRdvY=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
