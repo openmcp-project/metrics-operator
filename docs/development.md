@@ -47,7 +47,7 @@ task run
 | `task run`           | Run the operator locally                                          |
 | `task dev:clean`     | Delete the local kind cluster                                     |
 | `task test`          | Run all Go tests                                                  |
-| `task generate`      | Regenerate CRDs and deepcopy code after API changes               |
+| `task generate`      | Regenerate CRDs and deepcopy code after API or build tooling changes |
 | `task validate:lint` | Run golangci-lint                                                 |
 
 Run `task` with no arguments for the full list of available tasks.
