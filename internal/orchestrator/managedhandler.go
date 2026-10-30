@@ -5,16 +5,13 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	rcli "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 	"github.com/openmcp-project/metrics-operator/internal/clientoptl"
@@ -50,74 +47,116 @@ func NewManagedHandler(metric v1alpha1.ManagedMetric, qc QueryConfig, gaugeMetri
 }
 
 func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string, error) {
-	l := log.FromContext(ctx)
-	resources, err := h.getResourcesStatus(ctx)
+	list, err := h.getManagedUnstructured(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	// data point split by dimensions
-	for _, cr := range resources {
-		// Create a new data point for each resource
-		dataPoint := clientoptl.NewDataPoint()
+	projections := h.metric.Spec.Dimensions
+	if projections == nil {
+		projections = defaultManagedProjections()
+	}
+	projections = managedCustomProjections(projections)
 
-		// Preserve old logic so that if custom dimensions are not set, we use status.conditions
-		// as default dimensions
-		if h.metric.Spec.Dimensions == nil {
-			gv, err := schema.ParseGroupVersion(cr.MangedResource.APIVersion)
-			if err != nil {
-				return "", err
-			}
-
-			dataPoint.AddDimension(KIND, cr.MangedResource.Kind)
-			dataPoint.AddDimension(GROUP, gv.Group)
-			dataPoint.AddDimension(VERSION, gv.Version)
-
-			for typ, state := range cr.Status {
-				t := strings.ToLower(typ)
-				if t == "ready" || t == "synced" {
-					dataPoint.AddDimension(t, strconv.FormatBool(state))
-				}
-			}
-		} else {
-			objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cr.MangedResource)
-			if err != nil {
-				return "", err
-			}
-
-			u := &unstructured.Unstructured{Object: objMap}
-
-			for _, dimension := range h.metric.Spec.Dimensions {
-				if dimension.Name != "" && dimension.FieldPath != "" {
-					value, _, err := nestedFieldValue(*u, dimension.FieldPath, dimension.Type, dimension.Default)
-					if err != nil {
-						l.Error(err, fmt.Sprintf("WARN: Could not parse expression '%s' for dimension field '%s'. Error: %v\n", dimension.Name, dimension.FieldPath, err))
-						continue
-					}
-					dataPoint.AddDimension(dimension.Name, value)
-				}
-			}
+	byGVK := make(map[schema.GroupVersionKind]*unstructured.UnstructuredList)
+	for i := range list.Items {
+		obj := &list.Items[i]
+		gvk := obj.GroupVersionKind()
+		group := byGVK[gvk]
+		if group == nil {
+			group = &unstructured.UnstructuredList{}
+			byGVK[gvk] = group
 		}
-
-		// Add cluster dimension if available
-		if h.clusterName != nil {
-			dataPoint.AddDimension(CLUSTER, *h.clusterName)
-		}
-
-		// Set the value to 1 for each resource
-		dataPoint.SetValue(1)
-
-		// Record the metric
-		err = h.gaugeMetric.RecordMetrics(ctx, dataPoint)
-		if err != nil {
-			return "", err
-		}
+		group.Items = append(group.Items, *obj)
 	}
 
-	resourcesCount := len(resources)
+	for gvk, resources := range byGVK {
+		groups := extractProjectionGroupsFrom(resources, projections)
+		if len(projections) == 0 {
+			fields := make([][]projectedField, len(resources.Items))
+			groups = projectionGroups{"": fields}
+		}
+		for _, group := range groups {
+			dp := clientoptl.NewDataPoint().SetValue(int64(len(group)))
+			dp.AddDimension(KIND, gvk.Kind)
+			dp.AddDimension(GROUP, gvk.Group)
+			dp.AddDimension(VERSION, gvk.Version)
+			if h.clusterName != nil && *h.clusterName != "" {
+				dp.AddDimension(CLUSTER, *h.clusterName)
+			}
+			if len(group) > 0 {
+				for _, pf := range group[0] {
+					if pf.error == nil && pf.value != "" {
+						dp.AddDimension(pf.name, pf.value)
+					}
+				}
+			}
+			if err := h.gaugeMetric.RecordMetrics(ctx, dp); err != nil {
+				return "", err
+			}
+		}
+	}
+	return strconv.Itoa(len(list.Items)), nil
+}
 
-	// if no err, returns nil...duh!
-	return strconv.Itoa(resourcesCount), err
+func managedCustomProjections(projections []v1alpha1.Projection) []v1alpha1.Projection {
+	filtered := make([]v1alpha1.Projection, 0, len(projections))
+	for _, projection := range projections {
+		switch projection.Name {
+		case KIND, GROUP, VERSION, CLUSTER:
+			continue
+		default:
+			filtered = append(filtered, projection)
+		}
+	}
+	return filtered
+}
+
+// defaultManagedProjections returns the default ready/synced projections for Managed* resources.
+// These preserve backwards-compatible label dimensions when no custom Dimensions are configured.
+func defaultManagedProjections() []v1alpha1.Projection {
+	return []v1alpha1.Projection{
+		{Name: "ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive},
+		{Name: "synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive},
+	}
+}
+
+// getManagedUnstructured returns the raw unstructured list of all matching managed resources.
+func (h *ManagedHandler) getManagedUnstructured(ctx context.Context) (*unstructured.UnstructuredList, error) {
+	crds := &apiextensionsv1.CustomResourceDefinitionList{}
+	if err := h.client.List(ctx, crds); err != nil {
+		return nil, err
+	}
+
+	result := &unstructured.UnstructuredList{Items: make([]unstructured.Unstructured, 0)}
+	for _, crd := range crds.Items {
+		if !h.hasCategory("crossplane", crd) || !h.hasCategory("managed", crd) {
+			continue
+		}
+		if !h.matchesGroupVersionKind(crd) {
+			continue
+		}
+		for _, crdv := range crd.Spec.Versions {
+			if !crdv.Served {
+				continue
+			}
+			target := h.metric.Spec.Target
+			if target != nil && target.Version != "" && target.Version != crdv.Name {
+				continue
+			}
+			gvr := schema.GroupVersionResource{
+				Resource: crd.Spec.Names.Plural,
+				Group:    crd.Spec.Group,
+				Version:  crdv.Name,
+			}
+			list, err := h.dCli.Resource(gvr).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("could not find any matching resources for metric with filter '%s'. %w", h.metric.GvkToString(), err)
+			}
+			result.Items = append(result.Items, list.Items...)
+		}
+	}
+	return result, nil
 }
 
 // Monitor executes the monitoring of the metric
@@ -149,130 +188,6 @@ func (h *ManagedHandler) hasCategory(category string, crd apiextensionsv1.Custom
 	}
 
 	return false
-}
-
-func (h *ManagedHandler) getResourcesStatus(ctx context.Context) ([]ClusterResourceStatus, error) {
-	managedResources, err := h.getManagedResources(ctx)
-	if err != nil {
-		return []ClusterResourceStatus{}, err
-	}
-
-	crStatuses := make([]ClusterResourceStatus, 0)
-
-	for _, item := range managedResources {
-		rsStatus := ClusterResourceStatus{MangedResource: item, Status: make(map[string]bool)}
-		for _, condition := range item.Status.Conditions {
-			status, _ := strconv.ParseBool(condition.Status)
-			rsStatus.Status[condition.Type] = status
-		}
-		crStatuses = append(crStatuses, rsStatus)
-	}
-
-	return crStatuses, nil
-}
-
-//nolint:gocyclo
-func (h *ManagedHandler) getManagedResources(ctx context.Context) ([]Managed, error) {
-
-	crds := &apiextensionsv1.CustomResourceDefinitionList{} // get ALL custom resource definitions
-	if err := h.client.List(ctx, crds); err != nil {
-		return nil, err
-	}
-
-	resourceCRDs := make([]apiextensionsv1.CustomResourceDefinition, 0, len(crds.Items))
-	for _, crd := range crds.Items {
-		// drop non-crossplane crds
-		if !h.hasCategory("crossplane", crd) || !h.hasCategory("managed", crd) {
-			continue
-		}
-		// drop crds that don't match the spec gvk
-		if !h.matchesGroupVersionKind(crd) {
-			continue
-		}
-		resourceCRDs = append(resourceCRDs, crd)
-	}
-
-	var resources []unstructured.Unstructured
-	for _, crd := range resourceCRDs {
-		versionsToRetrieve := make([]string, 0, len(crd.Spec.Versions))
-		for _, crdv := range crd.Spec.Versions {
-			// only use served versions for retrieval
-			if !crdv.Served {
-				continue
-			}
-			// drop versions that don't match the user provided target
-			target := h.metric.Spec.Target
-			if target != nil && target.Version != "" && target.Version != crdv.Name {
-				continue
-			}
-			versionsToRetrieve = append(versionsToRetrieve, crdv.Name)
-		}
-		// finally retrieve all matching resources
-		for _, version := range versionsToRetrieve {
-			gvr := schema.GroupVersionResource{
-				Resource: crd.Spec.Names.Plural,
-				Group:    crd.Spec.Group,
-				Version:  version,
-			}
-
-			list, err := h.dCli.Resource(gvr).List(ctx, metav1.ListOptions{}) // gets resources from all the available crds
-			if err != nil {
-				return nil, fmt.Errorf("could not find any matching resources for metric with filter '%s'. %w", h.metric.GvkToString(), err)
-			}
-
-			if len(list.Items) > 0 {
-				resources = append(resources, list.Items...)
-			}
-		}
-	}
-
-	managedResources := make([]Managed, 0, len(resources))
-	for _, u := range resources {
-		managed := Managed{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &managed)
-		if err != nil {
-			return nil, err
-		}
-
-		managedResources = append(managedResources, managed)
-	}
-
-	return managedResources, nil
-}
-
-// Managed is a struct that holds the managed resource
-type Managed struct {
-	APIVersion string            `json:"apiVersion"`
-	Kind       string            `json:"kind"`
-	Spec       Spec              `json:"spec"`
-	Metadata   metav1.ObjectMeta `json:"metadata"`
-	Status     Status            `json:"status"`
-}
-
-// Status is a struct that holds the status of a resource
-type Status struct {
-	AtProvider map[string]any `json:"forProvider"`
-	Conditions []Condition    `json:"conditions"`
-}
-
-// Condition is a struct that holds the condition of a resource
-type Condition struct {
-	LastTransitionTime string `json:"lastTransitionTime"`
-	Message            string `json:"message"`
-	Reason             string `json:"reason"`
-	Status             string `json:"status"`
-	Type               string `json:"type"`
-}
-
-// Spec is a struct that holds the specification of a resource
-type Spec struct {
-	ForProvider map[string]any `json:"forProvider"`
-}
-
-// ClusterResourceStatus is a struct that holds the status of a resource in the cluster
-type ClusterResourceStatus struct {
-	MangedResource Managed
-	Status         map[string]bool
 }
 
 func (h *ManagedHandler) matchesGroupVersionKind(crd apiextensionsv1.CustomResourceDefinition) bool {

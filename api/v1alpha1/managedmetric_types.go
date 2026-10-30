@@ -32,8 +32,8 @@ type ManagedMetricSpec struct {
 	// Defines which managed resources to observe
 	// +optional
 	Target *GroupVersionKindTarget `json:"target,omitempty"`
-	// Defines dimensions of the metric. All specified fields must be nested strings. Nested slices are not supported.
-	// If not specified, only status.conditions of the CR will be used as dimension.
+	// Dimensions adds projected fields to the authoritative group, version, kind, and cluster dimensions.
+	// If omitted, ready and synced condition dimensions are added; an empty list exports base dimensions only.
 	// +optional
 	Dimensions []Projection `json:"dimensions,omitempty"`
 	// Define labels of your object to adapt filters of the query
