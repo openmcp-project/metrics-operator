@@ -149,7 +149,7 @@ metadata:
 	if err != nil || count != 1 {
 		t.Fatalf("recordManagedResourceCounts = (%d, %v), want (1, nil)", count, err)
 	}
-	if got["Ready"] != "unknown" || got["Synced"] != "unknown" {
+	if got["Ready"] != "UNKNOWN" || got["Synced"] != "UNKNOWN" {
 		t.Fatalf("missing conditions were not represented as unknown: %#v", got)
 	}
 }

@@ -54,7 +54,7 @@ func (h *ManagedHandler) sendStatusBasedMetricValue(ctx context.Context) (string
 
 	projections := h.metric.Spec.Dimensions
 	if projections == nil {
-		projections = defaultManagedProjections()
+		projections = defaultProjections()
 	}
 	projections = managedCustomProjections(projections)
 
@@ -112,12 +112,13 @@ func managedCustomProjections(projections []v1alpha1.Projection) []v1alpha1.Proj
 	return filtered
 }
 
-// defaultManagedProjections returns the default ready/synced projections for Managed* resources.
+// defaultProjections returns the default ready/synced projections for Managed* resources.
 // These preserve backwards-compatible label dimensions when no custom Dimensions are configured.
-func defaultManagedProjections() []v1alpha1.Projection {
+func defaultProjections() []v1alpha1.Projection {
+	unknown := v1alpha1.NewProjectionDefaultValue("UNKNOWN")
 	return []v1alpha1.Projection{
-		{Name: "ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive},
-		{Name: "synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive},
+		{Name: "Ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
+		{Name: "Synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
 	}
 }
 

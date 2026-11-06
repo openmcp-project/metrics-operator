@@ -104,7 +104,7 @@ func TestMetricHandlerProjectionsMonitor(t *testing.T) {
 
 	// fakeResource produces resources with status.conditions where Ready=True
 	projections := []v1alpha1.Projection{
-		{Name: "ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive},
+		{Name: "Ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive},
 	}
 	handler, recorded := newMetricHandlerForTest(t, gvk,
 		[]string{fakeResource(gvk), fakeResource(gvk)},
@@ -118,7 +118,7 @@ func TestMetricHandlerProjectionsMonitor(t *testing.T) {
 		t.Fatalf("unexpected phase: %s, err=%v", result.Phase, result.Error)
 	}
 	// Both resources have Ready=True → one bucket with count=2
-	key := gvk.Kind + "|" + gvk.Group + "|" + gvk.Version + "|ready=True"
+	key := gvk.Kind + "|" + gvk.Group + "|" + gvk.Version + "|Ready=True"
 	if recorded[key] != 2 {
 		t.Fatalf("unexpected projection bucket: wanted %q=2, got=%v", key, recorded)
 	}

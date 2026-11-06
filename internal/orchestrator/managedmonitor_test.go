@@ -54,7 +54,7 @@ func TestManagedHandlerMonitorRecordsDefaultDimensions(t *testing.T) {
 	gauge := newTestGauge(t)
 	recorded := make(map[string]int64)
 	gauge.SetPrometheusFunc(func(dims map[string]string, value int64) error {
-		recorded[dims["ready"]+"|"+dims["synced"]] = value
+		recorded[dims["Ready"]+"|"+dims["Synced"]] = value
 		return nil
 	})
 

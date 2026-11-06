@@ -88,7 +88,7 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 	}
 	byGVK := make(map[schema.GroupVersionKind]*resourceBuckets)
 	resourceCount := 0
-	projections := federatedManagedConditionProjections()
+	projections := defaultProjections()
 
 	for _, crd := range crds.Items {
 		if !slices.Contains(crd.Spec.Names.Categories, "crossplane") || !slices.Contains(crd.Spec.Names.Categories, "managed") {
@@ -151,12 +151,4 @@ func (h *FederatedManagedHandler) recordManagedResourceCounts(ctx context.Contex
 	}
 
 	return resourceCount, nil
-}
-
-func federatedManagedConditionProjections() []v1alpha1.Projection {
-	unknown := v1alpha1.NewProjectionDefaultValue("unknown")
-	return []v1alpha1.Projection{
-		{Name: "Ready", FieldPath: "status.conditions[?(@.type=='Ready')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
-		{Name: "Synced", FieldPath: "status.conditions[?(@.type=='Synced')].status", Type: v1alpha1.TypePrimitive, Default: unknown},
-	}
 }
