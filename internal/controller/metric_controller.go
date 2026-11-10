@@ -135,9 +135,11 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Defer status update to ensure it's always called
 	defer func() {
+		start := time.Now()
 		if err := r.getClient().Status().Update(ctx, &metric); err != nil {
 			l.Error(err, "Failed to update Metric status")
 		}
+		l.Info("Metric status update duration", "duration", time.Since(start))
 	}()
 
 	// Initialize Ready condition if not present
