@@ -19,7 +19,7 @@ import (
 	"github.com/openmcp-project/metrics-operator/api/v1alpha1"
 )
 
-func TestGetManagedResources(t *testing.T) {
+func TestGetManagedUnstructured(t *testing.T) {
 	// we define a couple of GVKs to generate CRDs and resources for our test cases
 	k8sObjectGVK := schema.GroupVersionKind{
 		Group:   "kubernetes.m.crossplane.io",
@@ -220,23 +220,23 @@ func TestGetManagedResources(t *testing.T) {
 				},
 			}
 
-			// execute getManagedResources
-			result, err := handler.getManagedResources(context.Background())
+			// execute the production retrieval path
+			result, err := handler.getManagedUnstructured(context.Background())
 			if err != nil {
-				t.Fatalf("getManagedResource failed: %v", err)
+				t.Fatalf("getManagedUnstructured failed: %v", err)
 			}
 
 			// verify result
-			if len(tt.wantResources) != len(result) {
-				t.Errorf("unexpected result length: wanted=%v, got=%v", len(tt.wantResources), len(result))
+			if len(tt.wantResources) != len(result.Items) {
+				t.Errorf("unexpected result length: wanted=%v, got=%v", len(tt.wantResources), len(result.Items))
 			}
-			for _, managed := range result {
+			for _, managed := range result.Items {
 				if !slices.ContainsFunc(tt.wantResources, func(yaml string) bool {
 					left := yamlNameGVK(t, yaml)
-					right := managedNameGVK(t, managed)
+					right := fmt.Sprintf("%v:%v", managed.GroupVersionKind(), managed.GetName())
 					return left == right
 				}) {
-					t.Errorf("unexpected resource: %v", managedNameGVK(t, managed))
+					t.Errorf("unexpected resource: %v:%v", managed.GroupVersionKind(), managed.GetName())
 				}
 			}
 		})
@@ -283,20 +283,6 @@ func setupFakeDynamicClient(t *testing.T, yamlResources []string) *dynamicfake.F
 
 	// setup fake dynamic client
 	return dynamicfake.NewSimpleDynamicClient(scheme, fakeObjects...)
-}
-
-func managedNameGVK(t *testing.T, managed Managed) string {
-	t.Helper()
-	gv, err := schema.ParseGroupVersion(managed.APIVersion)
-	if err != nil {
-		t.Errorf("failed to parse managed group version: %v", err)
-	}
-	gvk := schema.GroupVersionKind{
-		Group:   gv.Group,
-		Version: gv.Version,
-		Kind:    managed.Kind,
-	}
-	return fmt.Sprintf("%v:%v", gvk, managed.Metadata.Name)
 }
 
 func yamlNameGVK(t *testing.T, yaml string) string {
