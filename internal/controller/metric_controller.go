@@ -200,11 +200,8 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		l.Error(errGauge, fmt.Sprintf("metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
-	metricName := metric.Spec.Name
-	metricNamespace := metric.Namespace
-	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) error {
-		return internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
-	})
+	prometheusRecorder := internalmetrics.NewMetricRecorder(metric.Spec.Name, metric.Namespace, metric.Name)
+	gaugeMetric.SetPrometheusFunc(prometheusRecorder.RecordDataPoint)
 	/*
 		2. Create a new orchestrator
 	*/
@@ -228,6 +225,14 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		metric.Status.Ready = v1alpha1.StatusStringFalse
 		l.Error(errMon, fmt.Sprintf("metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
+	}
+
+	if result.Phase != v1alpha1.PhaseFailed {
+		if err := prometheusRecorder.Commit(); err != nil {
+			metric.SetConditions(common.ReadyFalse("PrometheusRecordingFailed", err.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
+			return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+		}
 	}
 
 	errExport := metricClient.ExportMetrics(ctx)

@@ -201,7 +201,7 @@ deployment_age_seconds{namespace="monitoring",resource_namespace="team-b",name="
 
 Other projection names are unchanged. If both `namespace` and `resource_namespace` are projected with different values, recording fails rather than discarding either value. OTLP dimension names are unchanged.
 
-Metrics sharing a `spec.name` may expose different projection label sets. Adding or removing a projection does not prevent subsequent samples from being recorded. Existing series are retained until the operator restarts; this change does not add series expiration. Invalid label names or recording failures are reported through the metric's failure condition rather than silently skipped.
+After a successful reconciliation, the operator removes series previously emitted by that metric CR which are absent from the current result. A failed reconciliation retains the last successful snapshot. This keeps mutable projections such as resource status accurate. Metric names and schemas remain registered until the operator restarts.
 
 ### Enabling the ServiceMonitor
 

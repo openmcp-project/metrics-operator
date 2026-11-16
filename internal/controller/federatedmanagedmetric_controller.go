@@ -196,11 +196,8 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 		l.Error(errGauge, fmt.Sprintf("federated managed metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
-	metricName := metric.Spec.Name
-	metricNamespace := metric.Namespace
-	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) error {
-		return internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
-	})
+	prometheusRecorder := internalmetrics.NewMetricRecorder(metric.Spec.Name, metric.Namespace, metric.Name)
+	gaugeMetric.SetPrometheusFunc(prometheusRecorder.RecordDataPoint)
 
 	creds := common.DataSinkCredentials{}
 	if credentials != nil {
@@ -230,6 +227,12 @@ func (r *FederatedManagedMetricReconciler) Reconcile(ctx context.Context, req ct
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, nil
 		}
 
+	}
+
+	if err := prometheusRecorder.Commit(); err != nil {
+		metric.SetConditions(common.ReadyFalse("PrometheusRecordingFailed", err.Error()))
+		metric.Status.Ready = v1alpha1.StatusStringFalse
+		return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 	}
 
 	errExport := metricClient.ExportMetrics(ctx)

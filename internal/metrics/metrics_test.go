@@ -36,7 +36,14 @@ func isolatedCollector(t *testing.T) (*dynamicGaugeCollector, *prometheus.Regist
 
 func record(t *testing.T, collector *dynamicGaugeCollector, metricName, namespace string, dims map[string]string, value int64) {
 	t.Helper()
-	require.NoError(t, collector.recordDataPoint(metricName, namespace, dims, value))
+	recordAs(t, collector, metricName, namespace, t.Name(), dims, value)
+}
+
+func recordAs(t *testing.T, collector *dynamicGaugeCollector, metricName, namespace, name string, dims map[string]string, value int64) {
+	t.Helper()
+	recorder := collector.newMetricRecorder(metricName, namespace, name)
+	require.NoError(t, recorder.RecordDataPoint(dims, value))
+	require.NoError(t, recorder.Commit())
 }
 
 // gatherGauge returns all dto.Metric samples for the named metric family.
@@ -99,11 +106,27 @@ func TestRecordDataPoint_UpdatesAndMultipleMetricNames(t *testing.T) {
 	assert.InDelta(t, 20.0, samplesB[0].GetGauge().GetValue(), 0.001)
 }
 
+func TestMetricRecorderRemovesSupersededStatusSeries(t *testing.T) {
+	collector, reg := isolatedCollector(t)
+	recorder := collector.newMetricRecorder("helmrelease_status", "metrics-operator-system", "helmrelease")
+	require.NoError(t, recorder.RecordDataPoint(map[string]string{"name": "crossplane", "ready": "False"}, 1))
+	require.NoError(t, recorder.Commit())
+
+	recorder = collector.newMetricRecorder("helmrelease_status", "metrics-operator-system", "helmrelease")
+	require.NoError(t, recorder.RecordDataPoint(map[string]string{"name": "crossplane", "ready": "True"}, 1))
+	require.NoError(t, recorder.Commit())
+
+	samples := gatherGauge(t, reg, "helmrelease_status")
+	require.Len(t, samples, 1)
+	assert.Equal(t, "True", labelValue(samples[0], "ready"))
+	assert.InDelta(t, 1.0, samples[0].GetGauge().GetValue(), 0.001)
+}
+
 func TestRecordDataPoint_ProjectionSchemas(t *testing.T) {
 	collector, reg := isolatedCollector(t)
-	record(t, collector, "schema_metric", "first", map[string]string{"required": "one", "optional": "old"}, 1)
-	record(t, collector, "schema_metric", "second", map[string]string{"required": "two"}, 2)
-	record(t, collector, "schema_metric", "first", map[string]string{"required": "one", "new_optional": "later"}, 3)
+	recordAs(t, collector, "schema_metric", "first", "first-schema", map[string]string{"required": "one", "optional": "old"}, 1)
+	recordAs(t, collector, "schema_metric", "second", "second-schema", map[string]string{"required": "two"}, 2)
+	recordAs(t, collector, "schema_metric", "first", "later-schema", map[string]string{"required": "one", "new_optional": "later"}, 3)
 
 	samples := gatherGauge(t, reg, "schema_metric")
 	require.Len(t, samples, 3)
@@ -131,8 +154,8 @@ func TestRecordDataPoint_ProjectionSchemas(t *testing.T) {
 
 func TestRecordDataPoint_NamespaceSeparation(t *testing.T) {
 	collector, reg := isolatedCollector(t)
-	record(t, collector, "namespace_metric", "operator", map[string]string{"namespace": "resource-one"}, 11)
-	record(t, collector, "namespace_metric", "operator", map[string]string{"namespace": "resource-two"}, 22)
+	recordAs(t, collector, "namespace_metric", "operator", "resource-one", map[string]string{"namespace": "resource-one"}, 11)
+	recordAs(t, collector, "namespace_metric", "operator", "resource-two", map[string]string{"namespace": "resource-two"}, 22)
 
 	samples := gatherGauge(t, reg, "namespace_metric")
 	require.Len(t, samples, 2)
@@ -146,9 +169,11 @@ func TestRecordDataPoint_NamespaceSeparation(t *testing.T) {
 
 func TestRecordDataPoint_DelimiterBearingLabelNames(t *testing.T) {
 	collector, reg := isolatedCollector(t)
-	record(t, collector, "delimiter_metric", "ns", map[string]string{"a,b": "comma", "c": "first"}, 1)
-	record(t, collector, "delimiter_metric", "ns", map[string]string{"a": "single", "b,c": "second"}, 2)
-	require.NoError(t, collector.recordDataPoint("delimiter_metric", "ns", map[string]string{"a,b": "comma", "c": "first"}, 3))
+	recordAs(t, collector, "delimiter_metric", "ns", "first", map[string]string{"a,b": "comma", "c": "first"}, 1)
+	recordAs(t, collector, "delimiter_metric", "ns", "second", map[string]string{"a": "single", "b,c": "second"}, 2)
+	recorder := collector.newMetricRecorder("delimiter_metric", "ns", "first")
+	require.NoError(t, recorder.RecordDataPoint(map[string]string{"a,b": "comma", "c": "first"}, 3))
+	require.NoError(t, recorder.Commit())
 
 	samples := gatherGauge(t, reg, "delimiter_metric")
 	require.Len(t, samples, 2)
@@ -178,7 +203,8 @@ func TestRecordDataPoint_NilDims(t *testing.T) {
 
 func TestRecordDataPoint_RejectsConflictingNamespaceLabels(t *testing.T) {
 	collector, reg := isolatedCollector(t)
-	err := collector.recordDataPoint("namespace_conflict_metric", "operator", map[string]string{
+	recorder := collector.newMetricRecorder("namespace_conflict_metric", "operator", t.Name())
+	err := recorder.RecordDataPoint(map[string]string{
 		"namespace":          "one",
 		"resource_namespace": "two",
 	}, 1)
@@ -191,7 +217,8 @@ func TestRecordDataPoint_InvalidNameDoesNotPoisonGather(t *testing.T) {
 	collector, reg := isolatedCollector(t)
 	record(t, collector, "valid_metric_after_rejection", "ns", nil, 9)
 	for _, name := range []string{"", string([]byte{0xff})} {
-		err := collector.recordDataPoint(name, "ns", nil, 1)
+		recorder := collector.newMetricRecorder(name, "ns", t.Name())
+		err := recorder.RecordDataPoint(nil, 1)
 		require.Error(t, err, "metric name %q", name)
 	}
 	samples := gatherGauge(t, reg, "valid_metric_after_rejection")
@@ -204,7 +231,8 @@ func TestRecordDataPoint_InvalidNameDoesNotPoisonGather(t *testing.T) {
 func TestRecordDataPoint_InvalidProjectionLabelDoesNotPoisonGather(t *testing.T) {
 	collector, reg := isolatedCollector(t)
 	record(t, collector, "valid_label_metric", "ns", map[string]string{"valid": "value"}, 5)
-	err := collector.recordDataPoint("invalid_label_metric", "ns", map[string]string{"__bad": "value"}, 1)
+	recorder := collector.newMetricRecorder("invalid_label_metric", "ns", t.Name())
+	err := recorder.RecordDataPoint(map[string]string{"__bad": "value"}, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid labels")
 	assert.Empty(t, gatherGauge(t, reg, "invalid_label_metric"))
@@ -221,15 +249,19 @@ func TestRecordDataPoint_ConcurrentSchemasAndGather(t *testing.T) {
 	var wg sync.WaitGroup
 	for worker := range workers {
 		wg.Go(func() {
+			recorder := collector.newMetricRecorder("concurrent_metric", "operator", fmt.Sprint(worker))
 			dims := map[string]string{"worker": fmt.Sprint(worker)}
 			if worker%2 == 0 {
 				dims["optional"] = "present"
 			}
 			for value := range updates {
-				if err := collector.recordDataPoint("concurrent_metric", "operator", dims, int64(value)); err != nil {
+				if err := recorder.RecordDataPoint(dims, int64(value)); err != nil {
 					errors <- err
 					return
 				}
+			}
+			if err := recorder.Commit(); err != nil {
+				errors <- err
 			}
 		})
 	}
