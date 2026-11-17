@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/types"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -37,13 +38,16 @@ type dynamicGaugeCollector struct {
 	mu            sync.RWMutex
 	registered    bool
 	gauges        map[string]map[string]*prometheus.GaugeVec
-	seriesByOwner map[metricOwner]map[seriesKey]recordedSeries
+	seriesByOwner map[metricOwner]ownerSnapshot
 }
 
 type metricOwner struct {
+	uid types.UID
+}
+
+type ownerSnapshot struct {
 	metricName string
-	namespace  string
-	name       string
+	series     map[seriesKey]recordedSeries
 }
 
 type seriesKey struct {
@@ -60,16 +64,18 @@ type recordedSeries struct {
 
 // MetricRecorder accumulates a metric CR's Prometheus series for one successful reconciliation.
 type MetricRecorder struct {
-	collector *dynamicGaugeCollector
-	owner     metricOwner
-	series    map[seriesKey]recordedSeries
+	collector  *dynamicGaugeCollector
+	metricName string
+	namespace  string
+	owner      metricOwner
+	series     map[seriesKey]recordedSeries
 }
 
 func newDynamicGaugeCollector(registerer prometheus.Registerer) *dynamicGaugeCollector {
 	return &dynamicGaugeCollector{
 		registerer:    registerer,
 		gauges:        make(map[string]map[string]*prometheus.GaugeVec),
-		seriesByOwner: make(map[metricOwner]map[seriesKey]recordedSeries),
+		seriesByOwner: make(map[metricOwner]ownerSnapshot),
 	}
 }
 
@@ -94,13 +100,13 @@ func (c *dynamicGaugeCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (c *dynamicGaugeCollector) newMetricRecorder(metricName, namespace, name string) *MetricRecorder {
+func (c *dynamicGaugeCollector) newMetricRecorder(metricName, namespace string, uid types.UID) *MetricRecorder {
 	return &MetricRecorder{
-		collector: c,
+		collector:  c,
+		metricName: metricName,
+		namespace:  namespace,
 		owner: metricOwner{
-			metricName: metricName,
-			namespace:  namespace,
-			name:       name,
+			uid: uid,
 		},
 		series: make(map[seriesKey]recordedSeries),
 	}
@@ -108,7 +114,7 @@ func (c *dynamicGaugeCollector) newMetricRecorder(metricName, namespace, name st
 
 // RecordDataPoint records a point in the reconciliation snapshot.
 func (r *MetricRecorder) RecordDataPoint(dims map[string]string, value int64) error {
-	series, err := r.collector.newRecordedSeries(r.owner.metricName, r.owner.namespace, dims, value)
+	series, err := r.collector.newRecordedSeries(r.metricName, r.namespace, dims, value)
 	if err != nil {
 		return err
 	}
@@ -118,7 +124,7 @@ func (r *MetricRecorder) RecordDataPoint(dims map[string]string, value int64) er
 
 // Commit replaces the owner's previous series with the reconciliation snapshot.
 func (r *MetricRecorder) Commit() error {
-	return r.collector.commit(r.owner, r.series)
+	return r.collector.commit(r.owner, r.metricName, r.series)
 }
 
 func (c *dynamicGaugeCollector) newRecordedSeries(metricName, namespace string, dims map[string]string, value int64) (recordedSeries, error) {
@@ -162,28 +168,28 @@ func (c *dynamicGaugeCollector) newRecordedSeries(metricName, namespace string, 
 	}, nil
 }
 
-func (c *dynamicGaugeCollector) commit(owner metricOwner, current map[seriesKey]recordedSeries) error {
+func (c *dynamicGaugeCollector) commit(owner metricOwner, metricName string, current map[seriesKey]recordedSeries) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	schemas := c.gauges[owner.metricName]
+	schemas := c.gauges[metricName]
 	for _, series := range current {
 		gauge := schemas[series.schemaKey]
 		if gauge == nil {
 			gauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Name: owner.metricName,
+				Name: metricName,
 				Help: metricHelp,
 			}, series.labelNames)
 			if schemas == nil {
 				schemas = make(map[string]*prometheus.GaugeVec)
-				c.gauges[owner.metricName] = schemas
+				c.gauges[metricName] = schemas
 			}
 			schemas[series.schemaKey] = gauge
 		}
 
 		metric, err := gauge.GetMetricWith(series.labels)
 		if err != nil {
-			return fmt.Errorf("get metric %q with projection labels: %w", owner.metricName, err)
+			return fmt.Errorf("get metric %q with projection labels: %w", metricName, err)
 		}
 		metric.Set(float64(series.value))
 	}
@@ -195,24 +201,40 @@ func (c *dynamicGaugeCollector) commit(owner metricOwner, current map[seriesKey]
 		c.registered = true
 	}
 
-	for key, series := range c.seriesByOwner[owner] {
-		if _, exists := current[key]; exists || c.isOwnedByAnotherMetric(owner, key) {
-			continue
-		}
-		schemas[series.schemaKey].Delete(series.labels)
-	}
+	c.removeSeries(owner, c.seriesByOwner[owner], metricName, current)
 	if len(current) == 0 {
 		delete(c.seriesByOwner, owner)
-	} else {
-		c.seriesByOwner[owner] = current
+		return nil
 	}
+	c.seriesByOwner[owner] = ownerSnapshot{metricName: metricName, series: current}
 	return nil
 }
 
-func (c *dynamicGaugeCollector) isOwnedByAnotherMetric(owner metricOwner, key seriesKey) bool {
-	for otherOwner, series := range c.seriesByOwner {
-		if otherOwner != owner && otherOwner.metricName == owner.metricName {
-			if _, exists := series[key]; exists {
+func (c *dynamicGaugeCollector) remove(owner metricOwner) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.removeSeries(owner, c.seriesByOwner[owner], "", nil)
+	delete(c.seriesByOwner, owner)
+}
+
+func (c *dynamicGaugeCollector) removeSeries(owner metricOwner, snapshot ownerSnapshot, currentMetricName string, current map[seriesKey]recordedSeries) {
+	for key, series := range snapshot.series {
+		if snapshot.metricName == currentMetricName {
+			if _, exists := current[key]; exists {
+				continue
+			}
+		}
+		if c.isOwnedByAnotherMetric(owner, snapshot.metricName, key) {
+			continue
+		}
+		c.gauges[snapshot.metricName][series.schemaKey].Delete(series.labels)
+	}
+}
+
+func (c *dynamicGaugeCollector) isOwnedByAnotherMetric(owner metricOwner, metricName string, key seriesKey) bool {
+	for otherOwner, snapshot := range c.seriesByOwner {
+		if otherOwner != owner && snapshot.metricName == metricName {
+			if _, exists := snapshot.series[key]; exists {
 				return true
 			}
 		}
@@ -242,6 +264,11 @@ func labelValuesKey(labelNames []string, labels prometheus.Labels) string {
 }
 
 // NewMetricRecorder creates a reconciliation-scoped recorder for a metric CR.
-func NewMetricRecorder(metricName, namespace, name string) *MetricRecorder {
-	return dynamicMetrics.newMetricRecorder(metricName, namespace, name)
+func NewMetricRecorder(metricName, namespace string, uid types.UID) *MetricRecorder {
+	return dynamicMetrics.newMetricRecorder(metricName, namespace, uid)
+}
+
+// RemoveMetricOwner removes every Prometheus series owned by a metric CR.
+func RemoveMetricOwner(uid types.UID) {
+	dynamicMetrics.remove(metricOwner{uid: uid})
 }

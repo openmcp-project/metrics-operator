@@ -201,7 +201,7 @@ deployment_age_seconds{namespace="monitoring",resource_namespace="team-b",name="
 
 Other projection names are unchanged. If both `namespace` and `resource_namespace` are projected with different values, recording fails rather than discarding either value. OTLP dimension names are unchanged.
 
-After a successful reconciliation, the operator removes series previously emitted by that metric CR which are absent from the current result. A failed reconciliation retains the last successful snapshot. This keeps mutable projections such as resource status accurate. Metric names and schemas remain registered until the operator restarts.
+After a successful reconciliation and OTLP export, the operator removes series previously emitted by that metric CR which are absent from the current result. A failed reconciliation or export retains the last successful snapshot. Deleting a metric CR removes every series owned by that CR. This keeps mutable projections such as resource status accurate. Metric names and schemas remain registered until the operator restarts.
 
 ### Enabling the ServiceMonitor
 

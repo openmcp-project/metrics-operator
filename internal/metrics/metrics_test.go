@@ -25,6 +25,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func isolatedCollector(t *testing.T) (*dynamicGaugeCollector, *prometheus.Registry) {
@@ -41,7 +42,7 @@ func record(t *testing.T, collector *dynamicGaugeCollector, metricName, namespac
 
 func recordAs(t *testing.T, collector *dynamicGaugeCollector, metricName, namespace, name string, dims map[string]string, value int64) {
 	t.Helper()
-	recorder := collector.newMetricRecorder(metricName, namespace, name)
+	recorder := collector.newMetricRecorder(metricName, namespace, types.UID(name))
 	require.NoError(t, recorder.RecordDataPoint(dims, value))
 	require.NoError(t, recorder.Commit())
 }
@@ -94,9 +95,9 @@ func TestRecordDataPoint_ProjectionLabels(t *testing.T) {
 
 func TestRecordDataPoint_UpdatesAndMultipleMetricNames(t *testing.T) {
 	collector, reg := isolatedCollector(t)
-	record(t, collector, "metric_a", "ns", map[string]string{"x": "1"}, 10)
-	record(t, collector, "metric_a", "ns", map[string]string{"x": "1"}, 15)
-	record(t, collector, "metric_b", "ns", map[string]string{"x": "2"}, 20)
+	recordAs(t, collector, "metric_a", "ns", "metric-a-uid", map[string]string{"x": "1"}, 10)
+	recordAs(t, collector, "metric_a", "ns", "metric-a-uid", map[string]string{"x": "1"}, 15)
+	recordAs(t, collector, "metric_b", "ns", "metric-b-uid", map[string]string{"x": "2"}, 20)
 
 	samplesA := gatherGauge(t, reg, "metric_a")
 	samplesB := gatherGauge(t, reg, "metric_b")
@@ -108,11 +109,11 @@ func TestRecordDataPoint_UpdatesAndMultipleMetricNames(t *testing.T) {
 
 func TestMetricRecorderRemovesSupersededStatusSeries(t *testing.T) {
 	collector, reg := isolatedCollector(t)
-	recorder := collector.newMetricRecorder("helmrelease_status", "metrics-operator-system", "helmrelease")
+	recorder := collector.newMetricRecorder("helmrelease_status", "metrics-operator-system", types.UID("helmrelease"))
 	require.NoError(t, recorder.RecordDataPoint(map[string]string{"name": "crossplane", "ready": "False"}, 1))
 	require.NoError(t, recorder.Commit())
 
-	recorder = collector.newMetricRecorder("helmrelease_status", "metrics-operator-system", "helmrelease")
+	recorder = collector.newMetricRecorder("helmrelease_status", "metrics-operator-system", types.UID("helmrelease"))
 	require.NoError(t, recorder.RecordDataPoint(map[string]string{"name": "crossplane", "ready": "True"}, 1))
 	require.NoError(t, recorder.Commit())
 
@@ -120,6 +121,75 @@ func TestMetricRecorderRemovesSupersededStatusSeries(t *testing.T) {
 	require.Len(t, samples, 1)
 	assert.Equal(t, "True", labelValue(samples[0], "ready"))
 	assert.InDelta(t, 1.0, samples[0].GetGauge().GetValue(), 0.001)
+}
+
+func TestMetricRecorderRemovesEmptySnapshot(t *testing.T) {
+	collector, reg := isolatedCollector(t)
+	uid := types.UID("metric-uid")
+	recordAs(t, collector, "resource_status", "operator", string(uid), map[string]string{"ready": "False"}, 1)
+
+	require.NoError(t, collector.newMetricRecorder("resource_status", "operator", uid).Commit())
+	assert.Empty(t, gatherGauge(t, reg, "resource_status"))
+}
+
+func TestMetricRecorderKeepsSharedSeriesUntilLastOwnerRemovesIt(t *testing.T) {
+	collector, reg := isolatedCollector(t)
+	series := map[string]string{"name": "shared", "ready": "True"}
+	recordAs(t, collector, "resource_status", "operator", "first-uid", series, 1)
+	recordAs(t, collector, "resource_status", "operator", "second-uid", series, 1)
+
+	require.NoError(t, collector.newMetricRecorder("resource_status", "operator", types.UID("first-uid")).Commit())
+	require.Len(t, gatherGauge(t, reg, "resource_status"), 1)
+
+	require.NoError(t, collector.newMetricRecorder("resource_status", "operator", types.UID("second-uid")).Commit())
+	assert.Empty(t, gatherGauge(t, reg, "resource_status"))
+}
+
+func TestMetricRecorderSeparatesResourcesWithSameName(t *testing.T) {
+	collector, reg := isolatedCollector(t)
+	recordAs(t, collector, "resource_status", "operator", "metric-uid", map[string]string{"kind": "Metric"}, 1)
+	recordAs(t, collector, "resource_status", "operator", "managed-metric-uid", map[string]string{"kind": "ManagedMetric"}, 1)
+
+	recordAs(t, collector, "resource_status", "operator", "metric-uid", map[string]string{"kind": "Metric", "ready": "True"}, 1)
+	samples := gatherGauge(t, reg, "resource_status")
+	require.Len(t, samples, 2)
+	assert.ElementsMatch(t, []string{"ManagedMetric", "Metric"}, []string{labelValue(samples[0], "kind"), labelValue(samples[1], "kind")})
+}
+
+func TestMetricRecorderRemovesSeriesAfterMetricNameRename(t *testing.T) {
+	collector, reg := isolatedCollector(t)
+	uid := types.UID("metric-uid")
+	recordAs(t, collector, "old_metric_name", "operator", string(uid), map[string]string{"ready": "False"}, 1)
+
+	recorder := collector.newMetricRecorder("new_metric_name", "operator", uid)
+	require.NoError(t, recorder.RecordDataPoint(map[string]string{"ready": "True"}, 1))
+	require.NoError(t, recorder.Commit())
+
+	assert.Empty(t, gatherGauge(t, reg, "old_metric_name"))
+	samples := gatherGauge(t, reg, "new_metric_name")
+	require.Len(t, samples, 1)
+	assert.Equal(t, "True", labelValue(samples[0], "ready"))
+}
+
+func TestMetricRecorderRetainsSnapshotUntilCommit(t *testing.T) {
+	collector, reg := isolatedCollector(t)
+	uid := types.UID("metric-uid")
+	recordAs(t, collector, "resource_status", "operator", string(uid), map[string]string{"ready": "False"}, 1)
+
+	recorder := collector.newMetricRecorder("resource_status", "operator", uid)
+	require.NoError(t, recorder.RecordDataPoint(map[string]string{"ready": "True"}, 1))
+	samples := gatherGauge(t, reg, "resource_status")
+	require.Len(t, samples, 1)
+	assert.Equal(t, "False", labelValue(samples[0], "ready"))
+}
+
+func TestMetricRecorderRemovesOwnerSeries(t *testing.T) {
+	collector, reg := isolatedCollector(t)
+	uid := types.UID("metric-uid")
+	recordAs(t, collector, "resource_status", "operator", string(uid), map[string]string{"ready": "True"}, 1)
+
+	collector.remove(metricOwner{uid: uid})
+	assert.Empty(t, gatherGauge(t, reg, "resource_status"))
 }
 
 func TestRecordDataPoint_ProjectionSchemas(t *testing.T) {
@@ -171,7 +241,7 @@ func TestRecordDataPoint_DelimiterBearingLabelNames(t *testing.T) {
 	collector, reg := isolatedCollector(t)
 	recordAs(t, collector, "delimiter_metric", "ns", "first", map[string]string{"a,b": "comma", "c": "first"}, 1)
 	recordAs(t, collector, "delimiter_metric", "ns", "second", map[string]string{"a": "single", "b,c": "second"}, 2)
-	recorder := collector.newMetricRecorder("delimiter_metric", "ns", "first")
+	recorder := collector.newMetricRecorder("delimiter_metric", "ns", types.UID("first"))
 	require.NoError(t, recorder.RecordDataPoint(map[string]string{"a,b": "comma", "c": "first"}, 3))
 	require.NoError(t, recorder.Commit())
 
@@ -203,7 +273,7 @@ func TestRecordDataPoint_NilDims(t *testing.T) {
 
 func TestRecordDataPoint_RejectsConflictingNamespaceLabels(t *testing.T) {
 	collector, reg := isolatedCollector(t)
-	recorder := collector.newMetricRecorder("namespace_conflict_metric", "operator", t.Name())
+	recorder := collector.newMetricRecorder("namespace_conflict_metric", "operator", types.UID(t.Name()))
 	err := recorder.RecordDataPoint(map[string]string{
 		"namespace":          "one",
 		"resource_namespace": "two",
@@ -217,7 +287,7 @@ func TestRecordDataPoint_InvalidNameDoesNotPoisonGather(t *testing.T) {
 	collector, reg := isolatedCollector(t)
 	record(t, collector, "valid_metric_after_rejection", "ns", nil, 9)
 	for _, name := range []string{"", string([]byte{0xff})} {
-		recorder := collector.newMetricRecorder(name, "ns", t.Name())
+		recorder := collector.newMetricRecorder(name, "ns", types.UID(t.Name()))
 		err := recorder.RecordDataPoint(nil, 1)
 		require.Error(t, err, "metric name %q", name)
 	}
@@ -231,7 +301,7 @@ func TestRecordDataPoint_InvalidNameDoesNotPoisonGather(t *testing.T) {
 func TestRecordDataPoint_InvalidProjectionLabelDoesNotPoisonGather(t *testing.T) {
 	collector, reg := isolatedCollector(t)
 	record(t, collector, "valid_label_metric", "ns", map[string]string{"valid": "value"}, 5)
-	recorder := collector.newMetricRecorder("invalid_label_metric", "ns", t.Name())
+	recorder := collector.newMetricRecorder("invalid_label_metric", "ns", types.UID(t.Name()))
 	err := recorder.RecordDataPoint(map[string]string{"__bad": "value"}, 1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid labels")
@@ -249,7 +319,7 @@ func TestRecordDataPoint_ConcurrentSchemasAndGather(t *testing.T) {
 	var wg sync.WaitGroup
 	for worker := range workers {
 		wg.Go(func() {
-			recorder := collector.newMetricRecorder("concurrent_metric", "operator", fmt.Sprint(worker))
+			recorder := collector.newMetricRecorder("concurrent_metric", "operator", types.UID(fmt.Sprint(worker)))
 			dims := map[string]string{"worker": fmt.Sprint(worker)}
 			if worker%2 == 0 {
 				dims["optional"] = "present"

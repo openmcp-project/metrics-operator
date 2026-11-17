@@ -133,6 +133,13 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.handleGetError(errLoad, l)
 	}
 
+	if deleting, err := removePrometheusSeriesOnDeletion(ctx, r.getClient(), &metric); deleting || err != nil {
+		return ctrl.Result{}, err
+	}
+	if _, err := ensurePrometheusSeriesFinalizer(ctx, r.getClient(), &metric); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Defer status update to ensure it's always called
 	defer func() {
 		if err := r.getClient().Status().Update(ctx, &metric); err != nil {
@@ -200,7 +207,7 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		l.Error(errGauge, fmt.Sprintf("metric '%s' failed to create OTel gauge, re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
-	prometheusRecorder := internalmetrics.NewMetricRecorder(metric.Spec.Name, metric.Namespace, metric.Name)
+	prometheusRecorder := internalmetrics.NewMetricRecorder(metric.Spec.Name, metric.Namespace, metric.UID)
 	gaugeMetric.SetPrometheusFunc(prometheusRecorder.RecordDataPoint)
 	/*
 		2. Create a new orchestrator
@@ -227,15 +234,14 @@ func (r *MetricReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errMon
 	}
 
-	if result.Phase != v1alpha1.PhaseFailed {
+	errExport := metricClient.ExportMetrics(ctx)
+	if errExport == nil && result.Phase != v1alpha1.PhaseFailed {
 		if err := prometheusRecorder.Commit(); err != nil {
 			metric.SetConditions(common.ReadyFalse("PrometheusRecordingFailed", err.Error()))
 			metric.Status.Ready = v1alpha1.StatusStringFalse
 			return ctrl.Result{RequeueAfter: RequeueAfterError}, err
 		}
 	}
-
-	errExport := metricClient.ExportMetrics(ctx)
 
 	/*
 		3. Update the status of the metric with conditions and phase
