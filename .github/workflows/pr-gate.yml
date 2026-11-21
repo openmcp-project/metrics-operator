@@ -55,4 +55,4 @@ jobs:
       - name: Wait for all jobs to succeed or the first to fail
         run: |
           sleep 30  # let workflows register their checks first
-          hack/pr-gate.sh
+          bash hack/pr-gate.sh
