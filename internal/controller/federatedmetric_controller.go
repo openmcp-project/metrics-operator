@@ -128,6 +128,13 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return handleGetError(errLoad, l)
 	}
 
+	if deleting, err := removePrometheusSeriesOnDeletion(ctx, r.getClient(), &metric); deleting || err != nil {
+		return ctrl.Result{}, err
+	}
+	if _, err := ensurePrometheusSeriesFinalizer(ctx, r.getClient(), &metric); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Defer status update to ensure it's always called
 	defer func() {
 		if err := r.getClient().Status().Update(ctx, &metric); err != nil {
@@ -198,11 +205,8 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		l.Error(errGauge, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		return ctrl.Result{RequeueAfter: RequeueAfterError}, errGauge
 	}
-	metricName := metric.Spec.Name
-	metricNamespace := metric.Namespace
-	gaugeMetric.SetPrometheusFunc(func(dims map[string]string, value int64) error {
-		return internalmetrics.RecordDataPoint(metricName, metricNamespace, dims, value)
-	})
+	prometheusRecorder := internalmetrics.NewMetricRecorder(metric.Spec.Name, metric.Namespace, metric.UID)
+	gaugeMetric.SetPrometheusFunc(prometheusRecorder.RecordDataPoint)
 
 	creds := common.DataSinkCredentials{}
 	if credentials != nil {
@@ -242,6 +246,13 @@ func (r *FederatedMetricReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	errExport := metricClient.ExportMetrics(ctx)
+	if errExport == nil {
+		if err := prometheusRecorder.Commit(); err != nil {
+			metric.SetConditions(common.ReadyFalse("PrometheusRecordingFailed", err.Error()))
+			metric.Status.Ready = v1alpha1.StatusStringFalse
+			return ctrl.Result{RequeueAfter: RequeueAfterError}, err
+		}
+	}
 	if errExport != nil {
 		l.Error(errExport, fmt.Sprintf("federated metric '%s' re-queued for execution in %v minutes\n", metric.Spec.Name, RequeueAfterError))
 		metric.SetConditions(common.ReadyFalse("MetricExportFailed", errExport.Error()))
