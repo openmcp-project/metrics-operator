@@ -16,5 +16,5 @@ permissions:
 
 jobs:
   validate:
-    uses: openmcp-project/build/.github/workflows/go-license-check.lib.yaml@fd9dd7d9a651bbbe17d625a406929cdabc883097 # main
+    uses: openmcp-project/build/.github/workflows/go-license-check.lib.yaml@6486af1a13b28090683a6a83b82d69cbaff789dc # main
     secrets: inherit
