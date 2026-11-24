@@ -9,7 +9,7 @@ Used by `Metric` and `ManagedMetric` to monitor resources in a remote cluster. T
 Uses OIDC-based projected tokens — suitable for service mesh or in-cluster setups.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
@@ -25,10 +25,10 @@ spec:
 
 The secret referenced by `clusterSecretRef` must exist on the cluster running the operator and contain:
 
-| Key | Description |
-|---|---|
-| `host` | API server endpoint of the remote cluster |
-| `caData` | CA bundle (base64-encoded) |
+| Key        | Description                                        |
+| ---------- | -------------------------------------------------- |
+| `host`     | API server endpoint of the remote cluster          |
+| `caData`   | CA bundle (base64-encoded)                         |
 | `audience` | Token audience for projected service account token |
 
 You must also configure [RBAC](rbac.md) for the service account on the remote cluster.
@@ -38,7 +38,7 @@ You must also configure [RBAC](rbac.md) for the service account on the remote cl
 Provide an existing kubeconfig directly.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: RemoteClusterAccess
 metadata:
   name: remote-cluster
@@ -61,7 +61,7 @@ Discovers multiple clusters dynamically by watching a Kubernetes resource type. 
 Reads the kubeconfig from a string or object field on the discovered resource:
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ca-sample
@@ -79,7 +79,7 @@ spec:
 Reads the kubeconfig from a `SecretReference` object on the discovered resource. `namespace` defaults to the discovered resource's namespace; `key` defaults to `kubeconfig`.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedClusterAccess
 metadata:
   name: federate-ar-sample
