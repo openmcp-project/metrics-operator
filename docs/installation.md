@@ -56,7 +56,7 @@ Available versions are listed on [GitHub releases](https://github.com/openmcp-pr
 After deploying, configure at least one DataSink so the operator knows where to send metrics:
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: DataSink
 metadata:
   name: default

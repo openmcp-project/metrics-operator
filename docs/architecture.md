@@ -88,15 +88,15 @@ graph LR
 
 ## Resource Types
 
-| Resource | CRD | Description |
-|---|---|---|
-| **Metric** | [metrics.openmcp.cloud_metrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_metrics.yaml) | Monitors specific Kubernetes resources in local or remote clusters using GroupVersionKind targeting |
-| **ManagedMetric** | [metrics.openmcp.cloud_managedmetrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_managedmetrics.yaml) | Specialized for monitoring Crossplane managed resources (categories: "crossplane" + "managed") |
-| **FederatedMetric** | [metrics.openmcp.cloud_federatedmetrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedmetrics.yaml) | Monitors resources across multiple clusters, aggregating data from federated sources |
-| **FederatedManagedMetric** | [metrics.openmcp.cloud_federatedmanagedmetrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedmanagedmetrics.yaml) | Monitors Crossplane managed resources across multiple clusters |
-| **RemoteClusterAccess** | [metrics.openmcp.cloud_remoteclusteraccesses.yaml](../cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_remoteclusteraccesses.yaml) | Access configuration for monitoring resources in remote clusters |
-| **FederatedClusterAccess** | [metrics.openmcp.cloud_federatedclusteraccesses.yaml](../cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_federatedclusteraccesses.yaml) | Discovers and provides access to multiple clusters for federated monitoring |
-| **DataSink** | [metrics.openmcp.cloud_datasinks.yaml](../cmd/metrics-operator/embedded/crds/metrics.openmcp.cloud_datasinks.yaml) | Defines where metrics data should be sent (Dynatrace, custom OTLP endpoints) |
+| Resource                   | CRD                                                                                                                                                              | Description                                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **Metric**                 | [metrics.open-control-plane.io_metrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_metrics.yaml)                                   | Monitors specific Kubernetes resources in local or remote clusters using GroupVersionKind targeting |
+| **ManagedMetric**          | [metrics.open-control-plane.io_managedmetrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_managedmetrics.yaml)                     | Specialized for monitoring Crossplane managed resources (categories: "crossplane" + "managed")      |
+| **FederatedMetric**        | [metrics.open-control-plane.io_federatedmetrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_federatedmetrics.yaml)                 | Monitors resources across multiple clusters, aggregating data from federated sources                |
+| **FederatedManagedMetric** | [metrics.open-control-plane.io_federatedmanagedmetrics.yaml](../cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_federatedmanagedmetrics.yaml)   | Monitors Crossplane managed resources across multiple clusters                                      |
+| **RemoteClusterAccess**    | [metrics.open-control-plane.io_remoteclusteraccesses.yaml](../cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_remoteclusteraccesses.yaml)       | Access configuration for monitoring resources in remote clusters                                    |
+| **FederatedClusterAccess** | [metrics.open-control-plane.io_federatedclusteraccesses.yaml](../cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_federatedclusteraccesses.yaml) | Discovers and provides access to multiple clusters for federated monitoring                         |
+| **DataSink**               | [metrics.open-control-plane.io_datasinks.yaml](../cmd/metrics-operator/embedded/crds/metrics.open-control-plane.io_datasinks.yaml)                               | Defines where metrics data should be sent (Dynatrace, custom OTLP endpoints)                        |
 
 ## Data Flow
 

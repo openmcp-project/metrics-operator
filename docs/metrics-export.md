@@ -16,7 +16,7 @@ DataSink is a custom resource defining where the operator pushes collected metri
 ### Specification
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: DataSink
 metadata:
   name: default
@@ -110,7 +110,7 @@ Example — environment-based:
 
 ```yaml
 ---
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: DataSink
 metadata:
   name: dev-dynatrace
@@ -124,7 +124,7 @@ spec:
         name: dynatrace-dev-credentials
         key: api-token
 ---
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: DataSink
 metadata:
   name: prod-dynatrace
@@ -160,11 +160,11 @@ kubectl describe datasink default -n metrics-operator-system
 kubectl logs -n metrics-operator-system deployment/metrics-operator-controller-manager
 ```
 
-| Error                          | Likely cause               | Fix                                           |
-| ------------------------------ | -------------------------- | --------------------------------------------- |
-| `Secret "..." not found`       | Missing secret             | Create the secret in the DataSink's namespace |
-| `401 Unauthorized`             | Bad token                  | Verify token value and permissions            |
-| `connection refused` / timeout | Wrong endpoint             | Check URL and network/firewall rules          |
+| Error                          | Likely cause   | Fix                                           |
+| ------------------------------ | -------------- | --------------------------------------------- |
+| `Secret "..." not found`       | Missing secret | Create the secret in the DataSink's namespace |
+| `401 Unauthorized`             | Bad token      | Verify token value and permissions            |
+| `connection refused` / timeout | Wrong endpoint | Check URL and network/firewall rules          |
 
 ### Best Practices
 
@@ -180,8 +180,8 @@ The operator exposes a standard [controller-runtime](https://github.com/kubernet
 
 ### Exposed metrics
 
-| Metric | Type | Description |
-| --- | --- | --- |
+| Metric        | Type  | Description                                                                                                                                                         |
+| ------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<spec.name>` | Gauge | Named gauge with individual projection labels. `namespace` identifies the metric CR's namespace; a projection named `namespace` is exposed as `resource_namespace`. |
 
 Standard controller-runtime metrics (work queue depth, reconcile errors, etc.) are also available.

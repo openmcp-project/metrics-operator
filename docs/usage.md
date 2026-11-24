@@ -5,7 +5,7 @@
 Monitors any Kubernetes resource by GroupVersionKind. Supports custom dimensions (called `projections`) to extract labels, annotations, or field values.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: Metric
 metadata:
   name: metric-pod-count
@@ -29,7 +29,7 @@ See [Dimensions Configuration](dimensions-configuration.md) for full projection/
 Monitors Crossplane managed resources (CRDs with categories "crossplane" and "managed"). By default exports `status.conditions`-based dimensions.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: ManagedMetric
 metadata:
   name: managed-metric
@@ -48,7 +48,7 @@ spec:
 Monitors resources across multiple clusters via a `FederatedClusterAccess`. Supports projections and filtering by cluster.
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedMetric
 metadata:
   name: xfed-prov
@@ -73,7 +73,7 @@ spec:
 Monitors Crossplane managed resources across all clusters. Requires a `FederatedClusterAccess`. Resources must have CRD categories "crossplane" and "managed".
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: FederatedManagedMetric
 metadata:
   name: xfed-managed
@@ -91,7 +91,7 @@ spec:
 By default the gauge value equals the number of resources sharing a given dimension combination. Use `valueFrom` to set the gauge value from a field in the resource itself (e.g., a creation timestamp or replica count).
 
 ```yaml
-apiVersion: metrics.openmcp.cloud/v1alpha1
+apiVersion: metrics.open-control-plane.io/v1alpha1
 kind: Metric
 metadata:
   name: deployment-age
